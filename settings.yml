@@ -1,0 +1,41 @@
+# define which GPU to use
+CUDA_VISIBLE_DEVICES: "2"
+
+### Define the model settings ###
+
+DATASET: breast_mnist
+
+QUANTUM: False
+MODEL: cnn
+
+PARAMS:
+    num_gpus: 1
+    epochs_num: 30
+    lr: 0.06
+    batch_size: 64
+
+    # Seeds
+    random_seed: 4
+    generator_seed: 4
+
+    # Classical settings
+    ensemble_size: 10
+    likelihood_scale: 30
+    stochastic: True
+    calibration_curve_class: 0
+
+    # Quantum settings
+    device: lightning.qubit
+    diff_method: adjoint # Adjoint method much faster than default, but only available for simulation
+    measurement: UniformGateMeasurements
+    measurement_args: {}
+    trainable: True
+
+### Define the experiment settings ###
+
+# Directory to save the experiments
+SAVE_DIR: /data/alona
+# Folder name to save the experiments
+SAVE_NAME: qbnn
+# Experiment name to be changed at every experiment
+EXP_NAME: "cnn"
