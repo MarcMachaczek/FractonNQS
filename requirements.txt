@@ -1,0 +1,5 @@
+numpy~=1.23.1
+jax~=0.3.17
+flax~=0.6.0
+netket~=3.5.1
+matplotlib~=3.5.2
