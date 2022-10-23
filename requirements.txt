@@ -3,3 +3,4 @@ jax~=0.3.17
 flax~=0.6.0
 netket~=3.5.1
 matplotlib~=3.5.2
+scipy~=1.9.2

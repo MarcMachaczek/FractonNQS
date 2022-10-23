@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import netket as nk
 
 from typing import Tuple, Union
@@ -35,14 +36,16 @@ def position_to_star(position: jax.Array, shape: jax.Array) -> jax.Array:
     return indices
 
 
+@jax.jit
 @partial(jax.vmap, in_axes=(0, None))
 def plaqz2d_conns_and_mels(sigma: jax.Array, indices: jax.Array) -> Tuple[jax.Array, jax.Array]:
     # plaquette is diagonal in z basis, so eta is just the original
-    eta = sigma.reshape(1, -1)  # one dimension for number of connected states
-    mel = sigma[indices[0]] * sigma[indices[1]] * sigma[indices[2]] * sigma[indices[3]]
+    eta = sigma.reshape(1, -1)
+    mel = jnp.product(sigma.at[indices].get())
     return eta, mel
 
 
+@jax.jit
 @partial(jax.vmap, in_axes=(0, None))
 def starz2d_conns_and_mels(sigma: jax.Array, indices: jax.Array) -> Tuple[jax.Array, jax.Array]:
     eta = sigma.at[indices].set(-sigma.at[indices].get()).reshape(1, -1)
@@ -51,18 +54,10 @@ def starz2d_conns_and_mels(sigma: jax.Array, indices: jax.Array) -> Tuple[jax.Ar
 
 
 class Plaq2d(nk.operator.AbstractOperator):
-    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, position: jax.Array, shape: Union[jax.Array, str] = "square"):
+    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, position: jax.Array, shape: jax.Array):
         super().__init__(hilbert)
         self.position = position
-        # extract the shape
-        if type(shape) == str:
-            if shape == "square":
-                self.shape = jnp.array([jnp.sqrt(hilbert.size), jnp.sqrt(hilbert.size)], dtype=jnp.integer)
-            else:
-                raise NotImplementedError("Unkown shape type, please provide explicit shape (jax.Array) instead.")
-        else:
-            assert jnp.product(shape) == hilbert.size, "shape and hilbert space size do not fit."
-            self.shape = shape
+        self.shape = shape
         # get corresponding indices on which the operator acts on
         self.indices = position_to_plaq(self.position, self.shape)
 
@@ -70,10 +65,14 @@ class Plaq2d(nk.operator.AbstractOperator):
     def dtype(self):
         return float
 
+    @property
+    def is_hermitian(self):
+        return True
+
 
 def e_loc(logpsi, pars, sigma, extra_args):
     eta, mels = extra_args
-    assert sigma.ndim == 2, "sigma dimensions should be (Nsamples, Nsite)"
+    assert sigma.ndim == 2, f"sigma dimensions should be (Nsamples, Nsite), buthas dimensions {sigma.shape}"
     assert eta.ndim == 3, f"eta dimensions should be (Nsamples, Nconnected, Nsite), but has dimensions {eta.shape}"
 
     @partial(jax.vmap, in_axes=(0, 0, 0))
@@ -95,3 +94,55 @@ def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: Plaq2d):
     # if the input is a 2D matrix
     extra_args = plaqz2d_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.indices)
     return sigma, extra_args
+
+
+# %%
+class ToricCode2d(nk.operator.AbstractOperator):
+    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, shape: jax.Array):
+        super().__init__(hilbert)
+        self.shape = shape
+        # get corresponding indices on which the operators act on
+        positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
+        self.plaqs = jnp.stack([position_to_plaq(p, shape) for p in positions])
+        self.stars = jnp.stack([position_to_star(p, shape) for p in positions])
+
+    @property
+    def dtype(self):
+        return float
+
+    @property
+    def is_hermitian(self):
+        return True
+
+
+@nk.vqs.get_local_kernel.dispatch
+def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d):
+    return e_loc
+
+
+@nk.vqs.get_local_kernel_arguments.dispatch
+def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d):
+    sigma = vstate.samples
+    # get the connected elements. Reshape the samples because that code only works
+    # if the input is a 2D matrix
+    extra_args = toric2d_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars)
+    return sigma, extra_args
+
+
+@jax.jit
+@partial(jax.vmap, in_axes=(0, None, None))
+def toric2d_conns_and_mels(sigma: jax.Array, plaqs: jax.Array, stars: jax.Array) -> Tuple[jax.Array, jax.Array]:
+    # repeat sigma for #stars times
+    N = stars.shape[0]
+    eta = jnp.tile(sigma, (N + 1, 1))
+    # indices where spins will be flipped by star operators
+    ids = (jnp.arange(N).reshape(-1, 1), stars)
+    eta = eta.at[ids].set(-eta.at[ids].get())
+
+    # now calcualte matrix elements
+    mels = -jnp.ones(N + 1)
+    # axis 0 of sigma.at[plaqs] corresponds to #N_plaqs and axis 1 to the 4 edges of one plaquette
+    mels = mels.at[N].set(-jnp.sum(jnp.product(sigma.at[plaqs].get(), axis=1)))
+    return eta, mels
+
+
