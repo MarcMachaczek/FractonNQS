@@ -114,6 +114,9 @@ class ToricCode2d(nk.operator.AbstractOperator):
     def is_hermitian(self):
         return True
 
+    def conns_and_mels(self, sigma: jax.Array):
+        return toric2d_conns_and_mels(sigma, self.plaqs, self.stars)
+
 
 @nk.vqs.get_local_kernel.dispatch
 def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d):
@@ -123,8 +126,6 @@ def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d):
 @nk.vqs.get_local_kernel_arguments.dispatch
 def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d):
     sigma = vstate.samples
-    # get the connected elements. Reshape the samples because that code only works
-    # if the input is a 2D matrix
     extra_args = toric2d_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars)
     return sigma, extra_args
 
@@ -134,15 +135,16 @@ def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d):
 def toric2d_conns_and_mels(sigma: jax.Array, plaqs: jax.Array, stars: jax.Array) -> Tuple[jax.Array, jax.Array]:
     # repeat sigma for #stars times
     N = stars.shape[0]
-    eta = jnp.tile(sigma, (N + 1, 1))
-    # indices where spins will be flipped by star operators
-    ids = (jnp.arange(N).reshape(-1, 1), stars)
-    eta = eta.at[ids].set(-eta.at[ids].get())
+    star_eta = jnp.tile(sigma, (N, 1))
 
+    @jax.vmap
+    def flip(x, idx):
+        return x.at[idx].set(-x.at[idx].get())
+
+    star_eta = flip(star_eta, stars)
+    eta = jnp.vstack((star_eta, sigma.reshape(1, -1)))
     # now calcualte matrix elements
     mels = -jnp.ones(N + 1)
     # axis 0 of sigma.at[plaqs] corresponds to #N_plaqs and axis 1 to the 4 edges of one plaquette
     mels = mels.at[N].set(-jnp.sum(jnp.product(sigma.at[plaqs].get(), axis=1)))
     return eta, mels
-
-
