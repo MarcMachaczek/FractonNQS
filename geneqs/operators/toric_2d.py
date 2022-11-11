@@ -48,11 +48,12 @@ def toric2d_conns_and_mels(sigma: jax.Array, plaqs: jax.Array, stars: jax.Array)
     For a given input spin configuration sigma, calculates all connected states eta and the corresponding non-zero
     matrix elements mels. See netket for further details.
     Args:
-        sigma:
-        plaqs:
-        stars:
+        sigma: Input state or "bra", acting from the left.
+        plaqs: Array of shape (num_plaquettes, 4) containing the indices of all plaquette operators.
+        stars: Array of shape (num_stars, 4) containing the indices of all star operators.
 
     Returns:
+        connected states or "kets" eta, corresponding matrix elements mels
 
     """
     # repeat sigma for #stars times
@@ -73,9 +74,21 @@ def toric2d_conns_and_mels(sigma: jax.Array, plaqs: jax.Array, stars: jax.Array)
 
 
 def e_loc(logpsi, pars, sigma, extra_args):
+    """
+    Calculates the local estimate of the operator.
+    Args:
+        logpsi: Wavefunction, taking as input pars and some state, returning the log amplitude.
+        pars: Parameters for logpsi model.
+        sigma: VQS samples from which to calculate the estimate.
+        extra_args: Connected states, non-zero matrix elements.
+
+    Returns:
+        local estimates: sum_{eta} <sigma|Operator|eta> * psi(eta)/psi(sigma) over different sigmas
+
+    """
     eta, mels = extra_args
-    assert sigma.ndim == 2, f"sigma dimensions should be (Nsamples, Nsite), buthas dimensions {sigma.shape}"
-    assert eta.ndim == 3, f"eta dimensions should be (Nsamples, Nconnected, Nsite), but has dimensions {eta.shape}"
+    assert sigma.ndim == 2, f"sigma dimensions should be (Nsamples, Nsites), but has dimensions {sigma.shape}"
+    assert eta.ndim == 3, f"eta dimensions should be (Nsamples, Nconnected, Nsites), but has dimensions {eta.shape}"
 
     @partial(jax.vmap, in_axes=(0, 0, 0))
     def _loc_vals(sigma, eta, mels):

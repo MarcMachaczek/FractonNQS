@@ -25,7 +25,7 @@ ha_netketlocal = nk.operator.LocalOperator(hi)
 # adding the plaquette terms:
 for i in range(L):
     for j in range(L):
-        plaq_indices = geneqs.operators.toric_2d.position_to_plaq(jnp.array([i, j]), shape)
+        plaq_indices = geneqs.utils.indexing.position_to_plaq(jnp.array([i, j]), shape)
         ha_netketlocal -= nk.operator.spin.sigmaz(hi, plaq_indices[0].item()) * \
                           nk.operator.spin.sigmaz(hi, plaq_indices[1].item()) * \
                           nk.operator.spin.sigmaz(hi, plaq_indices[2].item()) * \
@@ -33,7 +33,7 @@ for i in range(L):
 # adding the star terms
 for i in range(L):
     for j in range(L):
-        star_indices = geneqs.operators.toric_2d.position_to_star(jnp.array([i, j]), shape)
+        star_indices = geneqs.utils.indexing.position_to_star(jnp.array([i, j]), shape)
         ha_netketlocal -= nk.operator.spin.sigmax(hi, star_indices[0].item()) * \
                           nk.operator.spin.sigmax(hi, star_indices[1].item()) * \
                           nk.operator.spin.sigmax(hi, star_indices[2].item()) * \

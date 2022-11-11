@@ -54,7 +54,7 @@ def index_to_edge(index: int, shape: jax.Array) -> Tuple[jax.Array, jax.Array]:
 def position_to_plaq(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
     From a position on a cubical lattice with PBC, returns the indices of the edges forming the plaquette operator.
-    The indices are chosen sucht that position is in the lower left corner of the plaquette.
+    The indices are chosen sucht that position is in the lower left corner of the plaquette. See Toric Code model.
     Args:
         position: Position of the plaquette. Array with entries [x_0 index, x_1 index, ...]
         shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
@@ -76,7 +76,7 @@ def position_to_plaq(position: jax.Array, shape: jax.Array) -> jax.Array:
 def position_to_star(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
     From a position on a cubical lattice with PBC, returns the indices of the edges forming the star operator.
-    The indices are chosen sucht that position is in the center of the star.
+    The indices are chosen sucht that position is in the center of the star. See Toric Code model.
     Args:
         position: Position of the star. Array with entries [x_0 index, x_1 index, ...]
         shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
