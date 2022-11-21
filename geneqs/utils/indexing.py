@@ -1,5 +1,7 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
+from numpy.typing import ArrayLike
 
 from typing import Tuple
 
@@ -95,3 +97,25 @@ def position_to_star(position: jax.Array, shape: jax.Array) -> jax.Array:
         edge_to_index(bot, 1, shape),
         edge_to_index(left, 0, shape)])
     return indices
+
+
+# %%
+def cubical_translation(arr: np.ndarray, shape: ArrayLike, dimension: int, shift: int = 1) -> np.ndarray:
+    """
+    Applies a translation to the input array, permuting the features of arr accordingly.
+
+    Args:
+        arr: Array of shape (n_sites, features).
+        shape: The shape of a cubical lattice with arbitrary dimension.
+        dimension: Dimension along which to apply the shift/translation.
+        shift: The "step size" for the translation
+
+    Returns:
+        Permuted version of arr, where the first axis of arr was permuted according to the specified translation.
+
+    """
+    n_dim = shape[dimension]
+    perm = (np.arange(n_dim) - shift) % n_dim  # create index permutation along dim
+    perm_array = np.copy(arr).reshape(*shape, *arr.shape[1:])  # unflatten spatial dimensions
+    perm_array = np.take(perm_array, perm, axis=dimension)  # apply permutation along spatial dimension
+    return perm_array.reshape(-1, *arr.shape[1:])  # flatten spatial dimensions again

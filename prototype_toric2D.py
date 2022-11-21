@@ -41,6 +41,18 @@ ax = fig.add_subplot(111)
 square_graph.draw(ax)
 plt.show()
 
+
+# %% get (specific) symmetries of the model, in our case translations
+base = np.arange(np.product(shape)).reshape(-1, 1)
+permutations = []
+for i in range(shape[0]):
+    for j in range(shape[1]):
+        dum = geneqs.utils.indexing.cubical_translation(base, shape, 0, i)  # apply x translation
+        dum = geneqs.utils.indexing.cubical_translation(dum, shape, 1, j)  # apply y translation
+        permutations.append(list(dum.flatten()))
+
+# note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
+
 # %%
 model = nk.models.RBMModPhase(alpha=2)
 sampler = nk.sampler.MetropolisLocal(hilbert)  # nk.sampler.MetropolisLocal(hilbert)
