@@ -44,21 +44,28 @@ plt.show()
 
 # %% get (specific) symmetries of the model, in our case translations
 base = np.arange(np.product(shape)).reshape(-1, 1)
-permutations = []
+permutations = np.zeros(shape=(np.product(shape), np.product(shape)), dtype=int)
+p = 0
 for i in range(shape[0]):
     for j in range(shape[1]):
         dum = geneqs.utils.indexing.cubical_translation(base, shape, 0, i)  # apply x translation
         dum = geneqs.utils.indexing.cubical_translation(dum, shape, 1, j)  # apply y translation
-        permutations.append(list(dum.flatten()))
+        permutations[p] = dum.flatten()
+        p += 1
 
 # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
+# now get permutations on the link level
+link_perms = np.zeros(shape=(np.product(shape), hilbert.size))
+for i, perm in enumerate(permutations):
+    link_perm = [[p * 2, p * 2 + 1] for p in perm]
+    link_perms[i] = np.asarray(link_perm).flatten()
 
-# %%
+# %% TODO: implement symmetric rbm using GCNN with complex outputs, test mcmc
 model = nk.models.RBMModPhase(alpha=2)
 sampler = nk.sampler.MetropolisLocal(hilbert)  # nk.sampler.MetropolisLocal(hilbert)
 optimizer = nk.optimizer.Sgd(learning_rate=0.15)
 vs = nk.vqs.MCState(sampler, model)  # nk.sampler.MetropolisLocal(hilbert)
-hi = toric # ha_netketlocal
+hi = toric  # ha_netketlocal
 
 vs.init_parameters()
 # Notice the use of Stochastic Reconfiguration, which considerably improves the optimisation
