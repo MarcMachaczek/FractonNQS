@@ -1,4 +1,5 @@
 FROM gitpod/workspace-full
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN sudo apt-get update -y
 
