@@ -119,3 +119,26 @@ def cubical_translation(arr: np.ndarray, shape: ArrayLike, dimension: int, shift
     perm_array = np.copy(arr).reshape(*shape, *arr.shape[1:])  # unflatten spatial dimensions
     perm_array = np.take(perm_array, perm, axis=dimension)  # apply permutation along spatial dimension
     return perm_array.reshape(-1, *arr.shape[1:])  # flatten spatial dimensions again
+
+
+# %%
+def get_translations_cubical2d(shape: ArrayLike) -> np.ndarray:
+    """
+    Retrieve permutations according to all translations of a 2d cubical lattice with PBC.
+    Args:
+        shape: Shape of the 2d lattice in the form (x0_extend, x1_extend)
+
+    Returns:
+        Array with permutations of the lattice sites with dimensions (#permutations, n_sites)
+
+    """
+    base = np.arange(np.product(shape)).reshape(-1, 1)
+    permutations = np.zeros(shape=(np.product(shape), np.product(shape)), dtype=int)
+    p = 0
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            dum = cubical_translation(base, shape, 0, i)  # apply x translation
+            dum = cubical_translation(dum, shape, 1, j)  # apply y translation
+            permutations[p] = dum.flatten()
+            p += 1
+    return permutations
