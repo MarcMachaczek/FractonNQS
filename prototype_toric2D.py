@@ -6,25 +6,26 @@ import jax.numpy as jnp
 import netket as nk
 
 import geneqs
+from global_variables import RESULTS_PATH
 
 # %% setting hyper-parameters
 n_iter = 300
-n_chains = 512  # total number of MCMC chains, should be large when runnning on GPU  ~O(1000)
-n_samples = n_chains*32  # each chain will have length 32
-n_discard_per_chain = 20  # should be small for when using many chains, default is 10% of n_samples (too big)
+n_chains = 1024  # total number of MCMC chains, should be large when runnning on GPU  ~O(1000)
+n_samples = n_chains*20  # each chain will generate 32 samples
+n_discard_per_chain = 24  # should be small for when using many chains, default is 10% of n_samples (too big)
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 alpha = 2
 lr_multiplier = 1
 lr_rbm = 0.1 * lr_multiplier
-lr_rbm_symm = 0.05 * lr_multiplier
+lr_rbm_symm = 0.09 * lr_multiplier
 lr_rbm_mp = 0.1 * lr_multiplier
-lr_rbm_mp_symm = 0.05 * lr_multiplier
-preconditioner = nk.optimizer.SR(diag_shift=0.01)
+lr_rbm_mp_symm = 0.09 * lr_multiplier
+preconditioner = nk.optimizer.SR(diag_shift=0.008)
 
 
 # %% Define graph/lattice and hilbert space
-L = 6  # size should be at least 3, else there are problems with pbc and indexing
+L = 4  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
@@ -69,7 +70,7 @@ data_rbm = log.data
 # sampler = nk.sampler.ExactSampler(hilbert)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
 RBM_symm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha)
-sgd_symm = nk.optimizer.Sgd(learning_rate=lr_rbm_symm)
+sgd_symm = nk.optimizer.Sgd(learning_rate=0.09)  # lr_rbm_symm
 # n_samples is divided by n_chains for the length of any MCMC chain
 vqs_symm = nk.vqs.MCState(sampler, RBM_symm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
@@ -135,4 +136,4 @@ plot.set_title(f"using stochastic gradient descent with stochastic reconfigurati
 plot.legend()
 
 plt.show()
-fig.savefig(f"results/toric2d/Exact_lattice{shape}_2.pdf")
+# fig.savefig(f"{RESULTS_PATH}/toric2d/Exact_lattice{shape}_2.pdf")
