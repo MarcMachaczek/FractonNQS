@@ -10,8 +10,8 @@ from global_variables import RESULTS_PATH
 
 # %% setting hyper-parameters
 n_iter = 300
-n_chains = 1024  # total number of MCMC chains, should be large when runnning on GPU  ~O(1000)
-n_samples = n_chains*20  # each chain will generate 32 samples
+n_chains = 512  # total number of MCMC chains, should be large when runnning on GPU  ~O(1000)
+n_samples = n_chains*32  # each chain will generate 32 samples
 n_discard_per_chain = 24  # should be small for when using many chains, default is 10% of n_samples (too big)
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
@@ -37,14 +37,15 @@ toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape)
 fig = plt.figure(figsize=(10, 10), dpi=300)
 ax = fig.add_subplot(111)
 square_graph.draw(ax)
-# plt.show()
+plt.show()
 
 # %% get (specific) symmetries of the model, in our case translations
 permutations = geneqs.utils.indexing.get_translations_cubical2d(shape)
-
+nk_permutations = square_graph.automorphisms()
+# permutations = nk_permutations.to_array()
 # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
 # now get permutations on the link level
-link_perms = np.zeros(shape=(np.product(shape), hilbert.size))
+link_perms = np.zeros(shape=(permutations.shape[0], hilbert.size))
 for i, perm in enumerate(permutations):
     link_perm = [[p * 2, p * 2 + 1] for p in perm]
     link_perms[i] = np.asarray(link_perm, dtype=int).flatten()
@@ -70,7 +71,7 @@ data_rbm = log.data
 # sampler = nk.sampler.ExactSampler(hilbert)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
 RBM_symm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha)
-sgd_symm = nk.optimizer.Sgd(learning_rate=0.09)  # lr_rbm_symm
+sgd_symm = nk.optimizer.Sgd(learning_rate=0.08)  # lr_rbm_symm
 # n_samples is divided by n_chains for the length of any MCMC chain
 vqs_symm = nk.vqs.MCState(sampler, RBM_symm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
@@ -78,7 +79,7 @@ vqs_symm.init_parameters()
 gs_symm = nk.driver.VMC(toric, sgd_symm, variational_state=vqs_symm, preconditioner=preconditioner)
 
 log = nk.logging.RuntimeLog()
-gs_symm.run(n_iter=n_iter, out=log)
+gs_symm.run(n_iter=n_iter+200, out=log)
 data_symm = log.data
 
 # %% train complex RBM
