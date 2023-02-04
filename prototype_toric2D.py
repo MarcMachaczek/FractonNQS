@@ -6,13 +6,14 @@ import jax.numpy as jnp
 import netket as nk
 
 import geneqs
+from geneqs.utils.training import custom_callback
 from global_variables import RESULTS_PATH
 
 # %% setting hyper-parameters
 n_iter = 300
 n_chains = 512  # total number of MCMC chains, should be large when runnning on GPU  ~O(1000)
 n_samples = n_chains*32  # each chain will generate 32 samples
-n_discard_per_chain = 24  # should be small for when using many chains, default is 10% of n_samples (too big)
+n_discard_per_chain = 16  # should be small when using many chains, default is 10% of n_samples (too big)
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 alpha = 2
@@ -25,13 +26,13 @@ preconditioner = nk.optimizer.SR(diag_shift=0.008)
 
 
 # %% Define graph/lattice and hilbert space
-L = 4  # size should be at least 3, else there are problems with pbc and indexing
+L = 3  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
 
 # own custom hamiltonian
-toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape)
+toric = geneqs.operators.toric_2d.ToricCode2d_H(hilbert, shape, 2)
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -41,8 +42,6 @@ plt.show()
 
 # %% get (specific) symmetries of the model, in our case translations
 permutations = geneqs.utils.indexing.get_translations_cubical2d(shape)
-nk_permutations = square_graph.automorphisms()
-# permutations = nk_permutations.to_array()
 # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
 # now get permutations on the link level
 link_perms = np.zeros(shape=(permutations.shape[0], hilbert.size))
@@ -53,25 +52,24 @@ for i, perm in enumerate(permutations):
 # must be hashable to be included as flax.module attribute
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
-# start with exact sampling to avoid MCMC issues
 #%% train regular RBM
 # sampler = nk.sampler.ExactSampler(hilbert)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
-RBM = nk.models.RBM(alpha=alpha)
+RBM = nk.models.RBM(alpha=3)
 sgd = nk.optimizer.Sgd(learning_rate=lr_rbm)
 vqs = nk.vqs.MCState(sampler, RBM, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
 gs = nk.driver.VMC(toric, sgd, variational_state=vqs, preconditioner=preconditioner)
 
 log = nk.logging.RuntimeLog()
-gs.run(n_iter=n_iter, out=log)
+gs.run(n_iter=n_iter, out=log, callback=custom_callback)
 data_rbm = log.data
 
 # %% train symmetric RBM
 # sampler = nk.sampler.ExactSampler(hilbert)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
 RBM_symm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha)
-sgd_symm = nk.optimizer.Sgd(learning_rate=0.08)  # lr_rbm_symm
+sgd_symm = nk.optimizer.Sgd(learning_rate=0.05)  # lr_rbm_symm
 # n_samples is divided by n_chains for the length of any MCMC chain
 vqs_symm = nk.vqs.MCState(sampler, RBM_symm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
@@ -79,7 +77,7 @@ vqs_symm.init_parameters()
 gs_symm = nk.driver.VMC(toric, sgd_symm, variational_state=vqs_symm, preconditioner=preconditioner)
 
 log = nk.logging.RuntimeLog()
-gs_symm.run(n_iter=n_iter+200, out=log)
+gs_symm.run(n_iter=n_iter, out=log, callback=custom_callback)
 data_symm = log.data
 
 # %% train complex RBM
