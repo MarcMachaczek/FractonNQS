@@ -142,3 +142,16 @@ def get_translations_cubical2d(shape: ArrayLike) -> np.ndarray:
             permutations[p] = dum.flatten()
             p += 1
     return permutations
+
+
+# %%
+def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
+    # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
+    # now get permutations on the link level
+    n_spins = 2*permutations.shape[0]
+    link_perms = np.zeros(shape=(permutations.shape[0], n_spins))
+    for i, perm in enumerate(permutations):
+        link_perm = [[p * 2, p * 2 + 1] for p in perm]
+        link_perms[i] = np.asarray(link_perm, dtype=int).flatten()
+
+    return link_perms

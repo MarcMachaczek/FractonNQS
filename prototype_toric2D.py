@@ -1,29 +1,12 @@
-# %%
-import numpy as np
+import jax.random
 from matplotlib import pyplot as plt
 
 import jax.numpy as jnp
 import netket as nk
 
 import geneqs
-from geneqs.utils.training import custom_callback
+from geneqs.utils.training import approximate_gs
 from global_variables import RESULTS_PATH
-
-# %% setting hyper-parameters
-n_iter = 300
-n_chains = 512  # total number of MCMC chains, should be large when runnning on GPU  ~O(1000)
-n_samples = n_chains*32  # each chain will generate 32 samples
-n_discard_per_chain = 16  # should be small when using many chains, default is 10% of n_samples (too big)
-# n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
-
-alpha = 2
-lr_multiplier = 1
-lr_rbm = 0.1 * lr_multiplier
-lr_rbm_symm = 0.09 * lr_multiplier
-lr_rbm_mp = 0.1 * lr_multiplier
-lr_rbm_mp_symm = 0.09 * lr_multiplier
-preconditioner = nk.optimizer.SR(diag_shift=0.008)
-
 
 # %% Define graph/lattice and hilbert space
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -32,7 +15,8 @@ square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
 
 # own custom hamiltonian
-toric = geneqs.operators.toric_2d.ToricCode2d_H(hilbert, shape, 2)
+field_strength = -1.
+toric = geneqs.operators.toric_2d.ToricCode2d_H(hilbert, shape, field_strength)
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -40,99 +24,101 @@ ax = fig.add_subplot(111)
 square_graph.draw(ax)
 plt.show()
 
-# %% get (specific) symmetries of the model, in our case translations
-permutations = geneqs.utils.indexing.get_translations_cubical2d(shape)
-# note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
-# now get permutations on the link level
-link_perms = np.zeros(shape=(permutations.shape[0], hilbert.size))
-for i, perm in enumerate(permutations):
-    link_perm = [[p * 2, p * 2 + 1] for p in perm]
-    link_perms[i] = np.asarray(link_perm, dtype=int).flatten()
-
+# get (specific) symmetries of the model, in our case translations
+perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
+link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 # must be hashable to be included as flax.module attribute
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
+training_records = {}
+# %% setting hyper-parameters
+n_iter = 300
+sampler_args = {"n_chains": 256*2,  # total number of MCMC chains, can be large when runnning on GPU  ~O(1000)
+                "n_samples": 256*8,
+                "n_discard_per_chain": 8}  # should be small when using many chains, default is 10% of n_samples
+# n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
+
+diag_shift = 0.01
+preconditioner = nk.optimizer.SR(diag_shift=diag_shift)
+
+alpha = 2
+features = (int(alpha*hilbert.size/link_perms.shape[0]), 1)
+
+learning_rates = {"symmetric_mlp": 0.01,
+                  "rbm": 0.01,
+                  "symm_rbm": 0.01,
+                  "rbm_modphase": 0.02,
+                  "rbm_symm_modphase": 0.01}
+
+default_kernel_init = jax.nn.initializers.normal(0.01)
+
+# %% simple (symmetric) FFNN ansatz
+model = geneqs.models.symmetric_networks.SymmetricNN(link_perms, features)
+optimizer = nk.optimizer.Sgd(learning_rates["symmetric_mlp"])
+vqs_mlp, data_mlp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
+training_records["symmetric_mlp"] = data_mlp
+
 #%% train regular RBM
-# sampler = nk.sampler.ExactSampler(hilbert)
-sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
-RBM = nk.models.RBM(alpha=3)
-sgd = nk.optimizer.Sgd(learning_rate=lr_rbm)
-vqs = nk.vqs.MCState(sampler, RBM, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-
-gs = nk.driver.VMC(toric, sgd, variational_state=vqs, preconditioner=preconditioner)
-
-log = nk.logging.RuntimeLog()
-gs.run(n_iter=n_iter, out=log, callback=custom_callback)
-data_rbm = log.data
+model = nk.models.RBM(alpha=alpha)
+optimizer = nk.optimizer.Sgd(learning_rates["rbm"])
+vqs_rbm, data_rbm = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
+training_records["rbm"] = data_rbm
 
 # %% train symmetric RBM
-# sampler = nk.sampler.ExactSampler(hilbert)
-sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
-RBM_symm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha)
-sgd_symm = nk.optimizer.Sgd(learning_rate=0.05)  # lr_rbm_symm
-# n_samples is divided by n_chains for the length of any MCMC chain
-vqs_symm = nk.vqs.MCState(sampler, RBM_symm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-
-vqs_symm.init_parameters()
-gs_symm = nk.driver.VMC(toric, sgd_symm, variational_state=vqs_symm, preconditioner=preconditioner)
-
-log = nk.logging.RuntimeLog()
-gs_symm.run(n_iter=n_iter, out=log, callback=custom_callback)
-data_symm = log.data
+model = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init)
+optimizer = nk.optimizer.Sgd(learning_rates["symm_rbm"])
+vqs_symm, data_symm = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
+training_records["symm_rbm"] = data_symm
 
 # %% train complex RBM
-# sampler = nk.sampler.ExactSampler(hilbert)
-sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
-RBM_mp = nk.models.RBMModPhase(alpha=alpha)
-sgd_mp = nk.optimizer.Sgd(learning_rate=lr_rbm_mp)
-vqs_mp = nk.vqs.MCState(sampler, RBM_mp, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-
-vqs_mp.init_parameters()
-gs_mp = nk.driver.VMC(toric, sgd_mp, variational_state=vqs_mp, preconditioner=preconditioner)
-
-log = nk.logging.RuntimeLog()
-gs_mp.run(n_iter=n_iter, out=log)
-data_mp = log.data
+model = nk.models.RBMModPhase(alpha=alpha)
+optimizer = nk.optimizer.Sgd(learning_rates["rbm_modphase"])
+vqs_mp, data_mp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
+training_records["rbm_modphase"] = data_mp
 
 # %% train symmetric complex RBM
-# sampler = nk.sampler.ExactSampler(hilbert)
-sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains)
-RBM_symm_mp = geneqs.models.RBMModPhaseSymm(symmetries=link_perms, alpha=alpha)
-sgd_symm_mp = nk.optimizer.Sgd(learning_rate=lr_rbm_mp_symm)
-vqs_symm_mp = nk.vqs.MCState(sampler, RBM_symm_mp, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-
-vqs_symm_mp.init_parameters()
-gs_symm_mp = nk.driver.VMC(toric, sgd_symm_mp, variational_state=vqs_symm_mp, preconditioner=preconditioner)
-
-log = nk.logging.RuntimeLog()
-gs_symm_mp.run(n_iter=n_iter, out=log)
-data_symm_mp = log.data
+model = geneqs.models.RBMModPhaseSymm(symmetries=link_perms, alpha=alpha)
+optimizer = nk.optimizer.Sgd(learning_rates["rbm_symm_modphase"])
+vqs_symm_mp, data_symm_mp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
+training_records["rbm_symm_modphase"] = data_symm_mp
 
 # %%
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
 
-plot.errorbar(data_rbm["Energy"].iters, data_rbm["Energy"].Mean, yerr=data_rbm["Energy"].Sigma,
-              label=f"RBM, lr={lr_rbm}")
-plot.errorbar(data_symm["Energy"].iters, data_symm["Energy"].Mean, yerr=data_symm["Energy"].Sigma,
-              label=f"RBMSymm, lr={lr_rbm_symm}")
-plot.errorbar(data_mp["Energy"].iters, data_mp["Energy"].Mean, yerr=data_mp["Energy"].Sigma,
-              label=f"RBMModPhase, lr={lr_rbm_mp}")
-plot.errorbar(data_symm_mp["Energy"].iters, data_symm_mp["Energy"].Mean, yerr=data_symm_mp["Energy"].Sigma,
-              label=f"RBMModPhaseSymm, lr={lr_rbm_mp_symm}")
+for model, record in training_records.items():
+    n_params = int(record["n_params"].value)
+    plot.errorbar(record["Energy"].iters, record["Energy"].Mean, yerr=record["Energy"].Sigma,
+                  label=f"{model}, lr={learning_rates[model]}, #p={n_params}")
 
-fig.suptitle(f"ToricCode2d Exact: size={shape},"
-             f" n_chains={n_chains},"
-             f" n_samples={n_samples},"
-             f" n_sweeps={L**2*2},"
+
+n_chains = sampler_args["n_chains"]
+n_samples = sampler_args["n_samples"]
+fig.suptitle(f"ToricCode2d VMC: size={shape},"
              f" single spin flip updates,"
-             f" alpha={alpha}")
+             f" alpha={alpha},"
+             f" n_sweeps={L**2*2},"
+             f" n_chains={n_chains},"
+             f" n_samples={n_samples}")
 
 plot.set_xlabel("iterations")
 plot.set_ylabel("energy")
 
-plot.set_title(f"using stochastic gradient descent with stochastic reconfiguration, diag_shift=0.01")
+plot.set_title(f"using stochastic gradient descent with stochastic reconfiguration, diag_shift={diag_shift}")
 plot.legend()
 
 plt.show()
-# fig.savefig(f"{RESULTS_PATH}/toric2d/Exact_lattice{shape}_2.pdf")
+
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_h{field_strength}.pdf")
+
+# %%
+# max acceptance rates for symm_mlp, symm_rbm, symm_rbm_mp
+# L=3: 0.999, 0.416, 0.995
+# L=4: 0.999, 0.674, 0.992
+# L=6: 0.999, 0.651, 0.982
+# L=8: 0.999, 0.903, 0.984
+a = data_symm_mp["acceptance_rate"].values
+print(a, jnp.max(a))
+
+# notes for later: decrease learning rate with system size, acceptance pretty low for symm_rbm
+# learning rate scheduler?, early stopping?, gradient clipping?
