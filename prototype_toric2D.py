@@ -9,14 +9,14 @@ from geneqs.utils.training import approximate_gs
 from global_variables import RESULTS_PATH
 
 # %% Define graph/lattice and hilbert space
-L = 3  # size should be at least 3, else there are problems with pbc and indexing
+L = 6  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
 
 # own custom hamiltonian
-field_strength = -1.
-toric = geneqs.operators.toric_2d.ToricCode2d_H(hilbert, shape, field_strength)
+field_strength = 0.01
+toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, field_strength)
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -44,11 +44,11 @@ preconditioner = nk.optimizer.SR(diag_shift=diag_shift)
 alpha = 2
 features = (int(alpha*hilbert.size/link_perms.shape[0]), 1)
 
-learning_rates = {"symmetric_mlp": 0.01,
-                  "rbm": 0.01,
-                  "symm_rbm": 0.01,
-                  "rbm_modphase": 0.02,
-                  "rbm_symm_modphase": 0.01}
+learning_rates = {"symmetric_mlp": 0.04,
+                  "rbm": 0.06,
+                  "symm_rbm": 0.03,
+                  "rbm_modphase": 0.05,
+                  "rbm_symm_modphase": 0.04}
 
 default_kernel_init = jax.nn.initializers.normal(0.01)
 
@@ -58,23 +58,11 @@ optimizer = nk.optimizer.Sgd(learning_rates["symmetric_mlp"])
 vqs_mlp, data_mlp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
 training_records["symmetric_mlp"] = data_mlp
 
-#%% train regular RBM
-model = nk.models.RBM(alpha=alpha)
-optimizer = nk.optimizer.Sgd(learning_rates["rbm"])
-vqs_rbm, data_rbm = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
-training_records["rbm"] = data_rbm
-
 # %% train symmetric RBM
 model = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init)
 optimizer = nk.optimizer.Sgd(learning_rates["symm_rbm"])
 vqs_symm, data_symm = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
 training_records["symm_rbm"] = data_symm
-
-# %% train complex RBM
-model = nk.models.RBMModPhase(alpha=alpha)
-optimizer = nk.optimizer.Sgd(learning_rates["rbm_modphase"])
-vqs_mp, data_mp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
-training_records["rbm_modphase"] = data_mp
 
 # %% train symmetric complex RBM
 model = geneqs.models.RBMModPhaseSymm(symmetries=link_perms, alpha=alpha)
@@ -82,6 +70,9 @@ optimizer = nk.optimizer.Sgd(learning_rates["rbm_symm_modphase"])
 vqs_symm_mp, data_symm_mp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
 training_records["rbm_symm_modphase"] = data_symm_mp
 
+# other models:
+# model = nk.models.RBM(alpha=alpha)
+# model = nk.models.RBMModPhase(alpha=alpha)
 # %%
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)

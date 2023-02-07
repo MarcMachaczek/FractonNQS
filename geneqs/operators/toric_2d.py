@@ -8,7 +8,7 @@ from functools import partial
 
 
 # %%
-class ToricCode2d(nk.operator.AbstractOperator):
+class ToricCode2d_old(nk.operator.AbstractOperator):
     def __init__(self, hilbert: nk.hilbert.AbstractHilbert, shape: jax.Array):
         super().__init__(hilbert)
         self.shape = shape
@@ -26,24 +26,24 @@ class ToricCode2d(nk.operator.AbstractOperator):
         return True
 
     def conns_and_mels(self, sigma: jax.Array):
-        return toric2d_conns_and_mels(sigma, self.plaqs, self.stars)
+        return toric2d_old_conns_and_mels(sigma, self.plaqs, self.stars)
 
 
 @nk.vqs.get_local_kernel.dispatch
-def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d):
+def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d_old):
     return e_loc
 
 
 @nk.vqs.get_local_kernel_arguments.dispatch
-def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d):
+def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d_old):
     sigma = vstate.samples
-    extra_args = toric2d_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars)
+    extra_args = toric2d_old_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars)
     return sigma, extra_args
 
 
 @jax.jit
 @partial(jax.vmap, in_axes=(0, None, None))
-def toric2d_conns_and_mels(sigma: jax.Array, plaqs: jax.Array, stars: jax.Array) -> Tuple[jax.Array, jax.Array]:
+def toric2d_old_conns_and_mels(sigma: jax.Array, plaqs: jax.Array, stars: jax.Array) -> Tuple[jax.Array, jax.Array]:
     """
     For a given input spin configuration sigma, calculates all connected states eta and the corresponding non-zero
     matrix elements mels. See netket for further details.
@@ -98,11 +98,14 @@ def e_loc(logpsi, pars, sigma, extra_args):
 
 
 # %%
-class ToricCode2d_H(nk.operator.AbstractOperator):
-    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, shape: jax.Array, g: float):
+class ToricCode2d(nk.operator.AbstractOperator):
+    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, shape: jax.Array, g: float = None):
         super().__init__(hilbert)
         self.shape = shape
-        self.field_strength = g
+        if g is None:
+            self.field_strength = 0
+        else:
+            self.field_strength = g
         # get corresponding indices on which the operators act on
         positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
         self.plaqs = jnp.stack([geneqs.utils.indexing.position_to_plaq(p, shape) for p in positions])
@@ -117,27 +120,27 @@ class ToricCode2d_H(nk.operator.AbstractOperator):
         return True
 
     def conns_and_mels(self, sigma: jax.Array):
-        return toric2d_h_conns_and_mels(sigma, self.plaqs, self.stars, self.field_strength)
+        return toric2d_conns_and_mels(sigma, self.plaqs, self.stars, self.field_strength)
 
 
 @nk.vqs.get_local_kernel.dispatch
-def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d_H):
+def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d):
     return e_loc
 
 
 @nk.vqs.get_local_kernel_arguments.dispatch
-def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d_H):
+def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d):
     sigma = vstate.samples
-    extra_args = toric2d_h_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars, op.field_strength)
+    extra_args = toric2d_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars, op.field_strength)
     return sigma, extra_args
 
 
 @jax.jit
 @partial(jax.vmap, in_axes=(0, None, None, None))
-def toric2d_h_conns_and_mels(sigma: jax.Array,
-                             plaqs: jax.Array,
-                             stars: jax.Array,
-                             g: float) -> Tuple[jax.Array, jax.Array]:
+def toric2d_conns_and_mels(sigma: jax.Array,
+                           plaqs: jax.Array,
+                           stars: jax.Array,
+                           g: float) -> Tuple[jax.Array, jax.Array]:
     """
     For a given input spin configuration sigma, calculates all connected states eta and the corresponding non-zero
     matrix elements mels. See netket for further details.
