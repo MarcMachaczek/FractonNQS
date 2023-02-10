@@ -8,15 +8,16 @@ import geneqs
 from geneqs.utils.training import approximate_gs
 from global_variables import RESULTS_PATH
 
-# %% Define graph/lattice and hilbert space
-L = 6  # size should be at least 3, else there are problems with pbc and indexing
+from tqdm import tqdm
+
+default_kernel_init = jax.nn.initializers.normal(0.01)
+
+# %%
+L = 10  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
-
-# own custom hamiltonian
-field_strength = 0.01
-toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, field_strength)
+magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -30,86 +31,100 @@ link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 # must be hashable to be included as flax.module attribute
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
-training_records = {}
-# %% setting hyper-parameters
-n_iter = 300
-sampler_args = {"n_chains": 256*2,  # total number of MCMC chains, can be large when runnning on GPU  ~O(1000)
-                "n_samples": 256*8,
-                "n_discard_per_chain": 8}  # should be small when using many chains, default is 10% of n_samples
+# h_c at 0.328474, for L=10 compute sigma_z average over different h
+field_strengths = (0., 0.1, 0.16, 0.2, 0.3, 0.328474, 0.35, 0.4, 0.5, 0.6)
+# field_strengths = (0.16,)
+
+magnetizations = {}
+
+# %%
+# setting hyper-parameters
+n_iter = 400
+n_expect = 300_000  # number of samples to estimate observables from the trained vqs
+sampler_args = {"n_chains": 256 * 2,  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+                "n_samples": 256 * 8,
+                "n_discard_per_chain": 8}  # should be small for using many chains, default is 10% of n_samples
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
 preconditioner = nk.optimizer.SR(diag_shift=diag_shift)
 
+# define model parameters
 alpha = 2
-features = (int(alpha*hilbert.size/link_perms.shape[0]), 1)
+RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init)
+RBMModPhaseSymm = geneqs.models.RBMModPhaseSymm(symmetries=link_perms, alpha=alpha)
 
-learning_rates = {"symmetric_mlp": 0.04,
-                  "rbm": 0.06,
-                  "symm_rbm": 0.03,
-                  "rbm_modphase": 0.05,
-                  "rbm_symm_modphase": 0.04}
+# be careful that keys match, TODO: check whether to combine models and their parameters into one dict
+models = {"rbm_symm": RBMSymm}  # "rbm_symm_modphase": RBMModPhaseSymm}
 
-default_kernel_init = jax.nn.initializers.normal(0.01)
+learning_rates = {"rbm_symm": 0.01,
+                  "rbm_symm_modphase": 0.01}
 
-# %% simple (symmetric) FFNN ansatz
-model = geneqs.models.symmetric_networks.SymmetricNN(link_perms, features)
-optimizer = nk.optimizer.Sgd(learning_rates["symmetric_mlp"])
-vqs_mlp, data_mlp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
-training_records["symmetric_mlp"] = data_mlp
+for g in tqdm(field_strengths, "external_field"):
+    variational_gs = {}
+    training_records = {}
+    for name, model in models.items():
+        # own custom hamiltonian
+        toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, g)
+        optimizer = nk.optimizer.Sgd(learning_rates[name])
+        vqs, training_data = approximate_gs(hilbert,
+                                            model,
+                                            toric,
+                                            optimizer,
+                                            preconditioner,
+                                            n_iter,
+                                            **sampler_args)
+        variational_gs[name] = vqs
+        training_records[name] = training_data
+    # save magnetization
+    variational_gs["rbm_symm"].n_samples = n_expect
+    magnetizations[g] = variational_gs["rbm_symm"].expect(magnetization)
 
-# %% train symmetric RBM
-model = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init)
-optimizer = nk.optimizer.Sgd(learning_rates["symm_rbm"])
-vqs_symm, data_symm = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
-training_records["symm_rbm"] = data_symm
+    # plot and save training data
+    fig = plt.figure(dpi=300, figsize=(10, 10))
+    plot = fig.add_subplot(111)
+    for name, record in training_records.items():
+        n_params = int(record["n_params"].value)
+        plot.errorbar(record["Energy"].iters, record["Energy"].Mean, yerr=record["Energy"].Sigma,
+                      label=f"{name}, lr={learning_rates[name]}, #p={n_params}")
 
-# %% train symmetric complex RBM
-model = geneqs.models.RBMModPhaseSymm(symmetries=link_perms, alpha=alpha)
-optimizer = nk.optimizer.Sgd(learning_rates["rbm_symm_modphase"])
-vqs_symm_mp, data_symm_mp = approximate_gs(hilbert, model, toric, optimizer, preconditioner, n_iter, **sampler_args)
-training_records["rbm_symm_modphase"] = data_symm_mp
+    E0 = training_records["rbm_symm"]["Energy"].Mean[-1].real
+    err = training_records["rbm_symm"]["Energy"].Sigma[-1].real
 
-# other models:
-# model = nk.models.RBM(alpha=alpha)
-# model = nk.models.RBMModPhase(alpha=alpha)
+    n_chains = sampler_args["n_chains"]
+    n_samples = sampler_args["n_samples"]
+    fig.suptitle(f" ToricCode2d hz={g}: size={shape},"
+                 f" single spin flip updates,"
+                 f" alpha={alpha},"
+                 f" n_sweeps={L ** 2 * 2},"
+                 f" n_chains={n_chains},"
+                 f" n_samples={n_samples} \n"
+                 f" RBM_symm E0 = {round(E0, 5)} +- {round(err, 5)}")
+
+    plot.set_xlabel("iterations")
+    plot.set_ylabel("energy")
+    plot.set_title(f"using stochastic gradient descent with stochastic reconfiguration, diag_shift={diag_shift}")
+    plot.legend()
+    fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_h{g}.pdf")
+
 # %%
+# create and save magnetization plot
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
-
-for model, record in training_records.items():
-    n_params = int(record["n_params"].value)
-    plot.errorbar(record["Energy"].iters, record["Energy"].Mean, yerr=record["Energy"].Sigma,
-                  label=f"{model}, lr={learning_rates[model]}, #p={n_params}")
-
-
-n_chains = sampler_args["n_chains"]
-n_samples = sampler_args["n_samples"]
-fig.suptitle(f"ToricCode2d VMC: size={shape},"
-             f" single spin flip updates,"
-             f" alpha={alpha},"
-             f" n_sweeps={L**2*2},"
-             f" n_chains={n_chains},"
-             f" n_samples={n_samples}")
-
-plot.set_xlabel("iterations")
-plot.set_ylabel("energy")
-
-plot.set_title(f"using stochastic gradient descent with stochastic reconfiguration, diag_shift={diag_shift}")
-plot.legend()
-
+for g, m in magnetizations.items():
+    plot.errorbar(g, m.Mean.item().real, yerr=m.error_of_mean.item().real, marker="o", markersize=2, color="blue")
+plot.set_xlabel("external field")
+plot.set_ylabel("magnetization")
+plot.set_title(f"Magnetization vs external field (z-direction) for ToricCode2d with size={shape}")
 plt.show()
-
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_h{field_strength}.pdf")
+# fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_magnetizations.pdf")
 
 # %%
-# max acceptance rates for symm_mlp, symm_rbm, symm_rbm_mp
+# max acceptance rates for symm_mlp, symm_rbm, symm_rbm_mp for toric without h_ext
 # L=3: 0.999, 0.416, 0.995
 # L=4: 0.999, 0.674, 0.992
 # L=6: 0.999, 0.651, 0.982
 # L=8: 0.999, 0.903, 0.984
-a = data_symm_mp["acceptance_rate"].values
-print(a, jnp.max(a))
 
 # notes for later: decrease learning rate with system size, acceptance pretty low for symm_rbm
-# learning rate scheduler?, early stopping?, gradient clipping?
+# learning rate scheduler?
