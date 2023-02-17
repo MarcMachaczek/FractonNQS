@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import netket as nk
 
 import geneqs
-from geneqs.utils.training import approximate_gs
+from geneqs.utils.training import loop_gs
 from global_variables import RESULTS_PATH
 
 from tqdm import tqdm
@@ -41,9 +41,9 @@ magnetizations = {}
 # setting hyper-parameters
 n_iter = 400
 n_expect = 300_000  # number of samples to estimate observables from the trained vqs
-sampler_args = {"n_chains": 256 * 2,  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-                "n_samples": 256 * 8,
-                "n_discard_per_chain": 8}  # should be small for using many chains, default is 10% of n_samples
+n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = 256 * 8
+n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
@@ -64,16 +64,13 @@ for g in tqdm(field_strengths, "external_field"):
     variational_gs = {}
     training_records = {}
     for name, model in models.items():
-        # own custom hamiltonian
         toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, g)
         optimizer = nk.optimizer.Sgd(learning_rates[name])
-        vqs, training_data = approximate_gs(hilbert,
-                                            model,
-                                            toric,
-                                            optimizer,
-                                            preconditioner,
-                                            n_iter,
-                                            **sampler_args)
+        sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtpye=jnp.int8)
+        vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+
+        vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_steps=200)
+
         variational_gs[name] = vqs
         training_records[name] = training_data
     # save magnetization
@@ -91,8 +88,6 @@ for g in tqdm(field_strengths, "external_field"):
     E0 = training_records["rbm_symm"]["Energy"].Mean[-1].real
     err = training_records["rbm_symm"]["Energy"].Sigma[-1].real
 
-    n_chains = sampler_args["n_chains"]
-    n_samples = sampler_args["n_samples"]
     fig.suptitle(f" ToricCode2d hz={g}: size={shape},"
                  f" single spin flip updates,"
                  f" alpha={alpha},"
@@ -118,13 +113,3 @@ plot.set_ylabel("magnetization")
 plot.set_title(f"Magnetization vs external field (z-direction) for ToricCode2d with size={shape}")
 plt.show()
 # fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_magnetizations.pdf")
-
-# %%
-# max acceptance rates for symm_mlp, symm_rbm, symm_rbm_mp for toric without h_ext
-# L=3: 0.999, 0.416, 0.995
-# L=4: 0.999, 0.674, 0.992
-# L=6: 0.999, 0.651, 0.982
-# L=8: 0.999, 0.903, 0.984
-
-# notes for later: decrease learning rate with system size, acceptance pretty low for symm_rbm
-# learning rate scheduler?
