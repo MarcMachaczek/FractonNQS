@@ -15,11 +15,12 @@ from dataclasses import dataclass
 
 # %% custom training loop to monitor performance of individual steps (timing)
 def loop_gs(v_state: nk.vqs.MCState,
-            hamiltonian: nk.operator.AbstractOperator,
+            _hamiltonian: nk.operator.AbstractOperator,
             optimizer: Any,
             preconditioner: Any,
             n_iter: int,
             min_steps: int = None):
+    hamiltonian = _hamiltonian.collect()
     if min_steps is None:
         min_steps = n_iter
     log = nk.logging.RuntimeLog()
@@ -36,10 +37,17 @@ def loop_gs(v_state: nk.vqs.MCState,
             times["pre_expectgrad"] = time.time()
             energy, gradients = v_state.expect_and_grad(hamiltonian)
 
+            # TODO: remove when done debugging
+            e_nan, e_inf = contains_naninf(energy.mean)
+            g_nan, g_inf = contains_naninf(gradients)
+
             # adapt gradients according to e.g. stochastic reconfiguration
             times["pre_sr"] = time.time()
             sr_gradients = preconditioner(v_state, gradients, epoch)
             times["post_sr"] = time.time()
+
+            # TODO: remove later
+            sr_nan, sr_inf = contains_naninf(sr_gradients)
 
             # If parameters are real, then take only real part of the gradient (if it's complex)
             sr_gradients = jax.tree_map(
@@ -78,6 +86,13 @@ def loop_gs(v_state: nk.vqs.MCState,
                                  f" p_update = {round(p_update_time/total_time, 2)}")
 
             if callback_stop:
+                break
+
+            # TODO: remove later
+            dummy = jnp.asarray([e_nan, e_inf, g_nan, g_inf, sr_nan, sr_inf])
+            if dummy.any():
+                print("nan or inf detected")
+                print(dummy)
                 break
 
             # reset time after first step to ignore compilation time
@@ -220,3 +235,13 @@ class DriverCallback:
             return False
         else:
             return True
+
+
+def contains_naninf(pytree):
+    nan, inf = False, False
+    for vals in jax.tree_util.tree_flatten(pytree)[0]:
+        nan = jnp.isnan(vals).any()
+        inf = jnp.isinf(vals).any()
+        if nan or inf:
+            return nan, inf
+    return nan, inf

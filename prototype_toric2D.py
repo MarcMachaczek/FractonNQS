@@ -32,8 +32,8 @@ link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-field_strengths = (0., 0.1, 0.16, 0.2, 0.3, 0.328474, 0.35, 0.4, 0.5, 0.6)
-# field_strengths = (0.16,)
+# field_strengths = (0., 0.1, 0.16, 0.2, 0.3, 0.328474, 0.35, 0.4, 0.5, 0.6)
+field_strengths = (0.16,)
 
 magnetizations = {}
 
@@ -47,14 +47,14 @@ n_discard_per_chain = 8  # should be small for using many chains, default is 10%
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
-preconditioner = nk.optimizer.SR(diag_shift=diag_shift)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTOnTheFly, diag_shift=diag_shift)
 
 # define model parameters
 alpha = 2
 RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init)
 RBMModPhaseSymm = geneqs.models.RBMModPhaseSymm(symmetries=link_perms, alpha=alpha)
 
-# be careful that keys match, TODO: check whether to combine models and their parameters into one dict
+# be careful that keys of model and hyperparameters dicts match
 models = {"rbm_symm": RBMSymm}  # "rbm_symm_modphase": RBMModPhaseSymm}
 
 learning_rates = {"rbm_symm": 0.01,
@@ -66,7 +66,7 @@ for g in tqdm(field_strengths, "external_field"):
     for name, model in models.items():
         toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, g)
         optimizer = nk.optimizer.Sgd(learning_rates[name])
-        sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtpye=jnp.int8)
+        sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
         vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
         vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_steps=200)
@@ -100,7 +100,7 @@ for g in tqdm(field_strengths, "external_field"):
     plot.set_ylabel("energy")
     plot.set_title(f"using stochastic gradient descent with stochastic reconfiguration, diag_shift={diag_shift}")
     plot.legend()
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_h{g}.pdf")
+    # fig.savefig(f"{RESULTS_PATH}/toric2d_h/VMC_lattice{shape}_h{g}.pdf")
 
 # %%
 # create and save magnetization plot
