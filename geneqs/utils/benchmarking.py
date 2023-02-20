@@ -4,6 +4,8 @@ from tqdm import tqdm
 import time
 import netket as nk
 
+from typing import Callable
+
 
 def parse_settings():
     """
@@ -17,21 +19,22 @@ def parse_settings():
     return config
 
 
-def time_expect(vqs: nk.vqs.VariationalState, operator: nk.operator.AbstractOperator, n_runs: int) -> float:
+def time_function(func: Callable, n_runs: int = 1, *args, **kwargs):
     """
-    Time the calculation of the expected value of an operator using a variational quantum state.
+
     Args:
-        vqs: The variational quantum state.
-        operator: The operator to calucalte the expected value of.
-        n_runs: Number of times to do the calculation for taking the average time.
+        func: Function to benchmark.
+        n_runs: How many times the function will be called.
+        *args: args for func
+        **kwargs: kwargs for func
 
     Returns:
-        The time required to compute the expected value averaged over n_runs.
+        The results of the last execution, the average execution time of func over n_runs
 
     """
-
+    result = None
     t0 = time.perf_counter()
-    for _ in tqdm(range(n_runs), type(operator).__name__):
-        vqs.expect(operator)
+    for _ in tqdm(range(n_runs)):
+        result = func(*args, **kwargs)
 
-    return (time.perf_counter() - t0) / n_runs
+    return result, round((time.perf_counter() - t0) / n_runs, 3)

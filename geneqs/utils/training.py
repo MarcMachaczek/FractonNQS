@@ -82,8 +82,7 @@ def loop_gs(v_state: nk.vqs.MCState,
             pbar.set_postfix_str(f"Energy = {loss}, time ratios:"
                                  f" sampling = {round(sampling_time/total_time, 2)},"
                                  f" ex_grad = {round(expect_grad_time/total_time, 2)},"
-                                 f" sr = {round(sr_time/total_time, 2)},"
-                                 f" p_update = {round(p_update_time/total_time, 2)}")
+                                 f" sr = {round(sr_time/total_time, 2)}")
 
             if callback_stop:
                 break
