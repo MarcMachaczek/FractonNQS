@@ -8,9 +8,9 @@ import optax
 import netket as nk
 
 import geneqs
-from geneqs.utils.training import loop_gs
+from geneqs.utils.training import loop_gs, driver_gs
 
-stddev = 0.1
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # %%
@@ -34,7 +34,7 @@ link_perms = nk.utils.HashableArray(link_perms.astype(int))
 # %%
 # setting hyper-parameters
 n_iter = 120
-n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
 n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
@@ -47,7 +47,8 @@ alpha = 2
 RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha,
                             kernel_init=default_kernel_init,
                             hidden_bias_init=default_kernel_init,
-                            visible_bias_init=default_kernel_init)
+                            visible_bias_init=default_kernel_init,
+                            param_dtype=float)
 
 lr_init = 0.02
 lr_end = 0.008
@@ -55,12 +56,19 @@ transition_begin = 50
 transition_steps = n_iter - transition_begin - 20
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
-h = 0
+h = (0., 0., 0.)  # (hx, hy, hz)
+
+ha = nk.operator.LocalOperator(hilbert, dtype=complex)
+ha += nk.operator.spin.sigmaz(hilbert, 0)
+ha += nk.operator.spin.sigmay(hilbert, 0)
 
 # %%
 toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
+netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 optimizer = optax.sgd(lr_schedule)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
-vqs = nk.vqs.MCState(sampler, RBMSymm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+vqs = nk.vqs.MCState(sampler, RBMSymm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
+                     chunk_size=int(n_samples/2))
 
-vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
+vqs, data = loop_gs(vqs, ha, optimizer, preconditioner, n_iter)
+

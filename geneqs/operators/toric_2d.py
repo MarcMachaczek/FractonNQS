@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 import netket as nk
 import geneqs
 
@@ -8,8 +9,8 @@ from functools import partial
 
 
 # %%
-class ToricCode2d(nk.operator.AbstractOperator):
-    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, shape: jax.Array, h: Tuple[float, float, float] = None):
+class ToricCode2d(nk.operator.DiscreteOperator):
+    def __init__(self, hilbert: nk.hilbert.DiscreteHilbert, shape: jax.Array, h: Tuple[float, float, float] = None):
         super().__init__(hilbert)
         self.shape = shape
         if h is None:
@@ -29,8 +30,33 @@ class ToricCode2d(nk.operator.AbstractOperator):
     def is_hermitian(self):
         return True
 
-    def conns_and_mels(self, sigma: jax.Array):
+    def get_conn_padded(self, sigma: jax.Array) -> Tuple[jax.Array, jax.Array]:
+        """
+        See Netket repo for details. This method is called by <get_local_kernel_arguments> for discrete operators.
+        Instead of implementing the flattened version, we can directly overwrite the padded method, which is more
+        efficient.
+        Args:
+            sigma:
+
+        Returns:
+
+        """
         return toric2d_conns_and_mels(sigma, self.plaqs, self.stars, self.h)
+
+    def get_conn_flattened(self, x, sections):
+        eta, mels = toric2d_conns_and_mels(x, self.plaqs, self.stars, self.h)
+
+        n_primes = eta.shape[1]  # number of connected states, same for alle possible configurations x
+        n_visible = x.shape[-1]
+        batch_size = x.shape[0]
+        eta = eta.reshape(batch_size, n_primes*n_visible)  # flatten last dimension
+        mels = mels.flatten()
+
+        # must manipulate sections in place
+        for i in range(len(sections)):
+            sections[i] = (i + 1) * n_primes
+
+        return eta, mels
 
 
 @nk.vqs.get_local_kernel.dispatch
@@ -85,8 +111,8 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     star_mels = -jnp.ones(n_sites)
     # axis 0 of sigma.at[plaqs] corresponds to #N_plaqs and axis 1 to the 4 edges of one plaquette
     diag_mel = -jnp.sum(jnp.product(sigma.at[plaqs].get(), axis=1)) - hz * jnp.sum(sigma)
-    # mel according to hx and hy
-    field_mels = -hx * jnp.ones(2*n_sites) - hy * sigma * 1j
+    # mel according to hx and hy, TODO: include hy and check chunking etc
+    field_mels = -hx * jnp.ones(2*n_sites)  # - hy * sigma * 1j
     mels = jnp.hstack((star_mels, diag_mel, field_mels))
     return eta, mels
 
@@ -113,3 +139,56 @@ def e_loc(logpsi, pars, sigma, extra_args):
         return jnp.sum(mels * jnp.exp(logpsi(pars, eta) - logpsi(pars, sigma)), axis=-1)
 
     return _loc_vals(sigma, eta, mels)
+
+
+class ToricCode2dAbstract(nk.operator.AbstractOperator):
+    def __init__(self, hilbert: nk.hilbert.AbstractHilbert, shape: jax.Array, h: Tuple[float, float, float] = None):
+        super().__init__(hilbert)
+        self.shape = shape
+        if h is None:
+            self.h = (0., 0., 0.)
+        else:
+            self.h = h
+        # get corresponding indices on which the operators act on
+        positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
+        self.plaqs = jnp.stack([geneqs.utils.indexing.position_to_plaq(p, shape) for p in positions])
+        self.stars = jnp.stack([geneqs.utils.indexing.position_to_star(p, shape) for p in positions])
+
+    @property
+    def dtype(self):
+        return float
+
+    @property
+    def is_hermitian(self):
+        return True
+
+    def conns_and_mels(self, sigma: jax.Array):
+        return toric2d_conns_and_mels(sigma, self.plaqs, self.stars, self.h)
+
+
+def get_netket_toric2dh(hi, shape, h):
+    ha_netketlocal = nk.operator.LocalOperator(hi, dtype=float)
+    hx, hy, hz = h
+    # adding the plaquette terms:
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            plaq_indices = geneqs.utils.indexing.position_to_plaq(jnp.array([i, j]), shape)
+            ha_netketlocal -= nk.operator.spin.sigmaz(hi, plaq_indices[0].item()) * \
+                              nk.operator.spin.sigmaz(hi, plaq_indices[1].item()) * \
+                              nk.operator.spin.sigmaz(hi, plaq_indices[2].item()) * \
+                              nk.operator.spin.sigmaz(hi, plaq_indices[3].item())
+    # adding the star terms
+    for i in range(shape[0]):
+        for j in range(shape[1]):
+            star_indices = geneqs.utils.indexing.position_to_star(jnp.array([i, j]), shape)
+            ha_netketlocal -= nk.operator.spin.sigmax(hi, star_indices[0].item()) * \
+                              nk.operator.spin.sigmax(hi, star_indices[1].item()) * \
+                              nk.operator.spin.sigmax(hi, star_indices[2].item()) * \
+                              nk.operator.spin.sigmax(hi, star_indices[3].item())
+
+    # adding external fields
+    ha_netketlocal -= hz * sum([nk.operator.spin.sigmaz(hi, i) for i in range(hi.size)])
+    ha_netketlocal -= hx * sum([nk.operator.spin.sigmax(hi, i) for i in range(hi.size)])
+    # ha_netketlocal -= hy * sum([nk.operator.spin.sigmay(hi, i) for i in range(hi.size)])
+
+    return ha_netketlocal
