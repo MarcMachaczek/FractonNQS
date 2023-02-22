@@ -35,46 +35,48 @@ link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-# field_strengths = ((0., 0., 0.0),
-#                    (0., 0., 0.1),
-#                    (0., 0., 0.2),
-#                    (0., 0., 0.3),
-#                    (0., 0., 0.32),
-#                    (0., 0., 0.34),
-#                    (0., 0., 0.36),
-#                    (0., 0., 0.38),
-#                    (0., 0., 0.4),
-#                    (0., 0., 0.45),
-#                    (0., 0., 0.5))
+field_strengths = ((0.3, 0., 0.0),
+                   (0.3, 0., 0.1),
+                   (0.3, 0., 0.2),
+                   (0.3, 0., 0.3),
+                   (0.3, 0., 0.31),
+                   (0.3, 0., 0.32),
+                   (0.3, 0., 0.33),
+                   (0.3, 0., 0.34),
+                   (0.3, 0., 0.35),
+                   (0.3, 0., 0.36),
+                   (0.3, 0., 0.37),
+                   (0.3, 0., 0.38),
+                   (0.3, 0., 0.39),
+                   (0.3, 0., 0.4),
+                   (0.3, 0., 0.45),
+                   (0.3, 0., 0.5))
 
 magnetizations = {}
 
 # %%
-field_strengths = ((0., 0., 0.3),
-                   (0., 0., 0.34),
-                   (0., 0., 0.38),
-                   (0., 0., 0.45))
+# field_strengths = ((0., 0., 0.3),)
 # setting hyper-parameters
 n_iter = 300
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4
+n_samples = n_chains * 2
 n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
+chunk_size = 1024 * 4  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift,)  # holomorphic=True)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define model parameters
 alpha = 2
-RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init, param_dtype=float)
+RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init, param_dtype=complex)
 
 # be careful that keys of model and hyperparameters dicts match
-eval_model = "real_rbm_symm"
-models = {"real_rbm_symm": RBMSymm}
+eval_model = "complex_rbm_symm"
+models = {"complex_rbm_symm": RBMSymm}
 
-learning_rates = {"real_rbm_symm": 0.01}
+learning_rates = {"complex_rbm_symm": 0.01}
 
 # %%
 for h in tqdm(field_strengths, "external_field"):
@@ -86,7 +88,7 @@ for h in tqdm(field_strengths, "external_field"):
         sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
         vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-        vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_steps=200)
+        vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_steps=300)
 
         variational_gs[name] = vqs
         training_records[name] = training_data
@@ -123,22 +125,23 @@ for h in tqdm(field_strengths, "external_field"):
 mags = []
 for h, mag in magnetizations.items():
     mags.append([*h] + [mag.Mean.item().real, mag.Sigma.item().real])
-
-np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals", np.asarray(mags))
-
+mags = np.asarray(mags)
+# np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals", mags)
+mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 # %%
 # create and save magnetization plot
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
-for h, m in magnetizations.items():
-    hz = h[2]
-    c = "red" if h[0] == 0. else "blue"
-    plot.errorbar(hz, np.abs(m.Mean.item().real), yerr=m.error_of_mean.item().real, marker="o", markersize=2, color=c)
-    plot.plot(hz, np.abs(m.Mean.item().real), marker="o", markersize=2, color=c) # TODO: correct plot
+c = "red" if mags[0, 0] == 0. else "blue"
+for mag in mags:
+    plot.errorbar(mag[2], np.abs(mag[3]), yerr=mag[4], marker="o", markersize=2, color=c)
+
+plot.plot(mags[:, 2], np.abs(mags[:, 3]), marker="o", markersize=2, color=c)
 
 plot.set_xlabel("external field hz")
 plot.set_ylabel("magnetization")
 plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
-               f"and hx={field_strengths[0][0]}")
+               f"and hx={mags[0, 0]}")
+
 plt.show()
-# fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
