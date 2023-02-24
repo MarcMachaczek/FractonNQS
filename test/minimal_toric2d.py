@@ -40,7 +40,7 @@ n_discard_per_chain = 8  # should be small for using many chains, default is 10%
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTOnTheFly, diag_shift=diag_shift)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift)
 
 # define model parameters
 alpha = 2
@@ -50,6 +50,14 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha,
                             visible_bias_init=default_kernel_init,
                             param_dtype=float)
 
+mask = jnp.vstack([geneqs.utils.indexing.position_to_plaq(jnp.asarray([0, 0]), shape), ])
+                   # geneqs.utils.indexing.position_to_plaq(jnp.asarray([0, 1]), shape),
+                   # geneqs.utils.indexing.position_to_plaq(jnp.asarray([1, 0]), shape),
+                   # geneqs.utils.indexing.position_to_plaq(jnp.asarray([1, 1]), shape)])
+mask = nk.utils.HashableArray(mask)
+features = (4, 4, 4)
+SymmNN = geneqs.models.symmetric_networks.SymmetricNN(link_perms, features)
+
 lr_init = 0.02
 lr_end = 0.008
 transition_begin = 50
@@ -58,17 +66,14 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 h = (0., 0., 0.)  # (hx, hy, hz)
 
-ha = nk.operator.LocalOperator(hilbert, dtype=complex)
-ha += nk.operator.spin.sigmaz(hilbert, 0)
-ha += nk.operator.spin.sigmay(hilbert, 0)
-
 # %%
 toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 optimizer = optax.sgd(lr_schedule)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
-vqs = nk.vqs.MCState(sampler, RBMSymm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
+vqs = nk.vqs.MCState(sampler, SymmNN, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
                      chunk_size=int(n_samples/2))
 
-vqs, data = loop_gs(vqs, ha, optimizer, preconditioner, n_iter)
+vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
 
+# rbm params: 293

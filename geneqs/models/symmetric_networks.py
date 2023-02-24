@@ -4,9 +4,10 @@ from flax import linen as nn
 from netket import nn as nknn
 from netket.utils import HashableArray
 
-from typing import Union, Any, Callable, Sequence
+from typing import Optional, Any, Callable, Sequence, Tuple
 
-default_kernel_init = jax.nn.initializers.normal(stddev=0.01)  # nn.initializers.lecun_normal()
+lecun = nn.initializers.lecun_normal(in_axis=1, out_axis=0)
+zeros = jax.nn.initializers.zeros
 
 
 class SimpleNN(nn.Module):
@@ -21,7 +22,7 @@ class SimpleNN(nn.Module):
     precision: Any = None
 
     # Initializer for the Dense layer matrix
-    kernel_init: callable = default_kernel_init
+    kernel_init: callable = lecun
 
     def setup(self):
         self.layers = [nn.Dense(feat,
@@ -46,9 +47,11 @@ class SymmetricNN(nn.Module):
     # permutations of lattice sites corresponding to symmetries
     symmetries: HashableArray
     # features for each layer in the NN
-    features: Sequence[int]
+    features: Tuple[int, ...]
+    # kernel mask (aka filter size for CNN)
+    mask: Optional[HashableArray] = None
     # The nonlinear activation function
-    activation: Any = nknn.gelu
+    activation: Any = jax.nn.selu
     # bias for the all layers
     use_bias: bool = True
     # The dtype of the weights
@@ -57,7 +60,8 @@ class SymmetricNN(nn.Module):
     precision: Any = None
 
     # Initializer for the Dense layer matrix
-    kernel_init: Callable = default_kernel_init
+    kernel_init: Callable = lecun
+    bias_init: Callable = zeros
 
     def setup(self):
         self.n_symm, self.n_sites = self.symmetries.shape
@@ -66,15 +70,16 @@ class SymmetricNN(nn.Module):
                                          symmetries=self.symmetries,
                                          features=self.features[0],
                                          use_bias=self.use_bias,
+                                         mask=self.mask,
                                          kernel_init=self.kernel_init,
-                                         bias_init=self.kernel_init,
+                                         bias_init=self.bias_init,
                                          param_dtype=self.param_dtype,
                                          precision=self.precision)
 
         self.layers = [nn.Dense(feat,
                                 use_bias=self.use_bias,
                                 kernel_init=self.kernel_init,
-                                bias_init=self.kernel_init,
+                                bias_init=self.bias_init,
                                 precision=self.precision,
                                 param_dtype=self.param_dtype)
                        for feat in self.features[1:]]
@@ -93,5 +98,5 @@ class SymmetricNN(nn.Module):
             x = lyr(x)
             if i != len(self.layers) - 1:
                 x = self.activation(x)
-        x = x.squeeze(-1)
+        x = jnp.sum(x, axis=-1)  # final sum layer
         return x

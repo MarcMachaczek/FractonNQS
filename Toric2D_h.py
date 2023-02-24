@@ -19,7 +19,7 @@ default_kernel_init = jax.nn.initializers.normal(stddev)
 L = 10  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
-hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
+hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
 
 # visualize the graph
@@ -35,48 +35,70 @@ link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-field_strengths = ((0.3, 0., 0.0),
-                   (0.3, 0., 0.1),
-                   (0.3, 0., 0.2),
-                   (0.3, 0., 0.3),
-                   (0.3, 0., 0.31),
-                   (0.3, 0., 0.32),
-                   (0.3, 0., 0.33),
-                   (0.3, 0., 0.34),
-                   (0.3, 0., 0.35),
-                   (0.3, 0., 0.36),
-                   (0.3, 0., 0.37),
-                   (0.3, 0., 0.38),
-                   (0.3, 0., 0.39),
-                   (0.3, 0., 0.4),
-                   (0.3, 0., 0.45),
-                   (0.3, 0., 0.5))
+# field_strengths = ((0.3, 0., 0.0),
+#                    (0.3, 0., 0.1),
+#                    (0.3, 0., 0.2),
+#                    (0.3, 0., 0.3),
+#                    (0.3, 0., 0.31),
+#                    (0.3, 0., 0.32),
+#                    (0.3, 0., 0.33),
+#                    (0.3, 0., 0.34),
+#                    (0.3, 0., 0.35),
+#                    (0.3, 0., 0.36),
+#                    (0.3, 0., 0.37),
+#                    (0.3, 0., 0.38),
+#                    (0.3, 0., 0.39),
+#                    (0.3, 0., 0.4),
+#                    (0.3, 0., 0.45),
+#                    (0.3, 0., 0.5))
 
 magnetizations = {}
 
 # %%
-# field_strengths = ((0., 0., 0.3),)
+field_strengths = ((0.3, 0., 0.31),
+                   (0.3, 0., 0.32),
+                   (0.3, 0., 0.33),
+                   (0.3, 0., 0.34),
+                   (0.3, 0., 0.35),
+                   (0.3, 0., 0.36),)
 # setting hyper-parameters
 n_iter = 300
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 2
+n_samples = n_chains * 4
 n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 4  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, )  # holomorphic=True)
 
-# define model parameters
+# define RBM
 alpha = 2
-RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha, kernel_init=default_kernel_init, param_dtype=complex)
+RBMSymm = nk.models.RBMSymm(symmetries=link_perms, alpha=alpha,
+                            kernel_init=default_kernel_init,
+                            hidden_bias_init=default_kernel_init,
+                            visible_bias_init=default_kernel_init,
+                            param_dtype=float)
+
+# define symmetric NN (GCNN followed by sum layer and dense)
+mask = jnp.vstack([geneqs.utils.indexing.position_to_plaq(jnp.asarray([0, 0]), shape),
+                   geneqs.utils.indexing.position_to_plaq(jnp.asarray([0, 1]), shape),
+                   geneqs.utils.indexing.position_to_plaq(jnp.asarray([1, 0]), shape),
+                   geneqs.utils.indexing.position_to_plaq(jnp.asarray([1, 1]), shape)])
+mask = nk.utils.HashableArray(mask)
+features = (4, 4, 4)
+SymmNN = geneqs.models.symmetric_networks.SymmetricNN(link_perms, features)
+
+# netket version of GCNN
+# ma = nk.models.GCNN(symmetries=link_perms, layers=3, features=features)
 
 # be careful that keys of model and hyperparameters dicts match
-eval_model = "complex_rbm_symm"
-models = {"complex_rbm_symm": RBMSymm}
+eval_model = "real_rbm_symm"
+models = {"real_rbm_symm": RBMSymm, }  # "symm_nn": SymmNN}
 
-learning_rates = {"complex_rbm_symm": 0.01}
+learning_rates = {"real_rbm_symm": 0.01,
+                  "symm_nn": 0.01}
 
 # %%
 for h in tqdm(field_strengths, "external_field"):
@@ -86,9 +108,10 @@ for h in tqdm(field_strengths, "external_field"):
     for name, model in models.items():
         optimizer = optax.sgd(learning_rates[name])
         sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
-        vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+        vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
+                             chunk_size=1024)
 
-        vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_steps=300)
+        vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_steps=150)
 
         variational_gs[name] = vqs
         training_records[name] = training_data
@@ -127,7 +150,7 @@ for h, mag in magnetizations.items():
     mags.append([*h] + [mag.Mean.item().real, mag.Sigma.item().real])
 mags = np.asarray(mags)
 # np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals", mags)
-mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
+# mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 # %%
 # create and save magnetization plot
 fig = plt.figure(dpi=300, figsize=(10, 10))

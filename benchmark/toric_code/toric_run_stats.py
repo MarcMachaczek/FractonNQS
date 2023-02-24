@@ -13,7 +13,7 @@ from tqdm import tqdm
 from global_variables import BENCHMARK_PATH
 
 RUN_PATH = f"{BENCHMARK_PATH}/toric_code/"
-SAVE = False
+SAVE = True
 
 stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
@@ -40,7 +40,7 @@ link_perms = nk.utils.HashableArray(link_perms.astype(int))
 # setting hyper-parameters
 n_iter = 120
 n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4
+n_samples = n_chains * 4 * 4  # TODO: remove *4
 n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
@@ -63,7 +63,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 h = (0, 0, 0)
 
 # %%
-runs = 1
+runs = 100
 energies = []
 errors = []
 for i in tqdm(range(runs)):
@@ -83,8 +83,8 @@ energies = np.asarray(energies)
 errors = np.asarray(errors)
 
 if SAVE:
-    np.save(f"{RUN_PATH}/data/L{shape}_h{h}_sd{stddev}_S{n_samples}_energies", energies)
-    np.save(f"{RUN_PATH}//data/L{shape}_h{h}_sd{stddev}_S{n_samples}_errors", errors)
+    np.save(f"{RUN_PATH}/data/L{shape}_h{h}_sd{stddev}_S{n_samples}_energies_2", energies)
+    np.save(f"{RUN_PATH}//data/L{shape}_h{h}_sd{stddev}_S{n_samples}_errors_2", errors)
 
 exact_gse = -2*L**2
 con_bound = 5e-4
@@ -115,7 +115,7 @@ plot.set_title(f"relative energy error over {n_iter} iterations for {runs} train
 plt.show()
 
 if SAVE:
-    fig.savefig(f"{RUN_PATH}/plots/RelativeErr_L{shape}_h{h}_sd{stddev}_S{n_samples}.pdf")
+    fig.savefig(f"{RUN_PATH}/plots/RelativeErr_L{shape}_h{h}_sd{stddev}_S{n_samples}_2.pdf")
 
 # %%
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -143,5 +143,5 @@ plot.set_title(f"relative energy error over {n_iter} iterations for {runs} train
 plt.show()
 
 if SAVE:
-    fig.savefig(f"{RUN_PATH}/plots/LogRelativeErr_L{shape}_h{h}_sd{stddev}_S{n_samples}.pdf")
+    fig.savefig(f"{RUN_PATH}/plots/LogRelativeErr_L{shape}_h{h}_sd{stddev}_S{n_samples}_2.pdf")
 
