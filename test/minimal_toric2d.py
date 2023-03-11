@@ -10,7 +10,7 @@ import netket as nk
 import geneqs
 from geneqs.utils.training import loop_gs, driver_gs
 
-stddev = 0.01
+stddev = 0.05
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # %%
@@ -36,7 +36,7 @@ link_perms = nk.utils.HashableArray(link_perms.astype(int))
 n_iter = 120
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
-n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.01
@@ -58,8 +58,8 @@ mask = nk.utils.HashableArray(mask)
 features = (4, 4, 4)
 SymmNN = geneqs.models.symmetric_networks.SymmetricNN(link_perms, features)
 
-lr_init = 0.02
-lr_end = 0.008
+lr_init = 0.03
+lr_end = 0.03
 transition_begin = 50
 transition_steps = n_iter - transition_begin - 20
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -71,7 +71,7 @@ toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 optimizer = optax.sgd(lr_schedule)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
-vqs = nk.vqs.MCState(sampler, SymmNN, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
+vqs = nk.vqs.MCState(sampler, RBMSymm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
                      chunk_size=int(n_samples/2))
 
 vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
