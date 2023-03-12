@@ -39,27 +39,35 @@ class CorrelationRBM(nn.Module):
                 f"RBMSymm: alpha={self.alpha} is too small "
                 f"for {self.n_symm} permutations, alpha ≥ {self.n_symm / self.n_sites} is needed.")
 
-        self.layers = [nn.Dense(feat,
-                                use_bias=self.use_bias,
-                                kernel_init=self.kernel_init,
-                                bias_init=self.bias_init,
-                                precision=self.precision,
-                                param_dtype=self.param_dtype)
-                       for feat in self.features[1:]]
-
     @nn.compact
     def __call__(self, x_in):
-        perm_x = jnp.take(x_in, self.symmetries, axis=1)
+        # x_in shape (batch, n_sites)
+        perm_x = jnp.take(x_in, self.symmetries, axis=1)  # perm_x shape (batch, n_symmetries, n_sites)
 
-        x = nn.Dense(features=self.features,
+        x = nn.Dense(name="Dense_SingleSpin",
+                     features=self.features,
                      use_bias=self.use_bias,
                      param_dtype=self.param_dtype,
                      precision=self.precision,
                      kernel_init=self.kernel_init,
-                     bias_init=self.bias_init)(perm_x)
+                     bias_init=self.bias_init)(perm_x)  # x shape (batch, n_symmetries, features/hidden_units)
 
-        for correlator in self.correlators:
-            x +=
+        for i, correlator in enumerate(self.correlators):
+            # before product, has shape (batch, n_symmetries, n_corrs, n_spins_in_corr)
+            # where n_corrs corresponds to eg the number of plaquettes, bonds, loops etc. in one configuration
+            corr_values = jnp.take(perm_x, correlator, axis=2).prod(axis=3)
+            x += nn.Dense(name=f"Dense_Correlator{i}",
+                          features=self.features,
+                          use_bias=False,
+                          param_dtype=self.param_dtype,
+                          precision=self.precision,
+                          kernel_init=self.kernel_init,
+                          bias_init=self.bias_init)(corr_values)
+
+        x = self.activation(x)
+        x = jnp.sum(x, axis=(1, 2))  # sum over all symmetries and features=alpha * n_sites / n_symmetries
+
+        # TODO: implement visible bias correctly
 
         return x
 
@@ -68,6 +76,9 @@ class CorrelationRBM(nn.Module):
 a = jnp.arange(12).reshape(4, 3)
 perms = jnp.array([[0, 1, 2], [1, 2, 0], [2, 0, 1]])
 perms_a = jnp.take(a, perms, axis=1)
+correlator = jnp.array([[0, 1], [1, 2], [2, 0]])
+perm_correlator = jnp.take(perms_a, correlator, axis=-1)
+features = jnp.take(perms_a, correlator, axis=2).prod(axis=3)
 
 
 # %%
