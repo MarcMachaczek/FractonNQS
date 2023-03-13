@@ -21,15 +21,13 @@ class CorrelationRBM(nn.Module):
     activation: Any = nknn.log_cosh
     # feature density. Number of features equal to alpha * input.shape[-1]
     alpha: Union[float, int] = 1
-    # if True uses a bias in the dense layer (hidden layer bias)
-    use_hidden_bias: bool = True
     # Numerical precision of the computation see :class:`jax.lax.Precision` for details
     precision: Any = None
 
     # Initializer for the Dense layer matrix
     kernel_init: Callable = default_kernel_init
-    # Initializer for the hidden bias
-    hidden_bias_init: Callable = default_kernel_init
+    # Initializer for the biases
+    bias_init: Callable = default_kernel_init
 
     def setup(self):
         self.n_symm, self.n_sites = self.symmetries.shape
@@ -52,6 +50,12 @@ class CorrelationRBM(nn.Module):
                      kernel_init=self.kernel_init,
                      bias_init=self.bias_init)(perm_x)  # x shape (batch, n_symmetries, features/hidden_units)
 
+        # for now, just stick with a single bias, irrespective of sublattice etc. (see Valenti et. al.)
+        visible_bias = self.param("visible_bias", self.bias_init, (1,), self.param_dtype)
+        bias = visible_bias * jnp.sum(x, axis=(1, 2))
+
+        correlator_biases = self.param("correlator_bias", self.bias_init, (len(self.correlators),), self.param_dtype)
+
         for i, correlator in enumerate(self.correlators):
             # before product, has shape (batch, n_symmetries, n_corrs, n_spins_in_corr)
             # where n_corrs corresponds to eg the number of plaquettes, bonds, loops etc. in one configuration
@@ -64,10 +68,11 @@ class CorrelationRBM(nn.Module):
                           kernel_init=self.kernel_init,
                           bias_init=self.bias_init)(corr_values)
 
+            bias += correlator_biases[i] * jnp.sum(corr_values, axis=(1, 2))
+
         x = self.activation(x)
         x = jnp.sum(x, axis=(1, 2))  # sum over all symmetries and features=alpha * n_sites / n_symmetries
-
-        # TODO: implement visible bias correctly
+        x += bias
 
         return x
 
