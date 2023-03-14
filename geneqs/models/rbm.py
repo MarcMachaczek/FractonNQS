@@ -1,6 +1,7 @@
 import jax
 from jax import numpy as jnp
 from flax import linen as nn
+from flax.linen.dtypes import promote_dtype
 from netket import nn as nknn
 from netket.utils import HashableArray
 
@@ -30,7 +31,85 @@ class CorrelationRBM(nn.Module):
     bias_init: Callable = default_kernel_init
 
     def setup(self):
-        self.n_symm, self.n_sites = self.symmetries.shape
+        self.n_symm, self.n_sites = jnp.asarray(self.symmetries).shape
+        self.features = int(self.alpha * self.n_sites / self.n_symm)
+        if self.alpha > 0 and self.features == 0:
+            raise ValueError(
+                f"RBMSymm: alpha={self.alpha} is too small "
+                f"for {self.n_symm} permutations, alpha ≥ {self.n_symm / self.n_sites} is needed.")
+
+    @nn.compact
+    def __call__(self, x):
+        # initialize bias and kernel for the "single spin correlators" analogous to GCNN
+        hidden_bias = self.param("hidden_bias", self.bias_init, (self.features,), self.param_dtype)
+        symm_kernel = self.param("symm_kernel", self.kernel_init, (self.features, self.n_sites), self.param_dtype)
+
+        # take care of possibly different dtypes (e.g. x is float while parameters are complex)
+        x, symm_kernel, hidden_bias = promote_dtype(x, symm_kernel, hidden_bias, dtype=None)
+
+        # convert kernel to dense kernel of shape (out_features, n_symmetries, n_sites)
+        symm_kernel = jnp.take(symm_kernel, jnp.asarray(self.symmetries), axis=1)
+
+        # x has shape (batch, n_sites)
+        # kernel has shape (out_features, n_symmetries, n_sites)
+        # theta has shape (batch, out_features, n_symmetries)
+        theta = jax.lax.dot_general(x, symm_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+        theta += hidden_bias
+
+        # for now, just stick with a single bias, irrespective of sublattice etc. (in contrast to Valenti et. al.)
+        visible_bias = self.param("visible_bias", self.bias_init, (1,), self.param_dtype)
+        bias = visible_bias * jnp.sum(x, axis=(1,))
+
+        for i, correlator in enumerate(self.correlators):
+            # define "visible" bias corresponding to each correlator
+            correlator_bias = self.param(f"correlator{i}_bias", self.bias_init, (len(self.correlators),),
+                                         self.param_dtype)
+            # TODO define correlator weight matrix, hot to do the multiplication efficiently with perms?
+            # TODO maybe do something like jnp.take(symmetries, correlator) and go from there
+
+
+
+            bias += correlator_bias * jnp.sum(corr_values, axis=(1, 2))
+
+        theta = self.activation(theta)
+        theta = jnp.sum(theta, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
+        theta += bias
+
+        return theta + bias
+
+
+# %%
+a = jnp.arange(12).reshape(4, 3)
+perms = jnp.array([[0, 1, 2], [1, 2, 0], [2, 0, 1]])
+perms_a = jnp.take(a, perms, axis=1)
+correlator = jnp.array([[0, 1], [1, 2], [2, 0]])
+perm_correlator = jnp.take(perms_a, correlator, axis=-1)
+features = jnp.take(perms_a, correlator, axis=2).prod(axis=3)
+testa = jax.lax.dot_general(a, a ** 2, (((1,), (1,)), ((), ())))
+
+
+# %%
+class OldCorrelationRBM(nn.Module):
+    # permutations of lattice sites corresponding to symmetries
+    symmetries: HashableArray
+    # correlators that serve as additional input for the cRBM
+    correlators: Sequence[HashableArray]
+    # The dtype of the weights
+    param_dtype: Any = jnp.float64
+    # The nonlinear activation function
+    activation: Any = nknn.log_cosh
+    # feature density. Number of features equal to alpha * input.shape[-1]
+    alpha: Union[float, int] = 1
+    # Numerical precision of the computation see :class:`jax.lax.Precision` for details
+    precision: Any = None
+
+    # Initializer for the Dense layer matrix
+    kernel_init: Callable = default_kernel_init
+    # Initializer for the biases
+    bias_init: Callable = default_kernel_init
+
+    def setup(self):
+        self.n_symm, self.n_sites = jnp.asarray(self.symmetries).shape
         self.features = int(self.alpha * self.n_sites / self.n_symm)
         if self.alpha > 0 and self.features == 0:
             raise ValueError(
@@ -40,11 +119,11 @@ class CorrelationRBM(nn.Module):
     @nn.compact
     def __call__(self, x_in):
         # x_in shape (batch, n_sites)
-        perm_x = jnp.take(x_in, self.symmetries, axis=1)  # perm_x shape (batch, n_symmetries, n_sites)
+        perm_x = jnp.take(x_in, jnp.asarray(self.symmetries), axis=1)  # perm_x shape (batch, n_symmetries, n_sites)
 
         x = nn.Dense(name="Dense_SingleSpin",
                      features=self.features,
-                     use_bias=self.use_bias,
+                     use_bias=True,
                      param_dtype=self.param_dtype,
                      precision=self.precision,
                      kernel_init=self.kernel_init,
@@ -52,14 +131,14 @@ class CorrelationRBM(nn.Module):
 
         # for now, just stick with a single bias, irrespective of sublattice etc. (see Valenti et. al.)
         visible_bias = self.param("visible_bias", self.bias_init, (1,), self.param_dtype)
-        bias = visible_bias * jnp.sum(x, axis=(1, 2))
+        bias = visible_bias * jnp.sum(perm_x, axis=(1, 2))
 
         correlator_biases = self.param("correlator_bias", self.bias_init, (len(self.correlators),), self.param_dtype)
 
         for i, correlator in enumerate(self.correlators):
             # before product, has shape (batch, n_symmetries, n_corrs, n_spins_in_corr)
             # where n_corrs corresponds to eg the number of plaquettes, bonds, loops etc. in one configuration
-            corr_values = jnp.take(perm_x, correlator, axis=2).prod(axis=3)
+            corr_values = jnp.take(perm_x, jnp.asarray(correlator), axis=2).prod(axis=3)
             x += nn.Dense(name=f"Dense_Correlator{i}",
                           features=self.features,
                           use_bias=False,
@@ -75,15 +154,6 @@ class CorrelationRBM(nn.Module):
         x += bias
 
         return x
-
-
-# %%
-a = jnp.arange(12).reshape(4, 3)
-perms = jnp.array([[0, 1, 2], [1, 2, 0], [2, 0, 1]])
-perms_a = jnp.take(a, perms, axis=1)
-correlator = jnp.array([[0, 1], [1, 2], [2, 0]])
-perm_correlator = jnp.take(perms_a, correlator, axis=-1)
-features = jnp.take(perms_a, correlator, axis=2).prod(axis=3)
 
 
 # %%
