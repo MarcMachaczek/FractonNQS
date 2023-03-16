@@ -16,6 +16,8 @@ class CorrelationRBM(nn.Module):
     symmetries: HashableArray
     # correlators that serve as additional input for the cRBM
     correlators: Sequence[HashableArray]
+    # permutations of correlators corresponding to symmetries
+    correlator_symmetries: Sequence[HashableArray]
     # The dtype of the weights
     param_dtype: Any = jnp.float64
     # The nonlinear activation function
@@ -31,7 +33,7 @@ class CorrelationRBM(nn.Module):
     bias_init: Callable = default_kernel_init
 
     def setup(self):
-        self.n_symm, self.n_sites = jnp.asarray(self.symmetries).shape
+        self.n_symm, self.n_sites = self.symmetries.__array__().shape
         self.features = int(self.alpha * self.n_sites / self.n_symm)
         if self.alpha > 0 and self.features == 0:
             raise ValueError(
@@ -47,35 +49,41 @@ class CorrelationRBM(nn.Module):
         # take care of possibly different dtypes (e.g. x is float while parameters are complex)
         x, symm_kernel, hidden_bias = promote_dtype(x, symm_kernel, hidden_bias, dtype=None)
 
-        # convert kernel to dense kernel of shape (out_features, n_symmetries, n_sites)
-        symm_kernel = jnp.take(symm_kernel, jnp.asarray(self.symmetries), axis=1)
+        # convert kernel to dense kernel of shape (features, n_symmetries, n_sites)
+        symm_kernel = jnp.take(symm_kernel, self.symmetries.__array__(), axis=1)
 
-        # x has shape (batch, n_sites)
-        # kernel has shape (out_features, n_symmetries, n_sites)
-        # theta has shape (batch, out_features, n_symmetries)
+        # x has shape (batch, n_sites), kernel has shape (features, n_symmetries, n_sites)
+        # theta has shape (batch, features, n_symmetries)
         theta = jax.lax.dot_general(x, symm_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
-        theta += hidden_bias
+        theta += jnp.expand_dims(hidden_bias, 1)
 
         # for now, just stick with a single bias, irrespective of sublattice etc. (in contrast to Valenti et. al.)
         visible_bias = self.param("visible_bias", self.bias_init, (1,), self.param_dtype)
         bias = visible_bias * jnp.sum(x, axis=(1,))
 
         for i, correlator in enumerate(self.correlators):
-            # define "visible" bias corresponding to each correlator
-            correlator_bias = self.param(f"correlator{i}_bias", self.bias_init, (len(self.correlators),),
-                                         self.param_dtype)
-            # TODO define correlator weight matrix, hot to do the multiplication efficiently with perms?
-            # TODO maybe do something like jnp.take(symmetries, correlator) and go from there
+            # initialize "visible" bias and kernel matrix for correlator
+            correlator = correlator.__array__()  # convert hashable array to (usable) jax.Array
+            corr_bias = self.param(f"corr{i}_bias", self.bias_init, (1,), self.param_dtype)
+            corr_kernel = self.param("corr_kernel", self.kernel_init, (self.features, len(correlator)),
+                                     self.param_dtype)
 
+            # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
+            corr_kernel = jnp.take(corr_kernel, self.correlator_symmetries[i].__array__(), axis=1)
 
+            # correlator has shape (n_corrs, degree), e.g. n_corrs=L²=n_site/2 and degree=4 for plaquettes
+            corr_values = jnp.take(x, correlator, axis=1).prod(axis=2)  # shape (batch, n_corrs)
 
-            bias += correlator_bias * jnp.sum(corr_values, axis=(1, 2))
+            # corr_values has shape (batch, n_corrs)
+            # kernel has shape (features, n_correlator_symmetries, n_corrs)
+            # theta has shape (batch, features, n_symmetries)
+            theta += jax.lax.dot_general(corr_values, corr_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+            bias += corr_bias * jnp.sum(corr_values, axis=(1,))
 
         theta = self.activation(theta)
         theta = jnp.sum(theta, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
         theta += bias
-
-        return theta + bias
+        return theta
 
 
 # %%
@@ -152,7 +160,6 @@ class OldCorrelationRBM(nn.Module):
         x = self.activation(x)
         x = jnp.sum(x, axis=(1, 2))  # sum over all symmetries and features=alpha * n_sites / n_symmetries
         x += bias
-
         return x
 
 
