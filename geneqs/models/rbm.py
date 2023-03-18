@@ -65,7 +65,7 @@ class CorrelationRBM(nn.Module):
             # initialize "visible" bias and kernel matrix for correlator
             correlator = correlator.__array__()  # convert hashable array to (usable) jax.Array
             corr_bias = self.param(f"corr{i}_bias", self.bias_init, (1,), self.param_dtype)
-            corr_kernel = self.param("corr_kernel", self.kernel_init, (self.features, len(correlator)),
+            corr_kernel = self.param(f"corr{i}_kernel", self.kernel_init, (self.features, len(correlator)),
                                      self.param_dtype)
 
             # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
@@ -84,16 +84,6 @@ class CorrelationRBM(nn.Module):
         theta = jnp.sum(theta, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
         theta += bias
         return theta
-
-
-# %%
-a = jnp.arange(12).reshape(4, 3)
-perms = jnp.array([[0, 1, 2], [1, 2, 0], [2, 0, 1]])
-perms_a = jnp.take(a, perms, axis=1)
-correlator = jnp.array([[0, 1], [1, 2], [2, 0]])
-perm_correlator = jnp.take(perms_a, correlator, axis=-1)
-features = jnp.take(perms_a, correlator, axis=2).prod(axis=3)
-testa = jax.lax.dot_general(a, a ** 2, (((1,), (1,)), ((), ())))
 
 
 # %%

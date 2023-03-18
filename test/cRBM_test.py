@@ -14,7 +14,7 @@ stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # %%
-L = 4  # size should be at least 3, else there are problems with pbc and indexing
+L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
@@ -38,7 +38,7 @@ toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 
 # setting hyper-parameters
-n_iter = 120
+n_iter = 100
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
 n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
@@ -49,6 +49,9 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=d
 
 # define model parameters
 alpha = 1
+
+# TODO: Difference to Valenti are the visible bias terms. This doesn't yet seem to impact performance substantially.
+# for regular spin terms, a change in model itself is required. for bonds, provide separate corrs for each bond class
 
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
@@ -70,8 +73,8 @@ cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
                                     bias_init=default_kernel_init,
                                     param_dtype=float)
 
-lr_init = 0.02
-lr_end = 0.02
+lr_init = 0.03
+lr_end = 0.03
 transition_begin = 50
 transition_steps = n_iter - transition_begin - 20
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -83,3 +86,9 @@ vqs = nk.vqs.MCState(sampler, cRBM, n_samples=n_samples, n_discard_per_chain=n_d
                      chunk_size=int(n_samples/2))
 
 vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
+
+# no correlators (standard translation invariant RBM): 2.9it/s but does not converge
+# plaq only: 2.22it/s
+# plaq+xstring: 1.92it/s
+# plaq+xstring+ystring: 1.69it/s
+# all correlators: 1.10it/s

@@ -248,17 +248,22 @@ def get_bonds_cubical2d(shape: jax.Array) -> jax.Array:
 
 # %%
 def get_xstring_perms(shape: jax.Array):
-    a = jnp.arange(shape[1])
-    b = jnp.stack([(a + i) % shape[0] for i in range(shape[1])])
-    c = jnp.tile(b, (shape[0], 1))
-    return c
+    base = jnp.arange(shape[1])  # identity permutation, number of x-strings is equal to extend in y dimension
+    # proper (not identity) permutations, corresponding to translations in d=1 / y direction
+    proper_perms = jnp.stack([(base - i) % shape[1] for i in range(shape[1])])
+    # stack them as many times as we have x translations, x_translation leave the correlators invariant
+    # recall that translation perms start with trailing dimension ([0,0], [0,1]... ,[0,y_dim-1], [1,0], [1,1]...)
+    xstring_perms = jnp.tile(proper_perms, (shape[0], 1))
+    return xstring_perms
 
 
 def get_ystring_perms(shape: jax.Array):
-    a = jnp.arange(shape[1])
-    b = jnp.stack([(a + i) % shape[0] for i in range(shape[1])])
-    c = jnp.repeat(b, 4, axis=0)
-    return c
+    base = jnp.arange(shape[0])  # identity permutation, number of y-strings is equal to extend in x dimension
+    # proper (not identity) permutations, corresponding to translations in d=0 / x direction
+    proper_perms = jnp.stack([(base - i) % shape[0] for i in range(shape[0])])
+    # only changes every y_dim translations because only x-translations permute the correlators
+    ystring_perms = jnp.repeat(proper_perms, shape[1], axis=0)
+    return ystring_perms
 
 
 def get_bondperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
@@ -272,7 +277,7 @@ def get_bondperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
 
     """
     n_bonds = 4 * permutations.shape[1]
-    bond_perms = np.zeros(shape=(permutations.shape[0], n_bonds))
+    bond_perms = np.zeros(shape=(permutations.shape[0], n_bonds), dtype=int)
     for i, perm in enumerate(permutations):
         bond_perm = [[p * 4, p * 4 + 1, p * 4 + 2, p * 4 + 3] for p in perm]
         bond_perms[i] = np.asarray(bond_perm, dtype=int).flatten()
