@@ -87,7 +87,7 @@ class CorrelationRBM(nn.Module):
 
 
 # %%
-class OldCorrelationRBM(nn.Module):
+class ExplicitCorrelationRBM(nn.Module):
     # permutations of lattice sites corresponding to symmetries
     symmetries: HashableArray
     # correlators that serve as additional input for the cRBM
@@ -135,7 +135,7 @@ class OldCorrelationRBM(nn.Module):
 
         for i, correlator in enumerate(self.correlators):
             # before product, has shape (batch, n_symmetries, n_corrs, n_spins_in_corr)
-            # where n_corrs corresponds to eg the number of plaquettes, bonds, loops etc. in one configuration
+            # where n_corrs corresponds to e.g. the number of plaquettes, bonds, loops etc. in one configuration
             corr_values = jnp.take(perm_x, jnp.asarray(correlator), axis=2).prod(axis=3)
             x += nn.Dense(name=f"Dense_Correlator{i}",
                           features=self.features,
