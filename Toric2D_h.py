@@ -123,7 +123,7 @@ for h in tqdm(field_strengths, "external_field"):
 
     n_params = int(training_data["n_params"].value)
     plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
-                  label=f"{eval_model}, lr={learning_rate}, #p={n_params}")
+                  label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
     E0 = training_data["energy"].Mean[-1].item().real
     err = training_data["energy"].Sigma[-1].item().real
