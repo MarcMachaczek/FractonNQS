@@ -54,7 +54,7 @@ class ToricCode2d(nk.operator.DiscreteOperator):
 
         # must manipulate sections in place TODO: this doesnt work, sections are not modified by this piece of code
         for i in range(len(sections)):
-            sections[i] += (i + 1) * n_primes
+            sections[i] = (i + 1) * n_primes
 
         return eta, mels
 
@@ -79,7 +79,8 @@ def toric2d_conns_and_mels(sigma: jax.Array,
                            h: Tuple[float, float, float]) -> Tuple[jax.Array, jax.Array]:
     """
     For a given input spin configuration sigma, calculates all connected states eta and the corresponding non-zero
-    matrix elements mels. See netket for further details.
+    matrix elements mels. See netket for further details. This version is only faster than netket if external fields are
+    non-zero, as it already includes corresponding conns and mels, even when fields are zero.
     H = H_toric - hx * sum_i sigma_x - hy * sum_j sigma_y - hz * sum_k sigma_z
     Args:
         sigma: Input state or "bra", acting from the left.
@@ -98,14 +99,22 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     def flip(x, idx):
         return x.at[idx].set(-x.at[idx].get())
 
-    # connected states by star operators
-    star_eta = jnp.tile(sigma, (n_sites, 1))
-    star_eta = flip(star_eta, stars)
+    # initialize connected states
+    eta = jnp.tile(sigma, (1 + n_sites + 2*n_sites, 1))
+    # connected states by star operators, leave the first eta as is (diagonal connected state)
+    eta = eta.at[1:n_sites+1].set(flip(eta.at[:n_sites].get(), stars))
     # connected states through external field (sigma_x and sigma_y)
-    field_eta = jnp.tile(sigma, (2*n_sites, 1))
-    field_eta = flip(field_eta, jnp.arange(2*n_sites))
+    eta = eta.at[n_sites+1:3*n_sites+1].set(flip(eta.at[n_sites+1:3*n_sites+1].get(), jnp.arange(2*n_sites)))
+
+    # old implementation
+    # connected states by star operators
+    # star_eta = jnp.tile(sigma, (n_sites, 1))
+    # star_eta = flip(star_eta, stars)
+    # connected states through external field (sigma_x and sigma_y)
+    # field_eta = jnp.tile(sigma, (2*n_sites, 1))
+    # field_eta = flip(field_eta, jnp.arange(2*n_sites))
     # stack connected mels (sigma.reshape corresponds to diagonal part, i.e. plaquettes, of the hamiltonian)
-    eta = jnp.vstack((star_eta, sigma.reshape(1, -1), field_eta))
+    # eta = jnp.vstack((sigma.reshape(1, -1), star_eta, field_eta))
 
     # now calcualte matrix elements, first n_sites correspond to flipped stars
     star_mels = -jnp.ones(n_sites)
@@ -113,7 +122,7 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     diag_mel = -jnp.sum(jnp.product(sigma.at[plaqs].get(), axis=1)) - hz * jnp.sum(sigma)
     # mel according to hx and hy, TODO: include hy and check chunking etc
     field_mels = -hx * jnp.ones(2*n_sites)  # - hy * sigma * 1j
-    mels = jnp.hstack((star_mels, diag_mel, field_mels))
+    mels = jnp.hstack((diag_mel, star_mels, field_mels))
     return eta, mels
 
 
