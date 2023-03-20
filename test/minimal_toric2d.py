@@ -14,7 +14,7 @@ stddev = 0.05
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # %%
-L = 3  # size should be at least 3, else there are problems with pbc and indexing
+L = 6  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
@@ -64,9 +64,10 @@ transition_begin = 50
 transition_steps = n_iter - transition_begin - 20
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
-h = (0., 0., 0.)  # (hx, hy, hz)
+h = (0.0, 0., 0.0)  # (hx, hy, hz)
 
 # %%
+toric_nk = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 optimizer = optax.sgd(lr_schedule)

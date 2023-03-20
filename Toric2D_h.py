@@ -13,7 +13,7 @@ from global_variables import RESULTS_PATH
 
 from tqdm import tqdm
 
-save_results = False
+save_results = True
 
 # %%
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
