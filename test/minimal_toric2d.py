@@ -14,7 +14,7 @@ stddev = 0.05
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # %%
-L = 6  # size should be at least 3, else there are problems with pbc and indexing
+L = 3  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)

@@ -50,40 +50,33 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-field_strengths = ((0.3, 0., 0.0),
-                   (0.3, 0., 0.1),
-                   (0.3, 0., 0.2),
-                   (0.3, 0., 0.3),
-                   (0.3, 0., 0.31),
-                   (0.3, 0., 0.32),
-                   (0.3, 0., 0.33),
-                   (0.3, 0., 0.34),
-                   (0.3, 0., 0.35),
-                   (0.3, 0., 0.36),
-                   (0.3, 0., 0.37),
-                   (0.3, 0., 0.38),
-                   (0.3, 0., 0.39),
-                   (0.3, 0., 0.4),
-                   (0.3, 0., 0.45),
-                   (0.3, 0., 0.5))
-
-field_strengths = ((0.3, 0., 0.0),)
+hx = 0.3
+field_strengths = ((hx, 0., 0.0),
+                   (hx, 0., 0.1),
+                   (hx, 0., 0.2),
+                   (hx, 0., 0.3),
+                   (hx, 0., 0.31),
+                   (hx, 0., 0.32),
+                   (hx, 0., 0.33),
+                   (hx, 0., 0.34),
+                   (hx, 0., 0.35),
+                   (hx, 0., 0.36),
+                   (hx, 0., 0.37),
+                   (hx, 0., 0.38),
+                   (hx, 0., 0.39),
+                   (hx, 0., 0.4),
+                   (hx, 0., 0.45),
+                   (hx, 0., 0.5))
 
 magnetizations = {}
 
-# %%
-# field_strengths = ((0.3, 0., 0.31),
-#                    (0.3, 0., 0.32),
-#                    (0.3, 0., 0.33),
-#                    (0.3, 0., 0.34),
-#                    (0.3, 0., 0.35),
-#                    (0.3, 0., 0.36),)
-# setting hyper-parameters
-n_iter = 200
+# %%  setting hyper-parameters
+n_iter = 600
+min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
 n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 4  # doesn't work for gradient operations, need to check why!
+chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
@@ -98,22 +91,26 @@ cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
                                     alpha=alpha,
                                     kernel_init=default_kernel_init,
                                     bias_init=default_kernel_init,
-                                    param_dtype=float)
+                                    param_dtype=complex)
 
-# be careful that keys of model and hyperparameters dicts match
 model = cRBM
-learning_rate = 0.01
 eval_model = "cRBM"
+
+# learning rate scheduling
+lr_init = 0.01
+lr_end = 0.001
+transition_begin = int(n_iter / 3)
+transition_steps = int(n_iter / 3)
+lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # %%
 for h in tqdm(field_strengths, "external_field"):
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
-    optimizer = optax.sgd(learning_rate)
+    optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
-                                    chunk_size=1024)
+    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_steps=150)
+    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
     # save magnetization
     variational_gs.chunk_size = chunk_size
