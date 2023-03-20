@@ -13,8 +13,6 @@ from global_variables import RESULTS_PATH
 
 from tqdm import tqdm
 
-stddev = 0.01
-default_kernel_init = jax.nn.initializers.normal(stddev)
 save_results = False
 
 # %%
@@ -80,10 +78,13 @@ chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.01
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift)  # holomorphic=True)
+diag_shift = 0.001
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
+stddev = 0.01
+default_kernel_init = jax.nn.initializers.normal(stddev)
+
 alpha = 1
 cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
                                     correlators=correlators,
