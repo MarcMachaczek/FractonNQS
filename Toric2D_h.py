@@ -169,8 +169,8 @@ plot.set_ylabel("magnetization")
 plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
                f"and hx={mags[0, 0]}")
 
-plot.xlim(0, 0.5)
-plot.ylim(0, 1.)
+plot.set_xlim(0, 0.5)
+plot.set_ylim(0, 1.)
 plt.show()
 
 if save_results:
