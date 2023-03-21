@@ -3,8 +3,9 @@ import numpy as np
 from global_variables import RESULTS_PATH
 
 # %%
-mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L=8_complex_crbm/L[8 8]_cRBM_a1_magvals")
-mags_hx = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L=8_complex_crbm_hx03_2/L[8 8]_cRBM_a1_magvals")
+L = 8
+mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm/L[{L} {L}]_cRBM_a1_magvals")
+mags_hx = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_2/L[{L} {L}]_cRBM_a1_magvals")
 
 
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -20,9 +21,9 @@ plot.plot(mags_hx[:, 2], np.abs(mags_hx[:, 3]), marker="o", markersize=2, color=
 
 plot.set_xlabel("external field hz")
 plot.set_ylabel("magnetization")
-plot.set_title(f"magnetization vs external field in z-direction for ToricCode2d of shape=[10,10]")
+plot.set_title(f"magnetization vs external field in z-direction for ToricCode2d of shape=[{L},{L}]")
 plot.legend()
 
 plt.show()
 
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[8 8]_cRBM_a1_mags_comparison.pdf")
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_mags_comparison.pdf")

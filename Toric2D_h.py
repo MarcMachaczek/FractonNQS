@@ -14,6 +14,9 @@ from global_variables import RESULTS_PATH
 from tqdm import tqdm
 
 save_results = True
+pre_train = False
+
+random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
@@ -105,11 +108,30 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # %%
+if pre_train:
+    print(f"pre-training for {n_iter} iterations on the pure model")
+
+    toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
+    optimizer = optax.sgd(lr_schedule)
+    sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
+    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+
+    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
+    pretrained_parameters = variational_gs.parameters
+
+    print("\n pre-training finished")
+
 for h in tqdm(field_strengths, "external_field"):
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+
+    if pre_train:
+        noise_generator = jax.nn.initializers.normal(stddev/2)
+        random_key, noise_key = jax.random.split(random_key, 2)
+        variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
+                                                           pretrained_parameters)
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
