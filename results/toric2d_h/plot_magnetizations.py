@@ -3,8 +3,8 @@ import numpy as np
 from global_variables import RESULTS_PATH
 
 # %%
-mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L=10_real_rbm3/L[10 10]_real_rbm_symm_a2_magvals")
-mags_hx = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L=10_real_rbm_hx03/L[10 10]_real_rbm_symm_a2_magvals")
+mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L=8_complex_crbm/L[8 8]_cRBM_a1_magvals")
+mags_hx = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L=8_complex_crbm_hx03_2/L[8 8]_cRBM_a1_magvals")
 
 
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -25,4 +25,4 @@ plot.legend()
 
 plt.show()
 
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[10,10]_real_rbm_symm_a2_mags_comparison.pdf")
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[8 8]_cRBM_a1_mags_comparison.pdf")
