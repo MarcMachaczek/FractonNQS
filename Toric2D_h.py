@@ -19,7 +19,7 @@ pre_train = False
 random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 8  # size should be at least 3, else there are problems with pbc and indexing
+L = 10  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -72,7 +72,7 @@ field_strengths = ((hx, 0., 0.0),
 magnetizations = {}
 
 # %%  setting hyper-parameters
-n_iter = 600
+n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
