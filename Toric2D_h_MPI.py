@@ -1,7 +1,17 @@
+import os
+from mpi4py import MPI
+
+rank = MPI.COMM_WORLD.Get_rank()
+# set only one visible device
+os.environ["CUDA_VISIBLE_DEVICES"] = f"{rank}"
+# force to use gpu
+os.environ["JAX_PLATFORM_NAME"] = "gpu"
+
 from matplotlib import pyplot as plt
 import numpy as np
 
 import jax
+# jax.distributed.initialize()
 import jax.numpy as jnp
 import optax
 import netket as nk
@@ -24,12 +34,6 @@ shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
-
-# visualize the graph
-fig = plt.figure(figsize=(10, 10), dpi=300)
-ax = fig.add_subplot(111)
-square_graph.draw(ax)
-plt.show()
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
@@ -77,8 +81,7 @@ min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. du
 n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
 n_discard_per_chain = 10  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = 100_000  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.0005
@@ -141,29 +144,30 @@ for h in tqdm(field_strengths, "external_field"):
     magnetizations[h] = variational_gs.expect(magnetization)
 
     # plot and save training data
-    fig = plt.figure(dpi=300, figsize=(10, 10))
-    plot = fig.add_subplot(111)
+    if rank==0:
+        fig = plt.figure(dpi=300, figsize=(10, 10))
+        plot = fig.add_subplot(111)
 
-    n_params = int(training_data["n_params"].value)
-    plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
-                  label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
+        n_params = int(training_data["n_params"].value)
+        plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
+                      label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
-    E0 = training_data["energy"].Mean[-1].item().real
-    err = training_data["energy"].Sigma[-1].item().real
+        E0 = training_data["energy"].Mean[-1].item().real
+        err = training_data["energy"].Sigma[-1].item().real
 
-    fig.suptitle(f" ToricCode2d h={h}: size={shape},"
-                 f" {eval_model} with alpha={alpha},"
-                 f" n_sweeps={L ** 2 * 2},"
-                 f" n_chains={n_chains},"
-                 f" n_samples={n_samples} \n"
-                 f" E0 = {round(E0, 5)} +- {round(err, 5)}")
+        fig.suptitle(f" ToricCode2d h={h}: size={shape},"
+                     f" {eval_model} with alpha={alpha},"
+                     f" n_sweeps={L ** 2 * 2},"
+                     f" n_chains={n_chains},"
+                     f" n_samples={n_samples} \n"
+                     f" E0 = {round(E0, 5)} +- {round(err, 5)}")
 
-    plot.set_xlabel("iterations")
-    plot.set_ylabel("energy")
-    plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
-    plot.legend()
-    if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
+        plot.set_xlabel("iterations")
+        plot.set_ylabel("energy")
+        plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
+        plot.legend()
+        if save_results:
+            fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
 
 # %%
 mags = []
@@ -171,31 +175,33 @@ for h, mag in magnetizations.items():
     mags.append([*h] + [mag.Mean.item().real, mag.Sigma.item().real])
 mags = np.asarray(mags)
 
-if save_results:
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals", mags)
+if rank==0:
+    if save_results:
+        np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals", mags)
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
 # %%
 # create and save magnetization plot
-fig = plt.figure(dpi=300, figsize=(10, 10))
-plot = fig.add_subplot(111)
+if rank==0:
+    fig = plt.figure(dpi=300, figsize=(10, 10))
+    plot = fig.add_subplot(111)
 
-c = "red" if mags[0, 0] == 0. else "blue"
-for mag in mags:
-    plot.errorbar(mag[2], np.abs(mag[3]), yerr=mag[4], marker="o", markersize=2, color=c)
+    c = "red" if mags[0, 0] == 0. else "blue"
+    for mag in mags:
+        plot.errorbar(mag[2], np.abs(mag[3]), yerr=mag[4], marker="o", markersize=2, color=c)
 
-plot.plot(mags[:, 2], np.abs(mags[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(mags[:, 2], np.abs(mags[:, 3]), marker="o", markersize=2, color=c)
 
-plot.set_xlabel("external field hz")
-plot.set_ylabel("magnetization")
-plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
-               f"and hx={mags[0, 0]}")
+    plot.set_xlabel("external field hz")
+    plot.set_ylabel("magnetization")
+    plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
+                   f"and hx={mags[0, 0]}")
 
-plot.set_xlim(0, 0.5)
-plot.set_ylim(0, 1.)
-plt.show()
+    plot.set_xlim(0, 0.5)
+    plot.set_ylim(0, 1.)
+    plt.show()
 
-if save_results:
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
+    if save_results:
+        fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
 
 # took 02:50 till magnetization was calculated
