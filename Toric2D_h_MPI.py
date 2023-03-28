@@ -2,18 +2,19 @@ import os
 from mpi4py import MPI
 
 rank = MPI.COMM_WORLD.Get_rank()
+# supress warning about no cuda mpi version
+# we don't need that because jax handles that, we only want to run copies of a process with some communication
+os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"  
 # set only one visible device
 os.environ["CUDA_VISIBLE_DEVICES"] = f"{rank}"
 # force to use gpu
 os.environ["JAX_PLATFORM_NAME"] = "gpu"
 
-from matplotlib import pyplot as plt
-import numpy as np
-
 import jax
 # jax.distributed.initialize()
 import jax.numpy as jnp
 import optax
+
 import netket as nk
 from netket.utils import HashableArray
 
@@ -21,6 +22,8 @@ import geneqs
 from geneqs.utils.training import loop_gs
 from global_variables import RESULTS_PATH
 
+from matplotlib import pyplot as plt
+import numpy as np
 from tqdm import tqdm
 
 save_results = True
@@ -79,12 +82,13 @@ magnetizations = {}
 n_iter = 800
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4
-n_discard_per_chain = 10  # should be small for using many chains, default is 10% of n_samples
-n_expect = 100_000  # number of samples to estimate observables, must be dividable by chunk_size
+n_samples = n_chains * 8
+n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
+chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
+n_expect = chunk_size * 8  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.0005
+diag_shift = 0.0001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
