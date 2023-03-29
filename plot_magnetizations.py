@@ -3,9 +3,9 @@ import numpy as np
 from global_variables import RESULTS_PATH
 
 # %%
-L = 8
-mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm/L[{L} {L}]_cRBM_a1_magvals")
-mags_hx = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_2/L[{L} {L}]_cRBM_a1_magvals")
+L = 10
+mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx0_1/L[{L} {L}]_cRBM_a1_magvals")
+mags_hx = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_magvals")
 
 
 fig = plt.figure(dpi=300, figsize=(10, 10))
