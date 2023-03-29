@@ -7,11 +7,32 @@ from typing import Tuple
 
 
 # %%
+def position_to_index(position: jax.Array, shape: jax.Array) -> jax.Array:
+    """
+    Indexes the position of a cubical lattice with periodic boundary conditions.
+    Note: Only works correctly if extend in every direction (see shape) is at least three.
+    Args:
+        position: Specifies the point on the lattice the edge originates from. Array with entries [x_0, x_1, ...]
+        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
+
+    Returns:
+        A single element array containing the integer index.
+
+    """
+    assert jnp.alltrue(position < shape), f"position {position} is out of bounds for lattice of shape {shape}"
+    dimension = shape.shape[0]  # extract spatial dimension
+    index = 0
+    for d in range(dimension - 1):
+        index += position[d] * jnp.product(shape[d + 1:])
+    index += position[dimension - 1]
+    return index
+
+
 def edge_to_index(position: jax.Array, direction: int, shape: jax.Array) -> jax.Array:
     """
     Indexes the edge of a cubical lattice with periodic boundary conditions.
     An edge is described by the point it is starting from (position) and its direction.
-    Note: Only works correctly if extend in every direction (see size) is at least three.
+    Note: Only works correctly if extend in every direction (see shape) is at least three.
     Args:
         position: Specifies the point on the lattice the edge originates from. Array with entries [x_0, x_1, ...]
         direction: Specifies the direction. Starts from zero = x_0 direction, then one = x_1 direction etc.
@@ -21,7 +42,7 @@ def edge_to_index(position: jax.Array, direction: int, shape: jax.Array) -> jax.
         A single element array containing the integer index.
 
     """
-    assert jnp.alltrue(position < shape), f"position {position} is out of bounds for shape {shape}"
+    assert jnp.alltrue(position < shape), f"position {position} is out of bounds for lattice of shape {shape}"
     dimension = shape.shape[0]  # extract spatial dimension
     index = 0
     for d in range(dimension - 1):
@@ -53,21 +74,57 @@ def index_to_edge(index: int, shape: jax.Array) -> Tuple[jax.Array, jax.Array]:
     return position, (remainder % dimension)
 
 
-# %% Utilities specifically for the 2 dimensional toric code
-def position_to_plaq(position: jax.Array, shape: jax.Array) -> jax.Array:
+# %% Utilities specifically for the chedckerboard model
+def position_to_cube(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
-    From a position on a cubical lattice with PBC, returns the indices of the edges forming the plaquette operator.
-    The indices are chosen sucht that position is in the lower left corner of the plaquette. See Toric Code model.
+    From a position on a cubical lattice with PBC, returns the indices of the 8 corners forming the cube.
+    The indices are chosen sucht that the extent of the cube is positive in all directions.
     Args:
-        position: Position of the plaquette. Array with entries [x_0 index, x_1 index, ...]
+        position: Position of the cube. Array with entries [x_0 index, x_1 index, ...]
         shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
 
     Returns:
         The four indices forming the plaquette.
 
     """
-    right = (position + jnp.array([1, 0])) % shape[0]  # location to the right of position (PBC)
-    top = (position + jnp.array([0, 1])) % shape[1]  # location to the top of position (PBC)
+    # notation: b: bottom, t:top -> tbt means x_top=pos_x+1, y_bot=pos_y, z_top=pos_z+1. position is always bbb
+    bbb = position
+    bbt = position.at[2].set((position.at[2].get() + 1) % shape[2])
+    btb = position.at[1].set((position.at[1].get() + 1) % shape[1])
+    btt = btb.at[2].set((btb.at[2].get() + 1) % shape[2])
+    tbb = position.at[0].set((position.at[0].get() + 1) % shape[0])
+    tbt = tbb.at[2].set((tbb.at[2].get() + 1) % shape[2])
+    ttb = tbb.at[1].set((tbb.at[1].get() + 1) % shape[1])
+    ttt = ttb.at[2].set((ttb.at[2].get() + 1) % shape[2])
+
+    indices = jnp.stack([position_to_index(bbb, shape),
+                         position_to_index(btb, shape),
+                         position_to_index(ttb, shape),
+                         position_to_index(tbb, shape),
+                         position_to_index(bbt, shape),
+                         position_to_index(btt, shape),
+                         position_to_index(ttt, shape),
+                         position_to_index(tbt, shape)])
+    return indices
+
+
+# %% Utilities specifically for the 2 dimensional toric code
+def position_to_plaq(position: jax.Array, shape: jax.Array) -> jax.Array:
+    """
+    From a position on a cubical lattice with PBC, returns the indices of the edges forming the plaquette operator.
+    The indices are chosen sucht that position is in the lower left corner of the plaquette. See Toric Code model.
+    Args:
+        position: Position of the plaquette. Array with entries [x_0 index, x_1 index]
+        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend]
+
+    Returns:
+        The four indices forming the plaquette.
+
+    """
+    right = position.at[0].set((position.at[0].get() + 1) % shape[0])
+    top = position.at[1].set((position.at[1].get() + 1) % shape[1])
+    # right = (position + jnp.array([1, 0])) % shape[0]  # location to the right of position (PBC)
+    # top = (position + jnp.array([0, 1])) % shape[1]  # location to the top of position (PBC)
     indices = jnp.stack([
         edge_to_index(position, 1, shape),
         edge_to_index(top, 0, shape),
@@ -81,8 +138,8 @@ def position_to_star(position: jax.Array, shape: jax.Array) -> jax.Array:
     From a position on a cubical lattice with PBC, returns the indices of the edges forming the star operator.
     The indices are chosen sucht that position is in the center of the star. See Toric Code model.
     Args:
-        position: Position of the star. Array with entries [x_0 index, x_1 index, ...]
-        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
+        position: Position of the star. Array with entries [x_0 index, x_1 index]
+        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend]
 
     Returns:
         The four indices forming the star.
@@ -105,9 +162,9 @@ def position_to_string(position: jax.Array, direction: int, shape: jax.Array) ->
     From a position and direction on a cubical lattice, returns the indices of the edges forming a string (with PBC)
     along the specified direction.
     Args:
-        position: Position of the star. Array with entries [x_0 index, x_1 index, ...]
+        position: Position of the star. Array with entries [x_0 index, x_1 index]
         direction: Specifies the direction. Starts from zero = x_0 direction, then one = x_1 direction etc.
-        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
+        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend]
 
     Returns:
         The indices forming the string.
