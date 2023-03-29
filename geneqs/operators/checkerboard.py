@@ -17,6 +17,7 @@ class Checkerboard(nk.operator.DiscreteOperator):
             self.h = (0., 0., 0.)
         else:
             self.h = h
+            assert h[1] == 0, "Warning: hy field not implemented yet, uncomment code in conns_and_mels and change dtype"
         # get corresponding indices on which the operators act on
         positions = jnp.asarray([(x, y, z) for x in range(shape[0]) for y in range(shape[1]) for z in range(shape[2])
                                  if (x + y + z) % 2 == 0])
@@ -42,10 +43,10 @@ class Checkerboard(nk.operator.DiscreteOperator):
         Returns:
 
         """
-        return checkerboard_conns_and_mels(sigma, self.plaqs, self.stars, self.h)
+        return checkerboard_conns_and_mels(sigma, self.cubes, self.h)
 
     def get_conn_flattened(self, x, sections):
-        eta, mels = checkerboard_conns_and_mels(x, self.plaqs, self.stars, self.h)
+        eta, mels = checkerboard_conns_and_mels(x, self.cubes, self.h)
 
         n_primes = eta.shape[1]  # number of connected states, same for alle possible configurations x
         n_visible = x.shape[-1]
@@ -53,7 +54,7 @@ class Checkerboard(nk.operator.DiscreteOperator):
         eta = eta.reshape(batch_size, n_primes * n_visible)  # flatten last dimension
         mels = mels.flatten()
 
-        # must manipulate sections in place TODO: this doesnt work, sections are not modified by this piece of code
+        # must manipulate sections in place
         for i in range(len(sections)):
             sections[i] = (i + 1) * n_primes
 
@@ -68,63 +69,53 @@ def get_local_kernel(vstate: nk.vqs.MCState, op: Checkerboard):
 @nk.vqs.get_local_kernel_arguments.dispatch
 def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: Checkerboard):
     sigma = vstate.samples
-    extra_args = checkerboard_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars, op.h)
+    extra_args = checkerboard_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.cubes, op.h)
     return sigma, extra_args
 
 
 @jax.jit
-@partial(jax.vmap, in_axes=(0, None, None, None))
+@partial(jax.vmap, in_axes=(0, None, None))
 def checkerboard_conns_and_mels(sigma: jax.Array,
-                                plaqs: jax.Array,
-                                stars: jax.Array,
+                                cubes: jax.Array,
                                 h: Tuple[float, float, float]) -> Tuple[jax.Array, jax.Array]:
     """
     For a given input spin configuration sigma, calculates all connected states eta and the corresponding non-zero
     matrix elements mels. See netket for further details. This version is only faster than netket if external fields are
     non-zero, as it already includes corresponding conns and mels, even when fields are zero.
-    H = H_toric - hx * sum_i sigma_x - hy * sum_j sigma_y - hz * sum_k sigma_z
+    H = H_checkerboard - hx * sum_i sigma_x - hy * sum_j sigma_y - hz * sum_k sigma_z
     Args:
         sigma: Input state or "bra", acting from the left.
-        plaqs: Array of shape (num_plaquettes, 4) containing the indices of all plaquette operators.
-        stars: Array of shape (num_stars, 4) containing the indices of all star operators.
+        cubes: Array of shape (num_cubes, 8) containing the indices of all cube operators.
         h: Tuple of field strengths of the external magentic field in x, y and z direction.
 
     Returns:
         connected states or "kets" eta, corresponding matrix elements mels
 
     """
-    n_sites = stars.shape[0]
+    n_sites = sigma.shape[-1]
+    n_cubes = cubes.shape[0]
     hx, hy, hz = h
 
     @jax.vmap
     def flip(x, idx):
         return x.at[idx].set(-x.at[idx].get())
 
-    # initialize connected states
-    eta = jnp.tile(sigma, (1 + n_sites + 2 * n_sites, 1))
-    # connected states by star operators, leave the first eta as is (diagonal connected state)
-    eta = eta.at[1:n_sites + 1].set(flip(eta.at[:n_sites].get(), stars))
+    # initialize connected states: 1 diagonal, n_cubes by checkerboard, n_sites by external field
+    eta = jnp.tile(sigma, (1 + n_cubes + n_sites, 1))
+    # connected states by cube operators, leave the first eta as is (diagonal connected state)
+    eta = eta.at[1:n_cubes+1].set(flip(eta.at[1:n_cubes+1].get(), cubes))
     # connected states through external field (sigma_x and sigma_y)
-    eta = eta.at[n_sites + 1:3 * n_sites + 1].set(
-        flip(eta.at[n_sites + 1:3 * n_sites + 1].get(), jnp.arange(2 * n_sites)))
+    eta = eta.at[1+n_cubes:1+n_cubes+n_sites].set(
+        flip(eta.at[1+n_cubes:1+n_cubes+n_sites].get(), jnp.arange(n_sites)))
 
-    # old implementation
-    # connected states by star operators
-    # star_eta = jnp.tile(sigma, (n_sites, 1))
-    # star_eta = flip(star_eta, stars)
-    # connected states through external field (sigma_x and sigma_y)
-    # field_eta = jnp.tile(sigma, (2*n_sites, 1))
-    # field_eta = flip(field_eta, jnp.arange(2*n_sites))
-    # stack connected mels (sigma.reshape corresponds to diagonal part, i.e. plaquettes, of the hamiltonian)
-    # eta = jnp.vstack((sigma.reshape(1, -1), star_eta, field_eta))
-
-    # now calcualte matrix elements, first n_sites correspond to flipped stars
-    star_mels = -jnp.ones(n_sites)
-    # axis 0 of sigma.at[plaqs] corresponds to #N_plaqs and axis 1 to the 4 edges of one plaquette
-    diag_mel = -jnp.sum(jnp.product(sigma.at[plaqs].get(), axis=1)) - hz * jnp.sum(sigma)
-    # mel according to hx and hy, TODO: include hy and check chunking etc
-    field_mels = -hx * jnp.ones(2 * n_sites)  # - hy * sigma * 1j
-    mels = jnp.hstack((diag_mel, star_mels, field_mels))
+    # now calcualte matrix elements
+    # axis 0 of sigma.at[plaqs] corresponds to #n_cubes and axis 1 to the 8 sites in one cube
+    diag_mel = -jnp.sum(jnp.product(sigma.at[cubes].get(), axis=1)) - hz * jnp.sum(sigma)
+    # n_sites mels corresponding to flipped cubes
+    cube_mels = -jnp.ones(n_cubes)
+    # mel according to hx and hy, TODO: include hy and check chunking behaviour
+    field_mels = -hx * jnp.ones(n_sites)  # - hy * sigma * 1j
+    mels = jnp.hstack((diag_mel, cube_mels, field_mels))
     return eta, mels
 
 

@@ -17,6 +17,7 @@ class ToricCode2d(nk.operator.DiscreteOperator):
             self.h = (0., 0., 0.)
         else:
             self.h = h
+            assert h[1] == 0, "Warning: hy field not implemented yet, uncomment code in conns_and_mels and change dtype"
         # get corresponding indices on which the operators act on
         positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
         self.plaqs = jnp.stack([geneqs.utils.indexing.position_to_plaq(p, shape) for p in positions])
@@ -102,7 +103,7 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     # initialize connected states
     eta = jnp.tile(sigma, (1 + n_sites + 2*n_sites, 1))
     # connected states by star operators, leave the first eta as is (diagonal connected state)
-    eta = eta.at[1:n_sites+1].set(flip(eta.at[:n_sites].get(), stars))
+    eta = eta.at[1:n_sites+1].set(flip(eta.at[1:n_sites+1].get(), stars))
     # connected states through external field (sigma_x and sigma_y)
     eta = eta.at[n_sites+1:3*n_sites+1].set(flip(eta.at[n_sites+1:3*n_sites+1].get(), jnp.arange(2*n_sites)))
 
@@ -116,10 +117,11 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     # stack connected mels (sigma.reshape corresponds to diagonal part, i.e. plaquettes, of the hamiltonian)
     # eta = jnp.vstack((sigma.reshape(1, -1), star_eta, field_eta))
 
-    # now calcualte matrix elements, first n_sites correspond to flipped stars
-    star_mels = -jnp.ones(n_sites)
+    # now calcualte matrix elements
     # axis 0 of sigma.at[plaqs] corresponds to #N_plaqs and axis 1 to the 4 edges of one plaquette
     diag_mel = -jnp.sum(jnp.product(sigma.at[plaqs].get(), axis=1)) - hz * jnp.sum(sigma)
+    # n_sites mels corresponding to flipped stars
+    star_mels = -jnp.ones(n_sites)
     # mel according to hx and hy, TODO: include hy and check chunking etc
     field_mels = -hx * jnp.ones(2*n_sites)  # - hy * sigma * 1j
     mels = jnp.hstack((diag_mel, star_mels, field_mels))
