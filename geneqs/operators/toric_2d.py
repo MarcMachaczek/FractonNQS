@@ -25,7 +25,7 @@ class ToricCode2d(nk.operator.DiscreteOperator):
 
     @property
     def dtype(self):
-        return float
+        return complex
 
     @property
     def is_hermitian(self):
@@ -123,7 +123,7 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     # n_sites mels corresponding to flipped stars
     star_mels = -jnp.ones(n_sites)
     # mel according to hx and hy, TODO: include hy and check chunking etc
-    field_mels = -hx * jnp.ones(2*n_sites)  # - hy * sigma * 1j
+    field_mels = -hx * jnp.ones(2*n_sites) - hy * sigma * 1j
     mels = jnp.hstack((diag_mel, star_mels, field_mels))
     return eta, mels
 
