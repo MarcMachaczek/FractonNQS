@@ -19,7 +19,10 @@ class Checkerboard(nk.operator.DiscreteOperator):
             self.h = h
             assert h[1] == 0, "Warning: hy field not implemented yet, uncomment code in conns_and_mels and change dtype"
         # get corresponding indices on which the operators act on
-        positions = jnp.asarray([(x, y, z) for x in range(shape[0]) for y in range(shape[1]) for z in range(shape[2])
+        positions = jnp.asarray([(x, y, z)
+                                 for x in range(shape[0])
+                                 for y in range(shape[1])
+                                 for z in range(shape[2])
                                  if (x + y + z) % 2 == 0])
 
         self.cubes = jnp.stack([geneqs.utils.indexing.position_to_cube(p, shape) for p in positions])
@@ -147,13 +150,17 @@ def get_netket_checkerboard(hi, shape, h):
     ha_netketlocal = nk.operator.LocalOperator(hi, dtype=float)
     hx, hy, hz = h
 
-    positions = jnp.asarray([(x, y, z) for x in range(shape[0]) for y in range(shape[1]) for z in range(shape[2])
+    # get corresponding indices on which the operators act on
+    positions = jnp.asarray([(x, y, z)
+                             for x in range(shape[0])
+                             for y in range(shape[1])
+                             for z in range(shape[2])
                              if (x + y + z) % 2 == 0])
 
     for position in positions:
         cube = geneqs.utils.indexing.position_to_cube(position, shape)
-        x_ops = [nk.operator.spin.sigmax(hi, idx) for idx in cube]
-        z_ops = [nk.operator.spin.sigmaz(hi, idx) for idx in cube]
+        x_ops = [nk.operator.spin.sigmax(hi, idx.item()) for idx in cube]
+        z_ops = [nk.operator.spin.sigmaz(hi, idx.item()) for idx in cube]
         ha_netketlocal -= math.prod(x_ops) + math.prod(z_ops)
 
     # adding external fields
