@@ -17,7 +17,6 @@ class ToricCode2d(nk.operator.DiscreteOperator):
             self.h = (0., 0., 0.)
         else:
             self.h = h
-            assert h[1] == 0, "Warning: hy field not implemented yet, uncomment code in conns_and_mels and change dtype"
         # get corresponding indices on which the operators act on
         positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
         self.plaqs = jnp.stack([geneqs.utils.indexing.position_to_plaq(p, shape) for p in positions])
@@ -25,7 +24,7 @@ class ToricCode2d(nk.operator.DiscreteOperator):
 
     @property
     def dtype(self):
-        return float
+        return complex
 
     @property
     def is_hermitian(self):
@@ -123,7 +122,7 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     # n_sites mels corresponding to flipped stars
     star_mels = -jnp.ones(n_sites)
     # mel according to hx and hy, TODO: include hy and check chunking etc
-    field_mels = -hx * jnp.ones(2*n_sites)  # - hy * sigma * 1j
+    field_mels = -hx * jnp.ones(2*n_sites) - hy * sigma * 1j
     mels = jnp.hstack((diag_mel, star_mels, field_mels))
     return eta, mels
 
@@ -167,7 +166,7 @@ class ToricCode2dAbstract(nk.operator.AbstractOperator):
 
     @property
     def dtype(self):
-        return float
+        return complex
 
     @property
     def is_hermitian(self):
@@ -178,7 +177,7 @@ class ToricCode2dAbstract(nk.operator.AbstractOperator):
 
 
 def get_netket_toric2dh(hi, shape, h):
-    ha_netketlocal = nk.operator.LocalOperator(hi, dtype=float)
+    ha_netketlocal = nk.operator.LocalOperator(hi, dtype=complex)
     hx, hy, hz = h
     # adding the plaquette terms:
     for i in range(shape[0]):
@@ -200,6 +199,6 @@ def get_netket_toric2dh(hi, shape, h):
     # adding external fields
     ha_netketlocal -= hz * sum([nk.operator.spin.sigmaz(hi, i) for i in range(hi.size)])
     ha_netketlocal -= hx * sum([nk.operator.spin.sigmax(hi, i) for i in range(hi.size)])
-    # ha_netketlocal -= hy * sum([nk.operator.spin.sigmay(hi, i) for i in range(hi.size)])
+    ha_netketlocal -= hy * sum([nk.operator.spin.sigmay(hi, i) for i in range(hi.size)])
 
     return ha_netketlocal
