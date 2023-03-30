@@ -58,7 +58,7 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-hx = 0.3
+hx = 0.0
 field_strengths = ((hx, 0., 0.0),
                    (hx, 0., 0.1),
                    (hx, 0., 0.2),
@@ -76,14 +76,31 @@ field_strengths = ((hx, 0., 0.0),
                    (hx, 0., 0.45),
                    (hx, 0., 0.5))
 
+field_strengths = ((hx, 0.00, 0.),
+                   (hx, 0.20, 0.),
+                   (hx, 0.40, 0.),
+                   (hx, 0.60, 0.),
+                   (hx, 0.70, 0.),
+                   (hx, 0.75, 0.),
+                   (hx, 0.80, 0.),
+                   (hx, 0.81, 0.),
+                   (hx, 0.82, 0.),
+                   (hx, 0.83, 0.),
+                   (hx, 0.84, 0.),
+                   (hx, 0.85, 0.),
+                   (hx, 0.87, 0.),
+                   (hx, 0.90, 0.),
+                   (hx, 0.95, 0.),
+                   (hx, 1.00, 0.))
+
 magnetizations = {}
 
 # %%  setting hyper-parameters
 n_iter = 700
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4
-n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
+n_samples = n_chains * 6
+n_discard_per_chain = 16  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 8  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
@@ -95,7 +112,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=d
 stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
-alpha = 2
+alpha = 1
 cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
                                     correlators=correlators,
                                     correlator_symmetries=correlator_symmetries,
@@ -198,7 +215,7 @@ if rank==0:
 
     plot.set_xlabel("external field hz")
     plot.set_ylabel("magnetization")
-    plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
+    plot.set_title(f"Magnetization vs external field in y-direction for ToricCode2d of size={shape} "
                    f"and hx={mags[0, 0]}")
 
     plot.set_xlim(0, 0.5)
