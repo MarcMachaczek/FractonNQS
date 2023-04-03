@@ -4,7 +4,7 @@ from mpi4py import MPI
 rank = MPI.COMM_WORLD.Get_rank()
 # supress warning about no cuda mpi version
 # we don't need that because jax handles that, we only want to run copies of a process with some communication
-os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"  
+os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"
 # set only one visible device
 os.environ["CUDA_VISIBLE_DEVICES"] = f"{rank}"
 # force to use gpu
@@ -93,7 +93,7 @@ field_strengths = ((hx, 0.00, 0.),
                    (hx, 0.95, 0.),
                    (hx, 1.00, 0.))
 
-magnetizations = {}
+observables = {}
 
 # %%  setting hyper-parameters
 n_iter = 700
@@ -102,7 +102,7 @@ n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~
 n_samples = n_chains * 6
 n_discard_per_chain = 16  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 8  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.0001
@@ -152,20 +152,33 @@ for h in tqdm(field_strengths, "external_field"):
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
-        noise_generator = jax.nn.initializers.normal(stddev/2)
+        noise_generator = jax.nn.initializers.normal(stddev / 2)
         random_key, noise_key = jax.random.split(random_key, 2)
         variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
                                                            pretrained_parameters)
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
-    # save magnetization
+    # calculate observables, therefore set some params of vqs
     variational_gs.chunk_size = chunk_size
     variational_gs.n_samples = n_expect
-    magnetizations[h] = variational_gs.expect(magnetization)
+    observables[h] = {}
+
+    # calculate energy and specific heat / variance of energy
+    observables[h]["energy"] = variational_gs.expect(toric)
+
+    # calculate magnetization
+    observables[h]["mag"] = variational_gs.expect(magnetization)
+
+    # calculate susceptibility / variance of magnetization
+    m = observables[h]["mag"].Mean.item().real
+    chi = 1 / hilbert.size * sum((nk.operator.spin.sigmaz(hilbert, i) - m) *
+                                 (nk.operator.spin.sigmaz(hilbert, i) - m).H
+                                 for i in range(hilbert.size))
+    observables[h]["sus"] = variational_gs.expect(chi)
 
     # plot and save training data
-    if rank==0:
+    if rank == 0:
         fig = plt.figure(dpi=300, figsize=(10, 10))
         plot = fig.add_subplot(111)
 
@@ -191,38 +204,41 @@ for h in tqdm(field_strengths, "external_field"):
             fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
 
 # %%
-mags = []
-for h, mag in magnetizations.items():
-    mags.append([*h] + [mag.Mean.item().real, mag.Sigma.item().real])
-mags = np.asarray(mags)
+obs_to_array = []
+for h, obs in observables.items():
+    obs_to_array.append([*h] +
+                        [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
+                        [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
+                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real])
+obs_to_array = np.asarray(obs_to_array)
 
-if rank==0:
+if rank == 0:
     if save_results:
-        np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals", mags)
+        np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
+                   header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
 # %%
 # create and save magnetization plot
-if rank==0:
+if rank == 0:
     fig = plt.figure(dpi=300, figsize=(10, 10))
     plot = fig.add_subplot(111)
 
-    c = "red" if mags[0, 0] == 0. else "blue"
-    for mag in mags:
-        plot.errorbar(mag[2], np.abs(mag[3]), yerr=mag[4], marker="o", markersize=2, color=c)
+    c = "red" if hx == 0. else "blue"
+    for obs in obs_to_array:
+        plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(mags[:, 2], np.abs(mags[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external field hz")
     plot.set_ylabel("magnetization")
-    plot.set_title(f"Magnetization vs external field in y-direction for ToricCode2d of size={shape} "
-                   f"and hx={mags[0, 0]}")
+    plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
+                   f"and hx={hx}")
 
-    plot.set_xlim(0, 0.5)
+    plot.set_xlim(0, field_strengths[-1][-1])
     plot.set_ylim(0, 1.)
     plt.show()
 
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
-
 # took 02:50 till magnetization was calculated
