@@ -169,8 +169,8 @@ for h in tqdm(field_strengths, "external_field"):
         plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
                       label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
-        E0 = observables[h]["energy"].Mean.item().real
-        err = observables[h]["energy"].Sigma.item().real
+        E0 = observables[h]["energy"].Mean[-1].item().real
+        err = observables[h]["energy"].Sigma[-1].item().real
 
         fig.suptitle(f" ToricCode2d h={h}: size={shape},"
                      f" {eval_model} with alpha={alpha},"

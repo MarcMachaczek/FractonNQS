@@ -19,36 +19,30 @@ pre_train = False
 random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 6  # size should be at least 3, else there are problems with pbc and indexing
-shape = jnp.array([L, L])
-square_graph = nk.graph.Square(length=L, pbc=True)
-hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
+L = 4  # this translates to L+1 without PBC
+shape = jnp.array([L, L, L])
+cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
+hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
 magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
-ax = fig.add_subplot(111)
-square_graph.draw(ax)
+ax = fig.add_subplot(projection='3d')
+
+geneqs.utils.plotting.plot_checkerboard(ax, L)
 plt.show()
 
 # get (specific) symmetries of the model, in our case translations
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
-link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
+perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
 # must be hashable to be included as flax.module attribute
 # noinspection PyArgumentList
-link_perms = HashableArray(link_perms.astype(int))
+perms = HashableArray(perms.astype(int))
 
 # noinspection PyArgumentList
-correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)),  # y-string correlators
-               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)))  # bond correlators
+correlators = ()
 
 # noinspection PyArgumentList
-correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
-                         HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)))
+correlator_symmetries = ()
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 hx = 0.0
@@ -69,24 +63,21 @@ field_strengths = ((hx, 0., 0.0),
                    (hx, 0., 0.45),
                    (hx, 0., 0.5))
 
-field_strengths = ((hx, 0., 0.0),
-                   (hx, 0., 0.1),
-                   (hx, 0., 0.2),
-                   (hx, 0., 0.3),)
+field_strengths = ((hx, 0., 0.0),)
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 400
+n_iter = 300
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4
-n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
+n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = n_chains * 8
+n_discard_per_chain = 16  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.0001
+diag_shift = 0.00001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift,)  # holomorphic=True)
 
 # define correlation enhanced RBM
@@ -94,7 +85,7 @@ stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
-cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
+cRBM = geneqs.models.CorrelationRBM(symmetries=perms,
                                     correlators=correlators,
                                     correlator_symmetries=correlator_symmetries,
                                     alpha=alpha,
@@ -106,8 +97,8 @@ model = cRBM
 eval_model = "cRBM"
 
 # learning rate scheduling
-lr_init = 0.01
-lr_end = 0.0005
+lr_init = 0.03
+lr_end = lr_init
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -116,18 +107,18 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 if pre_train:
     print(f"pre-training for {n_iter} iterations on the pure model")
 
-    toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
+    hamiltonian = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
+    variational_gs, training_data = loop_gs(variational_gs, hamiltonian, optimizer, preconditioner, n_iter, min_iter)
     pretrained_parameters = variational_gs.parameters
 
     print("\n pre-training finished")
 
 for h in tqdm(field_strengths, "external_field"):
-    toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
+    hamiltonian = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
@@ -138,7 +129,7 @@ for h in tqdm(field_strengths, "external_field"):
         variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
                                                            pretrained_parameters)
 
-    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
+    variational_gs, training_data = loop_gs(variational_gs, hamiltonian, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
     variational_gs.chunk_size = chunk_size
@@ -146,7 +137,7 @@ for h in tqdm(field_strengths, "external_field"):
     observables[h] = {}
 
     # calculate energy and specific heat / variance of energy
-    observables[h]["energy"] = variational_gs.expect(toric)
+    observables[h]["energy"] = variational_gs.expect(hamiltonian)
 
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
@@ -169,9 +160,9 @@ for h in tqdm(field_strengths, "external_field"):
     E0 = observables[h]["energy"].Mean.item().real
     err = observables[h]["energy"].Sigma.item().real
 
-    fig.suptitle(f" ToricCode2d h={h}: size={shape},"
+    fig.suptitle(f" Checkerboard h={h}: size={shape},"
                  f" {eval_model} with alpha={alpha},"
-                 f" n_sweeps={L ** 2 * 2},"
+                 f" n_sweeps={hilbert.size},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
                  f" E0 = {round(E0, 5)} +- {round(err, 5)}")
@@ -181,7 +172,7 @@ for h in tqdm(field_strengths, "external_field"):
     plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
     plot.legend()
     if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
+        fig.savefig(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
 
 # %%
 obs_to_array = []
@@ -193,9 +184,8 @@ for h, obs in observables.items():
 obs_to_array = np.asarray(obs_to_array)
 
 if save_results:
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
+    np.savetxt(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
                header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
-# mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
 # %%
 # create and save magnetization plot
@@ -210,7 +200,7 @@ plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize
 
 plot.set_xlabel("external field hz")
 plot.set_ylabel("magnetization")
-plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
+plot.set_title(f"Magnetization vs external field in z-direction for Checkerboard of size={shape} "
                f"and hx={hx}")
 
 plot.set_xlim(0, 0.5)
@@ -218,5 +208,5 @@ plot.set_ylim(0, 1.)
 plt.show()
 
 if save_results:
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
+    fig.savefig(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
 

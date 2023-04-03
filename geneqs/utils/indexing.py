@@ -200,25 +200,53 @@ def cubical_translation(arr: np.ndarray, shape: ArrayLike, direction: int, shift
 
 
 # %%
-def get_translations_cubical2d(shape: ArrayLike) -> np.ndarray:
+def get_translations_cubical2d(shape: ArrayLike, shift: int = 1) -> np.ndarray:
     """
     Retrieve permutations according to all translations of a 2d cubical lattice with PBC.
     Args:
         shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
+        shift: Only include translations by n=shift steps
 
     Returns:
         Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
 
     """
+    assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
     base = np.arange(np.product(shape)).reshape(-1, 1)
-    permutations = np.zeros(shape=(np.product(shape), np.product(shape)), dtype=int)
+    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
     p = 0
-    for i in range(shape[0]):
-        for j in range(shape[1]):
+    for i in range(0, shape[0], shift):
+        for j in range(0, shape[1], shift):
             dum = cubical_translation(base, shape, 0, i)  # apply x translation
             dum = cubical_translation(dum, shape, 1, j)  # apply y translation
-            permutations[p] = dum.flatten()
+            permutations[p] = dum.flatten()  # flatten feature dimension
             p += 1
+    return permutations
+
+
+def get_translations_cubical3d(shape: ArrayLike, shift: int = 1) -> np.ndarray:
+    """
+    Retrieve permutations according to all translations of a 3d cubical lattice with PBC.
+    Args:
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+        shift: Only include translations by n=shift steps
+
+    Returns:
+        Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
+
+    """
+    assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
+    base = np.arange(np.product(shape)).reshape(-1, 1)
+    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
+    p = 0
+    for i in range(0, shape[0], shift):
+        for j in range(0, shape[1], shift):
+            for k in range(0, shape[2], shift):
+                dum = cubical_translation(base, shape, 0, i)  # apply x translation
+                dum = cubical_translation(dum, shape, 1, j)  # apply y translation
+                dum = cubical_translation(dum, shape, 2, k)  # apply z translation
+                permutations[p] = dum.flatten()  # flatten feature dimension
+                p += 1
     return permutations
 
 
