@@ -5,11 +5,11 @@ from global_variables import RESULTS_PATH
 
 cmap = matplotlib.colormaps["Set1"]
 # %%
-L = 6
+L = 10
 obs_list = []  # append multiple data to compare them each within one plot
-obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_observables"))
-# obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx0_1/L[{L} {L}]_cRBM_a1_observables"))
-# obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_observables"))
+# obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_observables"))
+obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_6/L[{L} {L}]_cRBM_a1_observables"))
+#obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_observables"))
 
 
 # %% magnetizations comparison
@@ -58,4 +58,4 @@ plot_spheat.set_title(f"specific heat vs external field in z-direction for Toric
 
 plot_spheat.legend()
 plt.show()
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_mags_comparison.pdf")
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_obs_comparison.pdf")

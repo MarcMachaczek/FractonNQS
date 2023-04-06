@@ -36,7 +36,7 @@ L = 10  # size should be at least 3, else there are problems with pbc and indexi
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
-magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
+magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmay(hilbert, i) for i in range(hilbert.size))
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
@@ -76,19 +76,36 @@ field_strengths = ((hx, 0., 0.0),
                    (hx, 0., 0.45),
                    (hx, 0., 0.5))
 
+field_strengths = ((hx, 0.00, 0.),
+                   (hx, 0.20, 0.),
+                   (hx, 0.40, 0.),
+                   (hx, 0.60, 0.),
+                   (hx, 0.70, 0.),
+                   (hx, 0.73, 0.),
+                   (hx, 0.76, 0.),
+                   (hx, 0.79, 0.),
+                   (hx, 0.82, 0.),
+                   (hx, 0.85, 0.),
+                   (hx, 0.88, 0.),
+                   (hx, 0.91, 0.),
+                   (hx, 0.94, 0.),
+                   (hx, 0.97, 0.),
+                   (hx, 1.00, 0.),
+                   (hx, 1.03, 0.))
+
 observables = {}
 
 # %%  setting hyper-parameters
 n_iter = 700
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 6
+n_samples = n_chains * 8
 n_discard_per_chain = 16  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.0001
+diag_shift = 0.0007
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
@@ -109,7 +126,7 @@ eval_model = "cRBM"
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.0005
+lr_end = 0.0001
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -155,8 +172,8 @@ for h in tqdm(field_strengths, "external_field"):
 
     # calculate susceptibility / variance of magnetization
     m = observables[h]["mag"].Mean.item().real
-    chi = 1 / hilbert.size * sum((nk.operator.spin.sigmaz(hilbert, i) - m) *
-                                 (nk.operator.spin.sigmaz(hilbert, i) - m).H
+    chi = 1 / hilbert.size * sum((nk.operator.spin.sigmay(hilbert, i) - m) *
+                                 (nk.operator.spin.sigmay(hilbert, i) - m).H
                                  for i in range(hilbert.size))
     observables[h]["sus"] = variational_gs.expect(chi)
 
@@ -209,16 +226,16 @@ if rank == 0:
 
     c = "red" if hx == 0. else "blue"
     for obs in obs_to_array:
-        plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[1], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, 1], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external field hz")
     plot.set_ylabel("magnetization")
-    plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
+    plot.set_title(f"Magnetization vs external field in y-direction for ToricCode2d of size={shape} "
                    f"and hx={hx}")
 
-    plot.set_xlim(0, field_strengths[-1][-1])
+    plot.set_xlim(0, field_strengths[-1][1])
     plot.set_ylim(0, 1.)
     plt.show()
 
