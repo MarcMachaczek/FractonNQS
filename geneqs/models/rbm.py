@@ -80,7 +80,9 @@ class CorrelationRBM(nn.Module):
             theta += jax.lax.dot_general(corr_values, corr_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
             bias += corr_bias * jnp.sum(corr_values, axis=(1,))
 
+        self.sow("intermediates", "activation_inputs", theta)
         theta = self.activation(theta)
+        self.sow("intermediates", "activation_outputs", theta)
         theta = jnp.sum(theta, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
         theta += bias
         return theta
