@@ -28,7 +28,6 @@ magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
 ax = fig.add_subplot(projection='3d')
-
 geneqs.utils.plotting.plot_checkerboard(ax, L)
 plt.show()
 
@@ -68,23 +67,23 @@ field_strengths = ((hx, 0., 0.0),)
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 300
+n_iter = 200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 8
-n_discard_per_chain = 16  # should be small for using many chains, default is 10% of n_samples
+n_samples = n_chains * 16
+n_discard_per_chain = 128  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.00001
+diag_shift = 0.001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift,)  # holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
-alpha = 1
+alpha = 0.5
 cRBM = geneqs.models.CorrelationRBM(symmetries=perms,
                                     correlators=correlators,
                                     correlator_symmetries=correlator_symmetries,
@@ -97,7 +96,7 @@ model = cRBM
 eval_model = "cRBM"
 
 # learning rate scheduling
-lr_init = 0.03
+lr_init = 0.02
 lr_end = lr_init
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
