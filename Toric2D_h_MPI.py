@@ -95,8 +95,8 @@ field_strengths = ((hx, 0.00, 0.),
 
 observables = {}
 
-# %%  setting hyper-parameters
-n_iter = 700
+# %%  setting hyper-parameters, TODO: at beginning: sampling takes 0.85 * t_iter, t_iter ~ 1.7 secs, more chains?
+n_iter = 900
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
@@ -105,7 +105,7 @@ chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check wh
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.0007
+diag_shift = 0.001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
@@ -125,7 +125,7 @@ model = cRBM
 eval_model = "cRBM"
 
 # learning rate scheduling
-lr_init = 0.01
+lr_init = 0.002
 lr_end = 0.0001
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
@@ -230,7 +230,7 @@ if rank == 0:
 
     plot.plot(obs_to_array[:, 1], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
-    plot.set_xlabel("external field hz")
+    plot.set_xlabel("external field hy")
     plot.set_ylabel("magnetization")
     plot.set_title(f"Magnetization vs external field in y-direction for ToricCode2d of size={shape} "
                    f"and hx={hx}")
