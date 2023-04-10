@@ -39,7 +39,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmay(hilbert, i) for i in range(hilbert.size))
 
 # get (specific) symmetries of the model, in our case translations
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
+perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
 link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 # must be hashable to be included as flax.module attribute
 # noinspection PyArgumentList
@@ -92,7 +92,7 @@ field_strengths = ((hx, 0.00, 0.),
                    (hx, 0.97, 0.),
                    (hx, 1.00, 0.),
                    (hx, 1.03, 0.))
-
+                   
 observables = {}
 
 # %%  setting hyper-parameters
@@ -218,24 +218,12 @@ for h in tqdm(field_strengths, "external_field"):
                 else:
                     np.savetxt(f, obs_to_write)
 
-# %%
-obs_to_array = []
-for h, obs in observables.items():
-    obs_to_array.append([*h] +
-                        [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
-                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real])
-obs_to_array = np.asarray(obs_to_array)
-
-if rank == 0:
-    if save_results:
-        np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
-                   header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
-# mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
-
+                    
 # %%
 # create and save magnetization plot
 if rank == 0:
+    obs_to_array = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt")
+
     fig = plt.figure(dpi=300, figsize=(10, 10))
     plot = fig.add_subplot(111)
 

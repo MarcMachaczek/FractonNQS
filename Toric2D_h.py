@@ -32,7 +32,7 @@ square_graph.draw(ax)
 plt.show()
 
 # get (specific) symmetries of the model, in our case translations
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
+perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
 link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 # must be hashable to be included as flax.module attribute
 # noinspection PyArgumentList
