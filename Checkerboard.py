@@ -38,7 +38,7 @@ perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
 perms = HashableArray(perms.astype(int))
 
 # noinspection PyArgumentList
-correlators = ()
+correlators = (geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2),)
 
 # noinspection PyArgumentList
 correlator_symmetries = ()

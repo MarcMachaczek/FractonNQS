@@ -74,6 +74,77 @@ def index_to_edge(index: int, shape: jax.Array) -> Tuple[jax.Array, jax.Array]:
     return position, (remainder % dimension)
 
 
+def cubical_translation(arr: np.ndarray, shape: ArrayLike, direction: int, shift: int) -> np.ndarray:
+    """
+    Applies a translation to the input array, permuting the features of arr accordingly.
+
+    Args:
+        arr: Array of shape (n_sites, features).
+        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
+        direction: Dimension along which to apply the shift/translation.
+        shift: The "step size" for the translation
+
+    Returns:
+        Permuted version of arr, where the first axis of arr was permuted according to the specified translation.
+
+    """
+    n_dim = shape[direction]
+    perm = (np.arange(n_dim) - shift) % n_dim  # create index permutation along dim
+    perm_array = np.copy(arr).reshape(*shape, *arr.shape[1:])  # unflatten spatial dimensions
+    perm_array = np.take(perm_array, perm, axis=direction)  # apply permutation along spatial dimension
+    return perm_array.reshape(-1, *arr.shape[1:])  # flatten spatial dimensions again
+
+
+def get_translations_cubical2d(shape: ArrayLike, shift: int) -> np.ndarray:
+    """
+    Retrieve permutations according to all translations of a 2d cubical lattice with PBC.
+    Args:
+        shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
+        shift: Only include translations by n=shift steps
+
+    Returns:
+        Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
+
+    """
+    assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
+    base = np.arange(np.product(shape)).reshape(-1, 1)
+    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
+    p = 0
+    for i in range(0, shape[0], shift):
+        for j in range(0, shape[1], shift):
+            dum = cubical_translation(base, shape, 0, i)  # apply x translation
+            dum = cubical_translation(dum, shape, 1, j)  # apply y translation
+            permutations[p] = dum.flatten()  # flatten feature dimension
+            p += 1
+    return permutations
+
+
+def get_translations_cubical3d(shape: ArrayLike, shift: int) -> np.ndarray:
+    """
+    Retrieve permutations according to all translations of a 3d cubical lattice with PBC.
+    Args:
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+        shift: Only include translations by n=shift steps
+
+    Returns:
+        Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
+
+    """
+    assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
+    base = np.arange(np.product(shape)).reshape(-1, 1)
+    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
+    p = 0
+    for i in range(0, shape[0], shift):
+        for j in range(0, shape[1], shift):
+            for k in range(0, shape[2], shift):
+                dum = cubical_translation(base, shape, 0, i)  # apply x translation
+                dum = cubical_translation(dum, shape, 1, j)  # apply y translation
+                dum = cubical_translation(dum, shape, 2, k)  # apply z translation
+                permutations[p] = dum.flatten()  # flatten feature dimension
+                p += 1
+    return permutations
+
+
 # %% Utilities specifically for the chedckerboard model
 def position_to_cube(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
@@ -108,7 +179,48 @@ def position_to_cube(position: jax.Array, shape: jax.Array) -> jax.Array:
     return indices
 
 
-# %% Utilities specifically for the 2 dimensional toric code
+def get_cubes_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
+    """
+    Get the indices of all cubes formed by corners on the three-dimensional lattice (with PBC).
+    Args:
+        shift: Shift between cubes: 1 means every cube, 2 corresponds to a checkerboard, etc.
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+
+    Returns:
+        Array with all indices of shape (n_plaquettes, 8)
+
+    """
+    positions = jnp.asarray([(x, y, z)
+                             for x in range(shape[0])
+                             for y in range(shape[1])
+                             for z in range(shape[2])
+                             if (x + y + z) % shift == 0])
+    return jnp.stack([position_to_cube(p, shape) for p in positions])
+
+
+def get_cubeperms_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
+
+    positions = jnp.asarray([(x, y, z)
+                             for x in range(shape[0])
+                             for y in range(shape[1])
+                             for z in range(shape[2])
+                             if (x + y + z) % shift == 0])
+
+    position_idxs = [position_to_index(p, shape).item() for p in positions]  # indexes where cubes are constructed
+
+    # create permutation dictionary to convert from positions_idxs back to cube indices
+    perm_dict = {}
+    for i, idx in enumerate(position_idxs):
+        perm_dict[idx] = i
+
+    perms = jnp.take(get_translations_cubical3d(shape, shift), jnp.asarray(position_idxs), axis=1)
+
+    cube_perms = [[perm_dict[idx.item()] for idx in perm] for perm in perms]
+
+    return jnp.asarray(cube_perms)
+
+
+# %%  Utilities specifically for the 2 dimensional toric code
 def position_to_plaq(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
     From a position on a cubical lattice with PBC, returns the indices of the edges forming the plaquette operator.
@@ -177,101 +289,6 @@ def position_to_string(position: jax.Array, direction: int, shape: jax.Array) ->
     return jnp.array(indices)
 
 
-# %%
-def cubical_translation(arr: np.ndarray, shape: ArrayLike, direction: int, shift: int = 1) -> np.ndarray:
-    """
-    Applies a translation to the input array, permuting the features of arr accordingly.
-
-    Args:
-        arr: Array of shape (n_sites, features).
-        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
-        direction: Dimension along which to apply the shift/translation.
-        shift: The "step size" for the translation
-
-    Returns:
-        Permuted version of arr, where the first axis of arr was permuted according to the specified translation.
-
-    """
-    n_dim = shape[direction]
-    perm = (np.arange(n_dim) - shift) % n_dim  # create index permutation along dim
-    perm_array = np.copy(arr).reshape(*shape, *arr.shape[1:])  # unflatten spatial dimensions
-    perm_array = np.take(perm_array, perm, axis=direction)  # apply permutation along spatial dimension
-    return perm_array.reshape(-1, *arr.shape[1:])  # flatten spatial dimensions again
-
-
-# %%
-def get_translations_cubical2d(shape: ArrayLike, shift: int = 1) -> np.ndarray:
-    """
-    Retrieve permutations according to all translations of a 2d cubical lattice with PBC.
-    Args:
-        shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
-        shift: Only include translations by n=shift steps
-
-    Returns:
-        Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
-
-    """
-    assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
-    base = np.arange(np.product(shape)).reshape(-1, 1)
-    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
-    p = 0
-    for i in range(0, shape[0], shift):
-        for j in range(0, shape[1], shift):
-            dum = cubical_translation(base, shape, 0, i)  # apply x translation
-            dum = cubical_translation(dum, shape, 1, j)  # apply y translation
-            permutations[p] = dum.flatten()  # flatten feature dimension
-            p += 1
-    return permutations
-
-
-def get_translations_cubical3d(shape: ArrayLike, shift: int = 1) -> np.ndarray:
-    """
-    Retrieve permutations according to all translations of a 3d cubical lattice with PBC.
-    Args:
-        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
-        shift: Only include translations by n=shift steps
-
-    Returns:
-        Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
-
-    """
-    assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
-    base = np.arange(np.product(shape)).reshape(-1, 1)
-    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
-    p = 0
-    for i in range(0, shape[0], shift):
-        for j in range(0, shape[1], shift):
-            for k in range(0, shape[2], shift):
-                dum = cubical_translation(base, shape, 0, i)  # apply x translation
-                dum = cubical_translation(dum, shape, 1, j)  # apply y translation
-                dum = cubical_translation(dum, shape, 2, k)  # apply z translation
-                permutations[p] = dum.flatten()  # flatten feature dimension
-                p += 1
-    return permutations
-
-
-# %%
-def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
-    """
-    Retrieve the permutations of links between sites induced by the permutations of the sites.
-    Args:
-        permutations: Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
-
-    Returns:
-        Array with permutations of the links/edges with dimensions (n_permutations, n_edges)
-
-    """
-    # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
-    # now get permutations on the link level
-    n_spins = 2 * permutations.shape[1]
-    link_perms = np.zeros(shape=(permutations.shape[0], n_spins))
-    for i, perm in enumerate(permutations):
-        link_perm = [[p * 2, p * 2 + 1] for p in perm]
-        link_perms[i] = np.asarray(link_perm, dtype=int).flatten()
-
-    return link_perms
-
-
 def get_strings_cubical2d(direction: int, shape: jax.Array) -> jax.Array:
     """
     Get the indices of all strings formed by edges around the two-dimensional lattice (with PBC)
@@ -331,7 +348,27 @@ def get_bonds_cubical2d(shape: jax.Array) -> jax.Array:
     return jnp.array(indices)
 
 
-# %%
+def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
+    """
+    Retrieve the permutations of links between sites induced by the permutations of the sites.
+    Args:
+        permutations: Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
+
+    Returns:
+        Array with permutations of the links/edges with dimensions (n_permutations, n_edges)
+
+    """
+    # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
+    # now get permutations on the link level
+    n_spins = 2 * permutations.shape[1]
+    link_perms = np.zeros(shape=(permutations.shape[0], n_spins))
+    for i, perm in enumerate(permutations):
+        link_perm = [[p * 2, p * 2 + 1] for p in perm]
+        link_perms[i] = np.asarray(link_perm, dtype=int).flatten()
+
+    return link_perms
+
+
 def get_xstring_perms(shape: jax.Array):
     base = jnp.arange(shape[1])  # identity permutation, number of x-strings is equal to extend in y dimension
     # proper (not identity) permutations, corresponding to translations in d=1 / y direction

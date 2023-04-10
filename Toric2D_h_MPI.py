@@ -95,7 +95,7 @@ field_strengths = ((hx, 0.00, 0.),
 
 observables = {}
 
-# %%  setting hyper-parameters, TODO: at beginning: sampling takes 0.85 * t_iter, t_iter ~ 1.7 secs, more chains?
+# %%  setting hyper-parameters
 n_iter = 900
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
@@ -177,7 +177,7 @@ for h in tqdm(field_strengths, "external_field"):
                                  for i in range(hilbert.size))
     observables[h]["sus"] = variational_gs.expect(chi)
 
-    # plot and save training data
+    # plot and save training data, save observables
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(10, 10))
         plot = fig.add_subplot(111)
@@ -202,6 +202,21 @@ for h in tqdm(field_strengths, "external_field"):
         plot.legend()
         if save_results:
             fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
+
+        # save observables to file
+        if save_results:
+            obs = observables[h]
+            obs_to_write = np.asarray([[*h] +
+                                      [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
+                                      [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
+                                      [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
+
+            with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt", "ab") as f:
+                if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt") == 0:
+                    np.savetxt(f, obs_to_write,
+                               header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
+                else:
+                    np.savetxt(f, obs_to_write)
 
 # %%
 obs_to_array = []
