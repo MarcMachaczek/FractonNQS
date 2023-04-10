@@ -38,10 +38,10 @@ perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
 perms = HashableArray(perms.astype(int))
 
 # noinspection PyArgumentList
-correlators = (geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2),)
+correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2)),)
 
 # noinspection PyArgumentList
-correlator_symmetries = ()
+correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, shift=2)),)
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 hx = 0.0
