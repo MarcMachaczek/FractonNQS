@@ -98,14 +98,14 @@ observables = {}
 # %%  setting hyper-parameters, TODO: at beginning: sampling takes 0.85 * t_iter, t_iter ~ 1.7 secs, more chains?
 n_iter = 900
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 8
-n_discard_per_chain = 16  # should be small for using many chains, default is 10% of n_samples
+n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = n_chains * 16
+n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.001
+diag_shift = 0.0001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
