@@ -67,11 +67,11 @@ field_strengths = ((hx, 0., 0.0),)
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 200
+n_iter = 100
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 16
-n_discard_per_chain = 128  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
@@ -83,7 +83,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=d
 stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
-alpha = 0.5
+alpha = 1 / 8
 cRBM = geneqs.models.CorrelationRBM(symmetries=perms,
                                     correlators=correlators,
                                     correlator_symmetries=correlator_symmetries,

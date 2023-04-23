@@ -36,7 +36,7 @@ L = 8  # size should be at least 3, else there are problems with pbc and indexin
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
-magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
+magnetization = geneqs.operators.observables.Magnetization(hilbert)
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
@@ -79,7 +79,7 @@ field_strengths = ((hx, 0.00, 0.),
 
 direction = np.array([1, 0, 1]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 22) * direction).T
-                   
+
 observables = {}
 
 # %%  setting hyper-parameters
@@ -160,16 +160,10 @@ for h in tqdm(field_strengths, "external_field"):
 
     # calculate susceptibility / variance of magnetization
     m = observables[h]["mag"].Mean.item().real
-    
-    chi = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) * nk.operator.spin.sigmaz(hilbert, i)
-                                 for i in range(hilbert.size)]) - m**2
-    
-    chi = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i)*nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)]) - 1 / hilbert.size**2 * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)]) * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-    
-    chi = 1 / hilbert.size * sum((nk.operator.spin.sigmaz(hilbert, i) - m) *
-                                 (nk.operator.spin.sigmaz(hilbert, i) - m)
-                                 for i in range(hilbert.size))
-    
+
+    chi = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) - m for i in range(hilbert.size)]) * \
+          sum([nk.operator.spin.sigmaz(hilbert, i) - m for i in range(hilbert.size)])
+
     observables[h]["sus"] = variational_gs.expect(chi)
 
     # plot and save training data, save observables
@@ -196,15 +190,16 @@ for h in tqdm(field_strengths, "external_field"):
         plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
         plot.legend()
         if save_results:
-            fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+            fig.savefig(
+                f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
         # save observables to file
         if save_results:
             obs = observables[h]
             obs_to_write = np.asarray([[*h] +
-                                      [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                                      [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
-                                      [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
+                                       [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
+                                       [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
+                                       [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
 
             with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt") == 0:
@@ -213,7 +208,6 @@ for h in tqdm(field_strengths, "external_field"):
                 else:
                     np.savetxt(f, obs_to_write)
 
-                    
 # %%
 # create and save magnetization plot
 if rank == 0:

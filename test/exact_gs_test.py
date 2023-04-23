@@ -89,7 +89,7 @@ e_random = vqs.expect(checkerboard)
 print(jax.tree_util.tree_map(lambda x: x.shape, vqs.parameters))
 # needed to avoid inf when applying log_cosh activation
 exact_hidden_bias = jnp.zeros_like(vqs.parameters["hidden_bias"])\
-                    + jax.random.normal(jax.random.PRNGKey(0), vqs.parameters["hidden_bias"].shape) * 0.00000001
+                    + jax.random.normal(jax.random.PRNGKey(0), vqs.parameters["hidden_bias"].shape) * 0.0001
 exact_visible_bias = jnp.zeros_like(vqs.parameters["visible_bias"])
 exact_weights = jnp.zeros_like(vqs.parameters["symm_kernel"], dtype=complex)
 exact_weights = exact_weights.at[0, cube_idx].set(1j * jnp.pi/4)
