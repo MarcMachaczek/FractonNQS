@@ -37,6 +37,9 @@ shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = geneqs.operators.observables.Magnetization(hilbert)
+magnetization_squared = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)]) * \
+1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
+
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
@@ -83,11 +86,11 @@ field_strengths = (np.linspace(0, 1, 22) * direction).T
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 900
+n_iter = 800
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 16
-n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
@@ -160,9 +163,8 @@ for h in tqdm(field_strengths, "external_field"):
 
     # calculate susceptibility / variance of magnetization
     m = observables[h]["mag"].Mean.item().real
-
-    chi = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) - m for i in range(hilbert.size)]) * \
-          sum([nk.operator.spin.sigmaz(hilbert, i) - m for i in range(hilbert.size)])
+    
+    chi = magnetization_squared - m**2
 
     observables[h]["sus"] = variational_gs.expect(chi)
 

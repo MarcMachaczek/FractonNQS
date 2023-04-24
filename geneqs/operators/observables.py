@@ -61,7 +61,7 @@ def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: Magnetization):
 
 
 @jax.jit
-@partial(jax.vmap, in_axes=(0, None, None, None))
+@partial(jax.vmap, in_axes=(0,))
 def magnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.Array]:
     """
     For a given input spin configuration sigma, calculates all connected states eta and the corresponding non-zero
