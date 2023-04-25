@@ -37,9 +37,6 @@ shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = geneqs.operators.observables.Magnetization(hilbert)
-magnetization_squared = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)]) * \
-1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
@@ -161,13 +158,6 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
 
-    # calculate susceptibility / variance of magnetization
-    m = observables[h]["mag"].Mean.item().real
-    
-    chi = magnetization_squared - m**2
-
-    observables[h]["sus"] = variational_gs.expect(chi)
-
     # plot and save training data, save observables
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -200,13 +190,12 @@ for h in tqdm(field_strengths, "external_field"):
             obs = observables[h]
             obs_to_write = np.asarray([[*h] +
                                        [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                                       [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
                                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
 
             with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt") == 0:
                     np.savetxt(f, obs_to_write,
-                               header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
+                               header="hx, hy, hz, mag, mag_var, energy, energy_var")
                 else:
                     np.savetxt(f, obs_to_write)
 

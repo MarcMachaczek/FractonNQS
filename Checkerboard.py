@@ -23,7 +23,7 @@ L = 4  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
-magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
+magnetization = geneqs.operators.observables.Magnetization(hilbert)
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -141,13 +141,6 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
 
-    # calculate susceptibility / variance of magnetization
-    m = observables[h]["mag"].Mean.item().real
-    chi = 1 / hilbert.size * sum((nk.operator.spin.sigmaz(hilbert, i) - m) *
-                                 (nk.operator.spin.sigmaz(hilbert, i) - m).H
-                                 for i in range(hilbert.size))
-    observables[h]["sus"] = variational_gs.expect(chi)
-
     # plot and save training data
     fig = plt.figure(dpi=300, figsize=(10, 10))
     plot = fig.add_subplot(111)
@@ -178,13 +171,12 @@ obs_to_array = []
 for h, obs in observables.items():
     obs_to_array.append([*h] +
                         [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
                         [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real])
 obs_to_array = np.asarray(obs_to_array)
 
 if save_results:
     np.savetxt(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
-               header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
+               header="hx, hy, hz, mag, mag_var, energy, energy_var")
 
 # %%
 # create and save magnetization plot

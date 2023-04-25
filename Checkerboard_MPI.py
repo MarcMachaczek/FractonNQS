@@ -36,7 +36,7 @@ L = 10  # size should be at least 3, else there are problems with pbc and indexi
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
-magnetization = 1 / hilbert.size * sum(nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size))
+magnetization = geneqs.operators.observables.Magnetization(hilbert)
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
@@ -153,13 +153,6 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
 
-    # calculate susceptibility / variance of magnetization
-    m = observables[h]["mag"].Mean.item().real
-    chi = 1 / hilbert.size * sum((nk.operator.spin.sigmaz(hilbert, i) - m) *
-                                 (nk.operator.spin.sigmaz(hilbert, i) - m).H
-                                 for i in range(hilbert.size))
-    observables[h]["sus"] = variational_gs.expect(chi)
-
     # plot and save training data
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -191,14 +184,13 @@ obs_to_array = []
 for h, obs in observables.items():
     obs_to_array.append([*h] +
                         [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["sus"].Mean.item().real, obs["sus"].Sigma.item().real] +
                         [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real])
 obs_to_array = np.asarray(obs_to_array)
 
 if rank == 0:
     if save_results:
         np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
-                   header="hx, hy, hz, mag, mag_var, susceptibility, sus_var, energy, energy_var")
+                   header="hx, hy, hz, mag, mag_var, energy, energy_var")
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
 # %%
