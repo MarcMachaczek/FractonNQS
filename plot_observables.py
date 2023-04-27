@@ -12,7 +12,7 @@ L = 8
 field_direction = 2  # 0=x, 1=y, 2=z
 obs_list = []  # append multiple data to compare them each within one plot
 # obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_observables"))
-obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_sd_4/L[{L} {L}]_cRBM_a1_observables.txt"))
+obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_sd_5/L[{L} {L}]_cRBM_a1_observables.txt"))
 #obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_observables"))
 
 
@@ -38,7 +38,7 @@ plot_sus = fig.add_subplot(132)
 
 for i, obs in enumerate(obs_list):
     sus, sus_fields = geneqs.utils.eval_obs.susc_from_mag(magnetizations=obs[:, 3], fields=obs[:, :3])
-    plot_sus.plot(sus_fields, sus, marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
+    plot_sus.plot(sus_fields[:,2], sus, marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
 
 plot_sus.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_sus.set_ylabel("susceptibility")
