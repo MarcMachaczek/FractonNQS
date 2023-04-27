@@ -52,7 +52,7 @@ class ToricCode2d(nk.operator.DiscreteOperator):
         eta = eta.reshape(batch_size, n_primes*n_visible)  # flatten last dimension
         mels = mels.flatten()
 
-        # must manipulate sections in place TODO: this doesnt work, sections are not modified by this piece of code
+        # must manipulate sections in place
         for i in range(len(sections)):
             sections[i] = (i + 1) * n_primes
 

@@ -11,6 +11,7 @@ from netket.utils.types import PyTree, PRNGKeyT
 from netket.sampler import MetropolisRule
 
 
+# %%
 @struct.dataclass
 class WeightedRule(MetropolisRule):
     """A Metropolis sampling rule that can be used to combine different rules acting
@@ -102,3 +103,42 @@ class WeightedRule(MetropolisRule):
 
     def __repr__(self):
         return f"WeightedRule(probabilities={self.probabilities}, rules={self.rules})"
+
+
+@struct.dataclass
+class MultiRule(MetropolisRule):
+    """
+    Updates/flips multiple spins according to update_clusters. One of the clusters provided is chosen at random,
+    then all spins within that cluster are updated.
+    """
+
+    update_clusters: jax.Array  # TODO: hashable array required?
+
+    def transition(self, sampler, machine, parameters, state, key, sigmas):
+        # Deduce the number of possible clusters to be updated
+        n_clusters = self.update_clusters.shape[0]
+
+        # Deduce the number of MCMC chains from input shape
+        n_chains = sigmas.shape[0]
+
+        # Load the Hilbert space of the sampler
+        hilb = sampler.hilbert
+
+        # Split the rng key into 2: one for each random operation
+        key_indx, key_flip = jax.random.split(key, 2)
+
+        # Pick two random sites on every chain
+        indxs = jax.random.randint(
+            key_indx, shape=(n_chains, 1), minval=0, maxval=n_clusters-1
+        )
+
+        @jax.vmap
+        def flip(sigma, cluster):
+            return sigma.at[cluster].set(-sigma.at[cluster].get())
+
+        # flip those clusters
+        sigmap = flip(sigmas, self.update_clusters[indxs])
+
+        # If this transition had a correcting factor L, it's possible
+        # to return it as a vector in the second value
+        return sigmap, None
