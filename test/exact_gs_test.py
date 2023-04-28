@@ -19,7 +19,7 @@ shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
 
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
+perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
 link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 

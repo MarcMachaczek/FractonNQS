@@ -142,6 +142,11 @@ if pre_train:
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
+    # exact ground state parameters for the 2d toric code
+    gs_params = jax.tree_util.tree_map(lambda p: jnp.zeros_like(p), variational_gs.parameters)
+    plaq_idxs = toric.plaqs[0].reshape(1, -1)
+    gs_params["symm_kernel"] = gs_params["symm_kernel"].at[0, plaq_idxs].set(1j * jnp.pi/4)
+
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
     pretrained_parameters = variational_gs.parameters
 
@@ -155,7 +160,7 @@ for h in tqdm(field_strengths, "external_field"):
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
-        noise_generator = jax.nn.initializers.normal(2 * stddev)
+        noise_generator = jax.nn.initializers.normal(0.1 * stddev)
         random_key, noise_key = jax.random.split(random_key, 2)
         variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
                                                            pretrained_parameters)
