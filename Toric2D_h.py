@@ -145,10 +145,15 @@ if pre_train:
     # exact ground state parameters for the 2d toric code
     gs_params = jax.tree_util.tree_map(lambda p: jnp.zeros_like(p), variational_gs.parameters)
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
-    gs_params["symm_kernel"] = gs_params["symm_kernel"].at[0, plaq_idxs].set(1j * jnp.pi/4)
+    star_idxs = toric.stars[0].reshape(1, -1)
+    exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    gs_params = gs_params.copy({"symm_kernel": exact_weights})
+    pretrained_parameters = gs_params
 
-    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
-    pretrained_parameters = variational_gs.parameters
+    # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
+    # pretrained_parameters = variational_gs.parameters
 
     print("\n pre-training finished")
 

@@ -14,7 +14,7 @@ n_discard_per_chain = 48
 
 h = (0., 0., 0.)  # external field
 # %%
-L = 6  # size should be at least 3, else there are problems with pbc and indexing
+L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
@@ -23,7 +23,7 @@ perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
 link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
 link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
-alpha = 0.5
+alpha = 1
 cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
                                     correlators=(),
                                     correlator_symmetries=(),
@@ -34,6 +34,7 @@ cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
 
 toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 plaq_idx = toric.plaqs[0].reshape(1, -1)
+star_idx = toric.stars[0].reshape(1, -1)
 
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
 
@@ -47,6 +48,7 @@ exact_hidden_bias = jnp.zeros_like(vqs.parameters["hidden_bias"])\
 exact_visible_bias = jnp.zeros_like(vqs.parameters["visible_bias"])
 exact_weights = jnp.zeros_like(vqs.parameters["symm_kernel"], dtype=complex)
 exact_weights = exact_weights.at[0, plaq_idx].set(1j * jnp.pi/4)
+exact_weights = exact_weights.at[1, star_idx].set(1j * jnp.pi/2)
 
 vqs.parameters = {"hidden_bias": exact_hidden_bias, "symm_kernel": exact_weights, "visible_bias": exact_visible_bias}
 
@@ -101,3 +103,5 @@ samples = vqs.sample().reshape(-1, hilbert.size)
 
 psi, state = cRBM.apply({"params": vqs.parameters}, samples, mutable=["intermediates"])
 e_exact = vqs.expect(checkerboard)
+
+# %%
