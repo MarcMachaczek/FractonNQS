@@ -19,7 +19,7 @@ pre_train = False
 random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 6  # size should be at least 3, else there are problems with pbc and indexing
+L = 4  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -69,18 +69,33 @@ field_strengths = ((hx, 0., 0.0),
                    (hx, 0., 0.45),
                    (hx, 0., 0.5))
 
-field_strengths = ((hx, 0., 0.0),
-                   (hx, 0., 0.1),
-                   (hx, 0., 0.2),
-                   (hx, 0., 0.3),)
+field_strengths = ((hx, 0.00, 0.),
+                   (hx, 0.20, 0.),
+                   (hx, 0.40, 0.),
+                   (hx, 0.60, 0.),
+                   (hx, 0.70, 0.),
+                   (hx, 0.73, 0.),
+                   (hx, 0.76, 0.),
+                   (hx, 0.79, 0.),
+                   (hx, 0.82, 0.),
+                   (hx, 0.85, 0.),
+                   (hx, 0.88, 0.),
+                   (hx, 0.91, 0.),
+                   (hx, 0.94, 0.),
+                   (hx, 0.97, 0.),
+                   (hx, 1.00, 0.),
+                   (hx, 1.03, 0.))
+
+direction = np.array([1, 0, 1]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 22) * direction).T
 
 observables = {}
 
 # %%  setting hyper-parameters
 n_iter = 400
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4
+n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = n_chains * 8
 n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
@@ -105,9 +120,15 @@ cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
 model = cRBM
 eval_model = "cRBM"
 
+# create custom update rule
+single_rule = nk.sampler.rules.LocalRule()
+vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
+xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.6, 0.2, 0.2), [single_rule, vertex_rule, xstring_rule])
+
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.0005
+lr_end = 0.005
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -118,7 +139,7 @@ if pre_train:
 
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
-    sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
+    sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
@@ -127,13 +148,14 @@ if pre_train:
     print("\n pre-training finished")
 
 for h in tqdm(field_strengths, "external_field"):
+    h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
-        noise_generator = jax.nn.initializers.normal(stddev/2)
+        noise_generator = jax.nn.initializers.normal(2 * stddev)
         random_key, noise_key = jax.random.split(random_key, 2)
         variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
                                                            pretrained_parameters)
@@ -211,4 +233,3 @@ plt.show()
 
 if save_results:
     fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
-

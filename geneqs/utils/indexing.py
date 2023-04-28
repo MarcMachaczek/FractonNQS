@@ -324,6 +324,20 @@ def get_plaquettes_cubical2d(shape: jax.Array) -> jax.Array:
     return jnp.stack([position_to_plaq(p, shape) for p in positions])
 
 
+def get_stars_cubical2d(shape: jax.Array) -> jax.Array:
+    """
+    Get the indices of all stars formed by edges on the two-dimensional lattice (with PBC).
+    Args:
+        shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
+
+    Returns:
+        Array with all indices of shape (n_stars, 4)
+
+    """
+    positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
+    return jnp.stack([position_to_star(p, shape) for p in positions])
+
+
 def get_bonds_cubical2d(shape: jax.Array) -> jax.Array:
     """
     Get indices of all bonds on the two-dimensional lattice where qubits are placed on the edges (with PBC).

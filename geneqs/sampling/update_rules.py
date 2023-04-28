@@ -111,7 +111,6 @@ class MultiRule(MetropolisRule):
     Updates/flips multiple spins according to update_clusters. One of the clusters provided is chosen at random,
     then all spins within that cluster are updated.
     """
-
     update_clusters: jax.Array  # TODO: hashable array required?
 
     def transition(self, sampler, machine, parameters, state, key, sigmas):
@@ -120,9 +119,6 @@ class MultiRule(MetropolisRule):
 
         # Deduce the number of MCMC chains from input shape
         n_chains = sigmas.shape[0]
-
-        # Load the Hilbert space of the sampler
-        hilb = sampler.hilbert
 
         # Split the rng key into 2: one for each random operation
         key_indx, key_flip = jax.random.split(key, 2)
