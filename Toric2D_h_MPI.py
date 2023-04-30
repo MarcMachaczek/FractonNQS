@@ -29,7 +29,7 @@ from tqdm import tqdm
 save_results = True
 pre_train = True
 
-random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
@@ -78,12 +78,12 @@ field_strengths = ((hx, 0.00, 0.),
                    (hx, 1.03, 0.))
 
 direction = np.array([1, 0, 1]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 22) * direction).T
+field_strengths = (np.linspace(0, 1, 16) * direction).T
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 600
+n_iter = 800
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 16
@@ -115,7 +115,7 @@ eval_model = "cRBM"
 single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.6, 0.2, 0.2), [single_rule, vertex_rule, xstring_rule])
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.25), [single_rule, vertex_rule, xstring_rule])
 
 # learning rate scheduling
 lr_init = 0.01
@@ -134,12 +134,15 @@ if pre_train:
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     # exact ground state parameters for the 2d toric code
+    noise_generator = jax.nn.initializers.normal(1 * stddev)
+    random_key, noise_key = jax.random.split(random_key, 2)
     gs_params = jax.tree_util.tree_map(lambda p: jnp.zeros_like(p), variational_gs.parameters)
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
-    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * (jnp.pi/4 + noise_generator(noise_key, plaq_idxs.shape)))
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * (jnp.pi/2 + noise_generator(noise_key, star_idxs.shape)))
+    # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
 
@@ -156,10 +159,7 @@ for h in tqdm(field_strengths, "external_field"):
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
-        noise_generator = jax.nn.initializers.normal(0.00001 * stddev)
-        random_key, noise_key = jax.random.split(random_key, 2)
-        variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
-                                                           pretrained_parameters)
+        variational_gs.parameters = pretrained_parameters
         # print(f"pre_train energy after adding noise:{variational_gs.expect(toric).Mean.item().real}")
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
