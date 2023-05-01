@@ -69,23 +69,6 @@ field_strengths = ((hx, 0., 0.0),
                    (hx, 0., 0.45),
                    (hx, 0., 0.5))
 
-field_strengths = ((hx, 0.00, 0.),
-                   (hx, 0.20, 0.),
-                   (hx, 0.40, 0.),
-                   (hx, 0.60, 0.),
-                   (hx, 0.70, 0.),
-                   (hx, 0.73, 0.),
-                   (hx, 0.76, 0.),
-                   (hx, 0.79, 0.),
-                   (hx, 0.82, 0.),
-                   (hx, 0.85, 0.),
-                   (hx, 0.88, 0.),
-                   (hx, 0.91, 0.),
-                   (hx, 0.94, 0.),
-                   (hx, 0.97, 0.),
-                   (hx, 1.00, 0.),
-                   (hx, 1.03, 0.))
-
 direction = np.array([1, 0, 1]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 22) * direction).T
 
@@ -102,20 +85,20 @@ n_expect = chunk_size * 12  # number of samples to estimate observables, must be
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.0001
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift,)  # holomorphic=True)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, )  # holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
-cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
-                                    correlators=correlators,
-                                    correlator_symmetries=correlator_symmetries,
-                                    alpha=alpha,
-                                    kernel_init=default_kernel_init,
-                                    bias_init=default_kernel_init,
-                                    param_dtype=float)
+cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
+                               correlators=correlators,
+                               correlator_symmetries=correlator_symmetries,
+                               alpha=alpha,
+                               kernel_init=default_kernel_init,
+                               bias_init=default_kernel_init,
+                               param_dtype=float)
 
 model = cRBM
 eval_model = "cRBM"
@@ -147,8 +130,8 @@ if pre_train:
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
-    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
 

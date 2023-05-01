@@ -111,7 +111,7 @@ class MultiRule(MetropolisRule):
     Updates/flips multiple spins according to update_clusters. One of the clusters provided is chosen at random,
     then all spins within that cluster are updated.
     """
-    update_clusters: jax.Array  # TODO: hashable array required?
+    update_clusters: jax.Array  # hashable array required? no bc not used as staticarg but dynamicarg instead
 
     def transition(self, sampler, machine, parameters, state, key, sigmas):
         # Deduce the number of possible clusters to be updated
