@@ -27,7 +27,7 @@ import numpy as np
 from tqdm import tqdm
 
 save_results = True
-pre_train = True
+pre_train = False
 
 random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
 
@@ -47,16 +47,15 @@ link_perms = HashableArray(link_perms.astype(int))
 
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
-               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)),  # bond correlators
                HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators
-
+               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)),  # y-string correlators
+               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)))  # bond correlators
 
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
-                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)),
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
+                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)),
+                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 hx = 0.3
@@ -80,12 +79,11 @@ field_strengths = ((hx, 0.00, 0.),
 
 direction = np.array([1, 0, 1]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 16) * direction).T
-field_strengths = field_strengths[1:]
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 500
+n_iter = 900
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 16
@@ -94,11 +92,11 @@ chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check wh
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.001
+diag_shift = 0.0001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.1
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
