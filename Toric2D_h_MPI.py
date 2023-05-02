@@ -27,7 +27,7 @@ import numpy as np
 from tqdm import tqdm
 
 save_results = True
-pre_train = False
+pre_train = True
 
 random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
 
@@ -47,15 +47,15 @@ link_perms = HashableArray(link_perms.astype(int))
 
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
+               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)),  # bond correlators
                HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)),  # y-string correlators
-               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)))  # bond correlators
+               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators
 
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
+                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)),
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)))
+                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 hx = 0.3
@@ -83,7 +83,7 @@ field_strengths = (np.linspace(0, 1, 16) * direction).T
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 900
+n_iter = 600
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 16
@@ -100,13 +100,13 @@ stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
-cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
-                                    correlators=correlators,
-                                    correlator_symmetries=correlator_symmetries,
-                                    alpha=alpha,
-                                    kernel_init=default_kernel_init,
-                                    bias_init=default_kernel_init,
-                                    param_dtype=complex)
+cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
+                               correlators=correlators,
+                               correlator_symmetries=correlator_symmetries,
+                               alpha=alpha,
+                               kernel_init=default_kernel_init,
+                               bias_init=default_kernel_init,
+                               param_dtype=complex)
 
 model = cRBM
 eval_model = "cRBM"
@@ -140,10 +140,13 @@ if pre_train:
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(noise_generator(noise_key_real, plaq_idxs.shape) + 1j * (jnp.pi/4 + noise_generator(noise_key_complex, plaq_idxs.shape)))
-    exact_weights = exact_weights.at[1, star_idxs].set(noise_generator(noise_key_real, star_idxs.shape) + 1j * (jnp.pi/2 + noise_generator(noise_key_complex, star_idxs.shape)))
+    # exact_weights = exact_weights.at[0, plaq_idxs].set(noise_generator(noise_key_real, plaq_idxs.shape) + 1j * (jnp.pi/4 + noise_generator(noise_key_complex, plaq_idxs.shape)))
+    # exact_weights = exact_weights.at[1, star_idxs].set(noise_generator(noise_key_real, star_idxs.shape) + 1j * (jnp.pi/2 + noise_generator(noise_key_complex, star_idxs.shape)))
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
     # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
+    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) + 1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
 
     # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)

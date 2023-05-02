@@ -44,7 +44,6 @@ correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shap
                HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
                HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators
 
-
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
                          HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)),
