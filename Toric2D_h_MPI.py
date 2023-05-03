@@ -27,12 +27,12 @@ import numpy as np
 from tqdm import tqdm
 
 save_results = True
-pre_train = True
+pre_train = False
 
 random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 8  # size should be at least 3, else there are problems with pbc and indexing
+L = 4  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -83,11 +83,11 @@ field_strengths = (np.linspace(0, 1, 16) * direction).T
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 600
+n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 16
-n_discard_per_chain = 32  # should be small for using many chains, default is 10% of n_samples
+n_samples = n_chains * 32
+n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
@@ -109,7 +109,7 @@ cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
                                param_dtype=complex)
 
 model = cRBM
-eval_model = "cRBM"
+eval_model = "ToricCRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()

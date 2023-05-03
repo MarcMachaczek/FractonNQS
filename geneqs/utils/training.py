@@ -241,6 +241,4 @@ def contains_naninf(pytree):
     for vals in jax.tree_util.tree_flatten(pytree)[0]:
         nan = jnp.isnan(vals).any()
         inf = jnp.isinf(vals).any()
-        if nan or inf:
-            return nan, inf
     return nan, inf
