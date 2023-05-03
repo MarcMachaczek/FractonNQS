@@ -75,7 +75,7 @@ def magnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.Array
     """
 
     # connected states is sigma itself
-    eta = sigma
+    eta = jnp.expand_dims(sigma, axis=0)  # insert dimension such that dim of eta is three
 
     # connected matrix elements
     n_sites = sigma.shape[-1]

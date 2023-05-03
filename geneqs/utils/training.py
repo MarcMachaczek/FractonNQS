@@ -163,7 +163,8 @@ class LoopCallback:
         if step == 1:
             log_data["n_params"] = v_state.n_parameters
         sampler_state = v_state.sampler_state
-        log_data["acceptance_rate"] = sampler_state.acceptance.item()
+        if not v_state.sampler.is_exact:
+            log_data["acceptance_rate"] = sampler_state.acceptance.item()
 
         loss = np.real(getattr(log_data["energy"], self.monitor))
         if loss < self._best_val:
@@ -217,7 +218,8 @@ class DriverCallback:
         if step == 1:
             log_data["n_params"] = driver._variational_state.n_parameters
         sampler_state = driver._variational_state.sampler_state
-        log_data["acceptance_rate"] = sampler_state.acceptance.item()
+        if not v_state.sampler.is_exact:
+            log_data["acceptance_rate"] = sampler_state.acceptance.item()
 
         loss = np.real(getattr(log_data[driver._loss_name], self.monitor))
         if loss < self._best_val:

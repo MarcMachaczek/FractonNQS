@@ -44,19 +44,19 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-direction = np.array([1, 0, 0]).reshape(-1, 1)
+
+direction = np.array([0.6, 0, 0]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 400
+n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 80
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
-chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.0001
@@ -132,7 +132,6 @@ for h in tqdm(field_strengths, "external_field"):
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
-    variational_gs.chunk_size = chunk_size
     variational_gs.n_samples = n_expect
     observables[h] = {}
 
@@ -182,7 +181,7 @@ for h, obs in observables.items():
 obs_to_array = np.asarray(obs_to_array)
 
 if save_results:
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_hdir{direction}_observables", obs_to_array,
+    np.savetxt(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_hdir{direction.flatten()}_observables", obs_to_array,
                header="hx, hy, hz, mag, mag_var, energy, energy_var, gs_energy_exact")
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
@@ -194,15 +193,16 @@ plot = fig.add_subplot(111)
 rel_errors = np.asarray([np.abs(observables[tuple(h)]["energy_exact"] - observables[tuple(h)]["energy"].Mean) /
                          np.abs(observables[tuple(h)]["energy_exact"]) for h in field_strengths])
 
-plot.plot(obs_to_array[:, 2], rel_errors, marker="o", markersize=2)
+plot.plot(obs_to_array[:, 0], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
+plot.set_ylim(1e-7, 1e-1)
 plot.set_xlabel("external field")
 plot.set_ylabel("relative error")
-plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field in {direction} "
+plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field in {direction.flatten()} "
                f"direction on a 3x3 lattice")
 
 plt.show()
 
 if save_results:
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_{eval_model}_hdir{direction}.pdf")
+    fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_{eval_model}_hdir{direction.flatten()}.pdf")
