@@ -126,13 +126,19 @@ if pre_train:
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     # exact ground state parameters for the 2d toric code
+    noise_generator = jax.nn.initializers.normal(stddev)
+    random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
     gs_params = jax.tree_util.tree_map(lambda p: jnp.zeros_like(p), variational_gs.parameters)
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
-    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
+    # exact_weights = exact_weights.at[0, plaq_idxs].set(noise_generator(noise_key_real, plaq_idxs.shape) + 1j * (jnp.pi/4 + noise_generator(noise_key_complex, plaq_idxs.shape)))
+    # exact_weights = exact_weights.at[1, star_idxs].set(noise_generator(noise_key_real, star_idxs.shape) + 1j * (jnp.pi/2 + noise_generator(noise_key_complex, star_idxs.shape)))
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
+    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) + 1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
 
     # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
@@ -148,10 +154,8 @@ for h in tqdm(field_strengths, "external_field"):
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
-        noise_generator = jax.nn.initializers.normal(0.1 * stddev)
-        random_key, noise_key = jax.random.split(random_key, 2)
-        variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
-                                                           pretrained_parameters)
+        variational_gs.parameters = pretrained_parameters
+        # print(f"pre_train energy after adding noise:{variational_gs.expect(toric).Mean.item().real}")
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 

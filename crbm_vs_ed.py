@@ -13,10 +13,10 @@ from global_variables import RESULTS_PATH
 
 from tqdm import tqdm
 
-save_results = False
+save_results = True
 pre_train = False
 
-random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -45,22 +45,22 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 direction = np.array([1, 0, 1]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 3) * direction).T
+field_strengths = (np.linspace(0, 1, 10) * direction).T
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 100
+n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 16
-n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
+n_samples = n_chains * 32
+n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
+chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
+n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.0001
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, )  # holomorphic=True)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.01
@@ -73,7 +73,7 @@ cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
                                alpha=alpha,
                                kernel_init=default_kernel_init,
                                bias_init=default_kernel_init,
-                               param_dtype=float)
+                               param_dtype=complex)
 
 model = cRBM
 eval_model = "ToricCRBM"
@@ -101,13 +101,19 @@ if pre_train:
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     # exact ground state parameters for the 2d toric code
+    noise_generator = jax.nn.initializers.normal(stddev)
+    random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
     gs_params = jax.tree_util.tree_map(lambda p: jnp.zeros_like(p), variational_gs.parameters)
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
-    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
+    # exact_weights = exact_weights.at[0, plaq_idxs].set(noise_generator(noise_key_real, plaq_idxs.shape) + 1j * (jnp.pi/4 + noise_generator(noise_key_complex, plaq_idxs.shape)))
+    # exact_weights = exact_weights.at[1, star_idxs].set(noise_generator(noise_key_real, star_idxs.shape) + 1j * (jnp.pi/2 + noise_generator(noise_key_complex, star_idxs.shape)))
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
+    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) + 1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
 
     # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
@@ -119,15 +125,13 @@ for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
-    sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
+    sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
-        noise_generator = jax.nn.initializers.normal(0.1 * stddev)
-        random_key, noise_key = jax.random.split(random_key, 2)
-        variational_gs.parameters = jax.tree_util.tree_map(lambda x: x + noise_generator(noise_key, x.shape),
-                                                           pretrained_parameters)
+        variational_gs.parameters = pretrained_parameters
+        # print(f"pre_train energy after adding noise:{variational_gs.expect(toric).Mean.item().real}")
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
@@ -170,19 +174,20 @@ for h in tqdm(field_strengths, "external_field"):
     plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
     plot.legend()
     if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{h}.pdf")
+        fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_a{alpha}_h{h}.pdf")
 
 # %%
 obs_to_array = []
 for h, obs in observables.items():
     obs_to_array.append([*h] +
                         [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real])
+                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real] + 
+                        [E0_exact])
 obs_to_array = np.asarray(obs_to_array)
 
 if save_results:
     np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
-               header="hx, hy, hz, mag, mag_var, energy, energy_var")
+               header="hx, hy, hz, mag, mag_var, energy, energy_var, gs_energy_exact")
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
 # %%
