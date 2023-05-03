@@ -45,12 +45,12 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 direction = np.array([1, 0, 1]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 22) * direction).T
+field_strengths = (np.linspace(0, 1, 3) * direction).T
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 400
+n_iter = 100
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 16
@@ -82,7 +82,7 @@ eval_model = "ToricCRBM"
 single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.6, 0.2, 0.2), [single_rule, vertex_rule, xstring_rule])
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.25), [single_rule, vertex_rule, xstring_rule])
 
 # learning rate scheduling
 lr_init = 0.01
@@ -190,10 +190,12 @@ if save_results:
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
 
-rel_errors = np.asarray([np.abs(observables[tuple(h)]["energy_exact"] - observables[tuple(h)]["energy"]) / np.abs(observables[tuple(h)]["energy_exact"])] for h in field_strengths)
+rel_errors = np.asarray([np.abs(observables[tuple(h)]["energy_exact"] - observables[tuple(h)]["energy"].Mean) /
+                         np.abs(observables[tuple(h)]["energy_exact"]) for h in field_strengths])
 
 plot.plot(obs_to_array[:, 2], rel_errors, marker="o", markersize=2)
 
+plot.set_yscale("log")
 plot.set_xlabel("external field")
 plot.set_ylabel("relative error")
 plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field on a 3x3 lattice")
