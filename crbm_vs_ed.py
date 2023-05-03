@@ -50,12 +50,12 @@ field_strengths = (np.linspace(0, 1, 10) * direction).T
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 500
+n_iter = 400
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 80
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
+chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
