@@ -44,7 +44,7 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-direction = np.array([1, 0, 1]).reshape(-1, 1)
+direction = np.array([1, 0, 0]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
 
 observables = {}
@@ -52,8 +52,8 @@ observables = {}
 # %%  setting hyper-parameters
 n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 32
+n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = n_chains * 80
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
@@ -107,17 +107,14 @@ if pre_train:
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    # exact_weights = exact_weights.at[0, plaq_idxs].set(noise_generator(noise_key_real, plaq_idxs.shape) + 1j * (jnp.pi/4 + noise_generator(noise_key_complex, plaq_idxs.shape)))
-    # exact_weights = exact_weights.at[1, star_idxs].set(noise_generator(noise_key_real, star_idxs.shape) + 1j * (jnp.pi/2 + noise_generator(noise_key_complex, star_idxs.shape)))
     exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+
     # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
-    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) + 1j * noise_generator(noise_key_complex, p.shape), gs_params)
+    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) +
+                                                 1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
-
-    # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
-    # pretrained_parameters = variational_gs.parameters
 
     print("\n pre-training finished")
 
@@ -131,7 +128,6 @@ for h in tqdm(field_strengths, "external_field"):
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
-        # print(f"pre_train energy after adding noise:{variational_gs.expect(toric).Mean.item().real}")
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
@@ -174,19 +170,19 @@ for h in tqdm(field_strengths, "external_field"):
     plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
     plot.legend()
     if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_a{alpha}_h{h}.pdf")
+        fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_h{h}.pdf")
 
 # %%
 obs_to_array = []
 for h, obs in observables.items():
     obs_to_array.append([*h] +
                         [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real] + 
+                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real] +
                         [E0_exact])
 obs_to_array = np.asarray(obs_to_array)
 
 if save_results:
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
+    np.savetxt(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_hdir{direction}_observables", obs_to_array,
                header="hx, hy, hz, mag, mag_var, energy, energy_var, gs_energy_exact")
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
@@ -203,9 +199,10 @@ plot.plot(obs_to_array[:, 2], rel_errors, marker="o", markersize=2)
 plot.set_yscale("log")
 plot.set_xlabel("external field")
 plot.set_ylabel("relative error")
-plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field on a 3x3 lattice")
+plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field in {direction} "
+               f"direction on a 3x3 lattice")
 
 plt.show()
 
 if save_results:
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_{eval_model}_a{alpha}.pdf")
+    fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_{eval_model}_hdir{direction}.pdf")
