@@ -24,7 +24,9 @@ from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
 import numpy as np
+
 from tqdm import tqdm
+from functools import partial
 
 save_results = True
 pre_train = False
@@ -65,7 +67,7 @@ field_strengths = (np.linspace(0, 1, 20) * direction).T
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 5
+n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 32
@@ -74,8 +76,13 @@ chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why
 n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.0001
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
+diag_shift_init = 1e-4
+diag_shift_end = 1e-5
+diag_shift_begin = int(n_iter / 3)
+diag_shift_steps = int(n_iter / 3)
+diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
+
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6), diag_shift=diag_shift_schedule, holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.01
@@ -122,8 +129,6 @@ if pre_train:
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    # exact_weights = exact_weights.at[0, plaq_idxs].set(noise_generator(noise_key_real, plaq_idxs.shape) + 1j * (jnp.pi/4 + noise_generator(noise_key_complex, plaq_idxs.shape)))
-    # exact_weights = exact_weights.at[1, star_idxs].set(noise_generator(noise_key_real, star_idxs.shape) + 1j * (jnp.pi/2 + noise_generator(noise_key_complex, star_idxs.shape)))
     exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
     # add noise to non-zero parameters
@@ -176,15 +181,15 @@ for h in tqdm(field_strengths, "external_field"):
         err = observables[h]["energy"].Sigma.item().real
 
         fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
-                     f" {eval_model} with alpha={alpha},"
-                     f" n_discard={n_discard_per_chain},"
-                     f" n_chains={n_chains},"
-                     f" n_samples={n_samples} \n"
-                     f" E0 = {round(E0, 5)} +- {round(err, 5)}")
+                 f" {eval_model}, alpha={alpha},"
+                 f" n_sweeps={L ** 2 * 2},"
+                 f" n_chains={n_chains},"
+                 f" n_samples={n_samples} \n"
+                 f" pre_train={pre_train}, stddev={stddev}")
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
-        plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}; noise to exact gs: std={stddev}")
+        plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}-{diag_shift_end}")
         plot.legend()
         if save_results:
             fig.savefig(

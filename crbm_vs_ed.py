@@ -12,9 +12,10 @@ from geneqs.utils.training import loop_gs
 from global_variables import RESULTS_PATH
 
 from tqdm import tqdm
+from functools import partial
 
 save_results = True
-pre_train = True
+pre_train = False
 
 random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
 
@@ -46,8 +47,8 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 
-direction = np.array([0, 0, 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 14) * direction).T
+direction = np.array([0., 0., -0.8]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 16) * direction).T
 
 observables = {}
 
@@ -60,8 +61,13 @@ n_discard_per_chain = 64  # should be small for using many chains, default is 10
 n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
-diag_shift = 0.0001
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
+diag_shift_init = 1e-4
+diag_shift_end = 1e-5
+diag_shift_begin = int(n_iter / 3)
+diag_shift_steps = int(n_iter / 3)
+diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
+
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6), diag_shift=diag_shift_schedule, holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.001
@@ -162,15 +168,15 @@ for h in tqdm(field_strengths, "external_field"):
     err = observables[h]["energy"].Sigma.item().real
 
     fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
-                 f" {eval_model} with alpha={alpha},"
+                 f" {eval_model}, alpha={alpha},"
                  f" n_sweeps={L ** 2 * 2},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" E0 = {round(E0, 5)} +- {round(err, 5)}")
+                 f" pre_train={pre_train}, stddev={stddev}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
-    plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
+    plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}-{diag_shift_end}")
     plot.legend()
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
