@@ -5,6 +5,7 @@ import netket as nk
 from typing import Tuple
 from functools import partial
 
+import geneqs
 
 # %%
 class Magnetization(nk.operator.DiscreteOperator):
@@ -106,3 +107,18 @@ def e_loc(logpsi, pars, sigma, extra_args):
         return jnp.sum(mels * jnp.exp(logpsi(pars, eta) - logpsi(pars, sigma)), axis=-1)
 
     return _loc_vals(sigma, eta, mels)
+
+def get_netket_wilsonob(hi, shape):
+    wilsonob = nk.operator.LocalOperator(hi, dtype=float)
+    for i in range(shape[0]):
+        for j in range(shape[0]):
+            wilsonob += geneqs.operators.toric_2d.get_netket_star(hi, jnp.array([i, j]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_star(hi, jnp.array([i, (j+1)%shape[1]]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_star(hi, jnp.array([(i+1)%shape[0], (j+1)%shape[1]]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_star(hi, jnp.array([(i+1)%shape[0], j]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_plaq(hi, jnp.array([i, j]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_plaq(hi, jnp.array([i, (j+1)%shape[1]]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_plaq(hi, jnp.array([(i+1)%shape[0], (j+1)%shape[1]]), shape) * \
+                        geneqs.operators.toric_2d.get_netket_plaq(hi, jnp.array([(i+1)%shape[0], j]), shape)
+    return wilsonob / hi.size
+            

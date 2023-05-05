@@ -182,19 +182,12 @@ def get_netket_toric2dh(hi, shape, h):
     # adding the plaquette terms:
     for i in range(shape[0]):
         for j in range(shape[1]):
-            plaq_indices = geneqs.utils.indexing.position_to_plaq(jnp.array([i, j]), shape)
-            ha_netketlocal -= nk.operator.spin.sigmaz(hi, plaq_indices[0].item()) * \
-                              nk.operator.spin.sigmaz(hi, plaq_indices[1].item()) * \
-                              nk.operator.spin.sigmaz(hi, plaq_indices[2].item()) * \
-                              nk.operator.spin.sigmaz(hi, plaq_indices[3].item())
+            ha_netketlocal -= get_netket_plaq(hi, jnp.array([i, j]), shape)
+            
     # adding the star terms
     for i in range(shape[0]):
         for j in range(shape[1]):
-            star_indices = geneqs.utils.indexing.position_to_star(jnp.array([i, j]), shape)
-            ha_netketlocal -= nk.operator.spin.sigmax(hi, star_indices[0].item()) * \
-                              nk.operator.spin.sigmax(hi, star_indices[1].item()) * \
-                              nk.operator.spin.sigmax(hi, star_indices[2].item()) * \
-                              nk.operator.spin.sigmax(hi, star_indices[3].item())
+            ha_netketlocal -= get_netket_star(hi, jnp.array([i, j]), shape) 
 
     # adding external fields
     ha_netketlocal -= hz * sum([nk.operator.spin.sigmaz(hi, i) for i in range(hi.size)])
@@ -202,3 +195,23 @@ def get_netket_toric2dh(hi, shape, h):
     ha_netketlocal -= hy * sum([nk.operator.spin.sigmay(hi, i) for i in range(hi.size)])
 
     return ha_netketlocal
+
+
+def get_netket_star(hi, pos, shape):
+    star = nk.operator.LocalOperator(hi, dtype=float)
+    star_indices = geneqs.utils.indexing.position_to_star(pos, shape)
+    star += nk.operator.spin.sigmax(hi, star_indices[0].item()) * \
+            nk.operator.spin.sigmax(hi, star_indices[1].item()) * \
+            nk.operator.spin.sigmax(hi, star_indices[2].item()) * \
+            nk.operator.spin.sigmax(hi, star_indices[3].item())
+    return star
+            
+            
+def get_netket_plaq(hi, pos, shape):
+    plaq = nk.operator.LocalOperator(hi, dtype=float)
+    plaq_indices = geneqs.utils.indexing.position_to_plaq(pos, shape)
+    plaq += nk.operator.spin.sigmaz(hi, plaq_indices[0].item()) * \
+            nk.operator.spin.sigmaz(hi, plaq_indices[1].item()) * \
+            nk.operator.spin.sigmaz(hi, plaq_indices[2].item()) * \
+            nk.operator.spin.sigmaz(hi, plaq_indices[3].item())
+    return plaq

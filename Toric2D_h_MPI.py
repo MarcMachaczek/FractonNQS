@@ -29,14 +29,15 @@ from tqdm import tqdm
 save_results = True
 pre_train = False
 
-random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 4  # size should be at least 3, else there are problems with pbc and indexing
+L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = geneqs.operators.observables.Magnetization(hilbert)
+wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
@@ -58,38 +59,19 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-hx = 0.3
-
-field_strengths = ((hx, 0.00, 0.),
-                   (hx, 0.20, 0.),
-                   (hx, 0.40, 0.),
-                   (hx, 0.60, 0.),
-                   (hx, 0.70, 0.),
-                   (hx, 0.73, 0.),
-                   (hx, 0.76, 0.),
-                   (hx, 0.79, 0.),
-                   (hx, 0.82, 0.),
-                   (hx, 0.85, 0.),
-                   (hx, 0.88, 0.),
-                   (hx, 0.91, 0.),
-                   (hx, 0.94, 0.),
-                   (hx, 0.97, 0.),
-                   (hx, 1.00, 0.),
-                   (hx, 1.03, 0.))
-
-direction = np.array([1, 0, 1]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 16) * direction).T
+direction = np.array([0.8, 0, 0]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 20) * direction).T
 
 observables = {}
 
 # %%  setting hyper-parameters
-n_iter = 500
+n_iter = 5
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 32
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 16  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
+chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
+n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift = 0.0001
@@ -177,10 +159,13 @@ for h in tqdm(field_strengths, "external_field"):
 
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
+    
+    # calcualte wilson loop operator, doesnt work yet, too many entries
+    # observables[h]["wilson"] = variational_gs.expect(wilsonob)
 
     # plot and save training data, save observables
     if rank == 0:
-        fig = plt.figure(dpi=300, figsize=(10, 10))
+        fig = plt.figure(dpi=300, figsize=(12, 12))
         plot = fig.add_subplot(111)
 
         n_params = int(training_data["n_params"].value)
@@ -190,9 +175,9 @@ for h in tqdm(field_strengths, "external_field"):
         E0 = observables[h]["energy"].Mean.item().real
         err = observables[h]["energy"].Sigma.item().real
 
-        fig.suptitle(f" ToricCode2d h={h}: size={shape},"
+        fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
                      f" {eval_model} with alpha={alpha},"
-                     f" n_sweeps={L ** 2 * 2},"
+                     f" n_discard={n_discard_per_chain},"
                      f" n_chains={n_chains},"
                      f" n_samples={n_samples} \n"
                      f" E0 = {round(E0, 5)} +- {round(err, 5)}")
@@ -209,8 +194,8 @@ for h in tqdm(field_strengths, "external_field"):
         if save_results:
             obs = observables[h]
             obs_to_write = np.asarray([[*h] +
-                                       [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                                       [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
+                                      [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
+                                      [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
 
             with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt") == 0:
@@ -227,19 +212,17 @@ if rank == 0:
     fig = plt.figure(dpi=300, figsize=(10, 10))
     plot = fig.add_subplot(111)
 
-    c = "red" if hx == 0. else "blue"
+    c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[0], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, 0], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
-    plot.set_xlabel("external field hz")
+    plot.set_xlabel("external field hx")
     plot.set_ylabel("magnetization")
-    plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
-                   f"and hx={hx}")
+    plot.set_title(f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
     plot.set_xlim(0, field_strengths[-1][2])
-    plot.set_ylim(0, 1.)
     plt.show()
 
     if save_results:

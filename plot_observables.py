@@ -8,21 +8,21 @@ from global_variables import RESULTS_PATH
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
-L = 8
+L = 3
 field_direction = 0  # 0=x, 1=y, 2=z
 obs_list = []  # append multiple data to compare them each within one plot
 # obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_observables"))
 # obs_list.append(
-#     np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_sd_6_sampling+/L[{L} {L}]_cRBM_a1_observables.txt"))
+#     np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx/L[{L} {L}]_ToricCRBM_a1_observables.txt"))
 
 obs_list.append(
-    np.loadtxt(f"{RESULTS_PATH}/toric2d_h/ed_test_ToricCRBM_hdir[[0.6] [0. ] [0. ]]_observables"))
+    np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_crbm_ed_test_hxhz_mc/ed_test_ToricCRBM_hdir[0.8 0.  0.8]_observables"))
 
 # obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_observables"))
 
 direction = obs_list[0][-1, :3]
 # %% magnetizations comparison
-# obs columns: "hx, hy, hz, mag, mag_var, energy, energy_var"
+# obs columns: "hx, hy, hz, mag, mag_var, energy, energy_var, wilson, wilson_var"
 fig = plt.figure(dpi=300, figsize=(26, 24))
 plot_mag = fig.add_subplot(221)
 
@@ -43,7 +43,7 @@ plot_sus = fig.add_subplot(222)
 
 for i, obs in enumerate(obs_list):
     sus, sus_fields = geneqs.utils.eval_obs.susc_from_mag(magnetizations=obs[:, 3], fields=obs[:, :3])
-    plot_sus.plot(sus_fields[:, 2], sus, marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
+    plot_sus.plot(sus_fields[:, field_direction], sus, marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
 
 plot_sus.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_sus.set_ylabel("susceptibility")

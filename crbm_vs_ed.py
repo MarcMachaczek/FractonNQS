@@ -14,9 +14,9 @@ from global_variables import RESULTS_PATH
 from tqdm import tqdm
 
 save_results = True
-pre_train = False
+pre_train = True
 
-random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -24,6 +24,7 @@ shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = geneqs.operators.observables.Magnetization(hilbert)
+wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
@@ -45,8 +46,8 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 
-direction = np.array([0.6, 0, 0]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 10) * direction).T
+direction = np.array([0, 0, 0.8]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 14) * direction).T
 
 observables = {}
 
@@ -63,7 +64,7 @@ diag_shift = 0.0001
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=diag_shift, holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -124,7 +125,7 @@ for h in tqdm(field_strengths, "external_field"):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -145,6 +146,9 @@ for h in tqdm(field_strengths, "external_field"):
 
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
+    
+    # calcualte wilson loop operator, doesn't work yet, too many entries
+    # observables[h]["wilson"] = variational_gs.expect(wilsonob)
 
     # plot and save training data
     fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -157,7 +161,7 @@ for h in tqdm(field_strengths, "external_field"):
     E0 = observables[h]["energy"].Mean.item().real
     err = observables[h]["energy"].Sigma.item().real
 
-    fig.suptitle(f" ToricCode2d h={h}: size={shape},"
+    fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
                  f" {eval_model} with alpha={alpha},"
                  f" n_sweeps={L ** 2 * 2},"
                  f" n_chains={n_chains},"
@@ -169,20 +173,20 @@ for h in tqdm(field_strengths, "external_field"):
     plot.set_title(f"using stochastic reconfiguration with diag_shift={diag_shift}")
     plot.legend()
     if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_h{h}.pdf")
+        fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
 # %%
 obs_to_array = []
 for h, obs in observables.items():
     obs_to_array.append([*h] +
                         [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real] +
+                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real] + 
                         [E0_exact])
 obs_to_array = np.asarray(obs_to_array)
 
 if save_results:
     np.savetxt(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_hdir{direction.flatten()}_observables", obs_to_array,
-               header="hx, hy, hz, mag, mag_var, energy, energy_var, gs_energy_exact")
+               header="hx, hy, hz, mag, mag_var, energy, energy_var, gs_energy_exact, wilson, wilson_var")
 # mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
 
 # %%
@@ -193,7 +197,7 @@ plot = fig.add_subplot(111)
 rel_errors = np.asarray([np.abs(observables[tuple(h)]["energy_exact"] - observables[tuple(h)]["energy"].Mean) /
                          np.abs(observables[tuple(h)]["energy_exact"]) for h in field_strengths])
 
-plot.plot(obs_to_array[:, 0], rel_errors, marker="o", markersize=2)
+plot.plot(obs_to_array[:, 2], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
