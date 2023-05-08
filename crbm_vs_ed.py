@@ -1,6 +1,3 @@
-from matplotlib import pyplot as plt
-import numpy as np
-
 import jax
 import jax.numpy as jnp
 import optax
@@ -10,6 +7,9 @@ from netket.utils import HashableArray
 import geneqs
 from geneqs.utils.training import loop_gs
 from global_variables import RESULTS_PATH
+
+from matplotlib import pyplot as plt
+import numpy as np
 
 from tqdm import tqdm
 from functools import partial
@@ -24,7 +24,10 @@ L = 3  # size should be at least 3, else there are problems with pbc and indexin
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
-magnetization = geneqs.operators.observables.Magnetization(hilbert)
+
+# define some observables
+magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
+abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 # get (specific) symmetries of the model, in our case translations
@@ -49,6 +52,14 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
 
 direction = np.array([0., 0.8, 0]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 12) * direction).T
+
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
+                                                       [0.32, 0, 0.32],
+                                                       [0.33, 0, 0.33],
+                                                       [0.34, 0, 0.34],
+                                                       [0.35, 0, 0.35],
+                                                       [0.36, 0, 0.36]])))
+field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = {}
 
@@ -153,8 +164,8 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
     
-    # calcualte wilson loop operator, doesn't work yet, too many entries
-    # observables[h]["wilson"] = variational_gs.expect(wilsonob)
+    # calcualte wilson loop operator
+    observables[h]["wilson"] = variational_gs.expect(wilsonob)
 
     # plot and save training data
     fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -169,14 +180,15 @@ for h in tqdm(field_strengths, "external_field"):
 
     fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
                  f" {eval_model}, alpha={alpha},"
-                 f" n_sweeps={L ** 2 * 2},"
+                 f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
                  f" pre_train={pre_train}, stddev={stddev}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
-    plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}-{diag_shift_end}")
+    plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
+                   f" down to {diag_shift_end}")
     plot.legend()
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/toric2d_h/ed_test_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")

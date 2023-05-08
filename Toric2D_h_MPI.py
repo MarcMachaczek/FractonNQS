@@ -38,7 +38,10 @@ L = 8  # size should be at least 3, else there are problems with pbc and indexin
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
-magnetization = geneqs.operators.observables.Magnetization(hilbert)
+
+# define some observables
+magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
+abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 # get (specific) symmetries of the model, in our case translations
@@ -69,8 +72,7 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
                                                        [0.33, 0, 0.33],
                                                        [0.34, 0, 0.34],
                                                        [0.35, 0, 0.35],
-                                                       [0.36, 0, 0.36]]))
-                           )
+                                                       [0.36, 0, 0.36]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = {}
@@ -140,9 +142,11 @@ if pre_train:
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
     exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+
     # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
-    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) + 1j * noise_generator(noise_key_complex, p.shape), gs_params)
+    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) +
+                                                 1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
 
     # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
@@ -156,13 +160,6 @@ for h in tqdm(field_strengths, "external_field"):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    
-    samples = variational_gs.sample().reshape(-1, hilbert.size)
-    
-    conns, mels = toric.get_conn_padded(samples)
-    
-    print(samples.dtype, conns.dtype, mels.dtype)
-    print("shapes:", conns.shape, mels.shape)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -181,8 +178,8 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate magnetization
     observables[h]["mag"] = variational_gs.expect(magnetization)
     
-    # calcualte wilson loop operator, doesnt work yet, too many entries
-    # observables[h]["wilson"] = variational_gs.expect(wilsonob)
+    # calcualte wilson loop operator
+    observables[h]["wilson"] = variational_gs.expect(wilsonob)
 
     # plot and save training data, save observables
     if rank == 0:
@@ -198,14 +195,15 @@ for h in tqdm(field_strengths, "external_field"):
 
         fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
                  f" {eval_model}, alpha={alpha},"
-                 f" n_sweeps={L ** 2 * 2},"
+                 f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
                  f" pre_train={pre_train}, stddev={stddev}")
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
-        plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init} down to {diag_shift_end}")
+        plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
+                       f" down to {diag_shift_end}")
         plot.legend()
         if save_results:
             fig.savefig(
