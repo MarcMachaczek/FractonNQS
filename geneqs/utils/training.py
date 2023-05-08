@@ -20,9 +20,25 @@ def loop_gs(v_state: nk.vqs.MCState,
             preconditioner: Any,
             n_iter: int,
             min_steps: int = None):
+    """
+    Training function with some additional functionality, like timing of each step, early stopping, logging etc.
+    Args:
+        v_state: NetKet variational state. Contains the sampler, model, parameters.
+        _hamiltonian: The hamiltonian to optimize.
+        optimizer: Base optimizer, usually plain SGD.
+        preconditioner: Gradient transformation like, for instance, stochastic reconfiguration.
+        n_iter: Number of training iterations.
+        min_steps: Minimum number of iterations before callback convergence criteria might cause early stopping.
+
+    Returns:
+        trained variational state, logger containing training information
+
+    """
+
     hamiltonian = _hamiltonian.collect()
     if min_steps is None:
         min_steps = n_iter
+
     log = nk.logging.RuntimeLog()
     cb = LoopCallback(min_delta=0.1, min_steps=min_steps, patience=20, baseline=None, monitor="mean")
 
@@ -32,22 +48,20 @@ def loop_gs(v_state: nk.vqs.MCState,
         for epoch in range(n_iter):
             times = {}
             v_state.reset()
+
             times["pre_sample"] = time.time()
             v_state.sample()
             times["pre_expectgrad"] = time.time()
-            energy, gradients = v_state.expect_and_grad(hamiltonian)
 
-            # TODO: remove when done debugging
+            energy, gradients = v_state.expect_and_grad(hamiltonian)
             e_nan, e_inf = contains_naninf(energy.mean)
             g_nan, g_inf = contains_naninf(gradients)
 
-            # adapt gradients according to e.g. stochastic reconfiguration
+            # adapt gradients according to stochastic reconfiguration
             times["pre_sr"] = time.time()
             sr_gradients = preconditioner(v_state, gradients, epoch)
-            times["post_sr"] = time.time()
-
-            # TODO: remove later
             sr_nan, sr_inf = contains_naninf(sr_gradients)
+            times["post_sr"] = time.time()
 
             # If parameters are real, then take only real part of the gradient (if it's complex)
             sr_gradients = jax.tree_map(
@@ -87,11 +101,9 @@ def loop_gs(v_state: nk.vqs.MCState,
             if callback_stop:
                 break
 
-            # TODO: remove later
-            dummy = jnp.asarray([e_nan, e_inf, g_nan, g_inf, sr_nan, sr_inf])
-            if dummy.any():
+            if jnp.asarray([e_nan, e_inf, g_nan, g_inf, sr_nan, sr_inf]).any():
                 print("nan or inf detected")
-                print(dummy)
+                print([e_nan, e_inf, g_nan, g_inf, sr_nan, sr_inf])
                 break
 
             # reset time after first step to ignore compilation time
@@ -218,7 +230,7 @@ class DriverCallback:
         if step == 1:
             log_data["n_params"] = driver._variational_state.n_parameters
         sampler_state = driver._variational_state.sampler_state
-        if not v_state.sampler.is_exact:
+        if not driver._variational_state.sampler.is_exact:
             log_data["acceptance_rate"] = sampler_state.acceptance.item()
 
         loss = np.real(getattr(log_data[driver._loss_name], self.monitor))
@@ -239,6 +251,14 @@ class DriverCallback:
 
 
 def contains_naninf(pytree):
+    """
+    Primite check if some elements in a pytree are NaNs or Infs.
+    Args:
+        pytree:
+
+    Returns:
+
+    """
     nan, inf = False, False
     for vals in jax.tree_util.tree_flatten(pytree)[0]:
         nan = jnp.isnan(vals).any()

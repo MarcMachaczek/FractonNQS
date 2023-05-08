@@ -6,7 +6,6 @@ for testing, two gpus are used with 4 cores in total
 
 
 from mpi4py import MPI
-import mpi4py
 import jax
 
 comm = MPI.COMM_WORLD

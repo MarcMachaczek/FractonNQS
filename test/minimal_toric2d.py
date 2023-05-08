@@ -9,7 +9,7 @@ import netket as nk
 import geneqs
 from geneqs.utils.training import loop_gs, driver_gs
 
-stddev = 0.05
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # %%
@@ -53,7 +53,7 @@ mask = jnp.vstack([geneqs.utils.indexing.position_to_plaq(jnp.asarray([0, 0]), s
 
 mask = nk.utils.HashableArray(mask)
 features = (4, 4, 4)
-SymmNN = geneqs.models.symmetric_networks.SymmetricNN(link_perms, features)
+SymmNN = geneqs.models.neural_networks.SymmetricNN(link_perms, features)
 
 lr_init = 0.03
 lr_end = 0.03
@@ -69,8 +69,7 @@ toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
 optimizer = optax.sgd(lr_schedule)
 sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
-vqs = nk.vqs.MCState(sampler, RBMSymm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
-                     chunk_size=int(n_samples/2))
+vqs = nk.vqs.MCState(sampler, RBMSymm, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
 vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
 

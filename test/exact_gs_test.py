@@ -13,7 +13,8 @@ n_samples = n_chains * 8
 n_discard_per_chain = 48
 
 h = (0., 0., 0.)  # external field
-# %%
+
+# %% Test for the Toric code in two dimensions
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
@@ -46,9 +47,10 @@ vqs = nk.vqs.MCState(sampler, cRBM, n_samples=n_samples, n_discard_per_chain=n_d
 e_random = vqs.expect(toric)
 
 print(jax.tree_util.tree_map(lambda x: x.shape, vqs.parameters))
-# needed to avoid inf when applying log_cosh activation
+
+# set exact wights for the rbm, noise avoids inf/nan when applying log_cosh activation
 exact_hidden_bias = jnp.zeros_like(vqs.parameters["hidden_bias"])\
-                    # + jax.random.normal(jax.random.PRNGKey(0), vqs.parameters["hidden_bias"].shape) * 0.00000001
+                    + jax.random.normal(jax.random.PRNGKey(0), vqs.parameters["hidden_bias"].shape) * 0.000001
 exact_visible_bias = jnp.zeros_like(vqs.parameters["visible_bias"])
 exact_weights = jnp.zeros_like(vqs.parameters["symm_kernel"], dtype=complex)
 exact_weights = exact_weights.at[0, plaq_idx].set(1j * jnp.pi/4)
@@ -61,7 +63,7 @@ samples = vqs.sample().reshape(-1, 2*L**2)
 psi, state = cRBM.apply({"params": vqs.parameters}, samples, mutable=["intermediates"])
 e_exact = vqs.expect(toric)
 
-# %%
+# %% Test for the Checkerboard model
 L = 4  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
@@ -87,13 +89,14 @@ cube_idx = checkerboard.cubes[0].reshape(1, -1)
 n_chains = 512 * 2
 n_samples = n_chains * 16
 n_discard_per_chain = 48*16
-sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)
+sampler = nk.sampler.MetropolisLocal(hilbert, n_chains=n_chains, dtype=jnp.int8)  # TODO: need better sampler
 
 vqs = nk.vqs.MCState(sampler, cRBM, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 e_random = vqs.expect(checkerboard)
 
 print(jax.tree_util.tree_map(lambda x: x.shape, vqs.parameters))
-# needed to avoid inf when applying log_cosh activation
+
+# set exact wights for the rbm, noise avoids inf/nan when applying log_cosh activation
 exact_hidden_bias = jnp.zeros_like(vqs.parameters["hidden_bias"])\
                     + jax.random.normal(jax.random.PRNGKey(0), vqs.parameters["hidden_bias"].shape) * 0.0001
 exact_visible_bias = jnp.zeros_like(vqs.parameters["visible_bias"])
@@ -107,5 +110,3 @@ samples = vqs.sample().reshape(-1, hilbert.size)
 
 psi, state = cRBM.apply({"params": vqs.parameters}, samples, mutable=["intermediates"])
 e_exact = vqs.expect(checkerboard)
-
-# %%

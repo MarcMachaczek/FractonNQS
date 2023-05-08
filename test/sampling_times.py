@@ -1,5 +1,4 @@
-# A very simple script to test training functionality
-import numpy as np
+# A very simple script to test sampling times
 from matplotlib import pyplot as plt
 
 import jax

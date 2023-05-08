@@ -40,7 +40,7 @@ link_perms = nk.utils.HashableArray(link_perms.astype(int))
 # setting hyper-parameters
 n_iter = 120
 n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 4 * 4  # TODO: remove *4
+n_samples = n_chains * 8
 n_discard_per_chain = 8  # should be small for using many chains, default is 10% of n_samples
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
@@ -84,13 +84,13 @@ errors = np.asarray(errors)
 
 if SAVE:
     np.save(f"{RUN_PATH}/data/L{shape}_h{h}_sd{stddev}_S{n_samples}_energies_2", energies)
-    np.save(f"{RUN_PATH}//data/L{shape}_h{h}_sd{stddev}_S{n_samples}_errors_2", errors)
+    np.save(f"{RUN_PATH}/data/L{shape}_h{h}_sd{stddev}_S{n_samples}_errors_2", errors)
 
 exact_gse = -2*L**2
 con_bound = 5e-4
 converged = np.sum(np.abs(energies[:, -1] - exact_gse)/np.abs(exact_gse) < con_bound)
 
-# %%
+# %% plot all runs with their respective energy and count converged runs
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
 
