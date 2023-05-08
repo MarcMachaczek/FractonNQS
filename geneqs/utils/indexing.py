@@ -12,7 +12,7 @@ def position_to_index(position: jax.Array, shape: jax.Array) -> jax.Array:
     Indexes the position of a cubical lattice with periodic boundary conditions.
     Note: Only works correctly if extend in every direction (see shape) is at least three.
     Args:
-        position: Specifies the point on the lattice the edge originates from. Array with entries [x_0, x_1, ...]
+        position: Specifies the point on the lattice. Array with entries [x_0, x_1, ...]
         shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, ...]
 
     Returns:
@@ -145,7 +145,7 @@ def get_translations_cubical3d(shape: ArrayLike, shift: int) -> np.ndarray:
     return permutations
 
 
-# %% Utilities specifically for the chedckerboard model
+# %% Utilities specifically for the checkerboard model
 def position_to_cube(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
     From a position on a cubical lattice with PBC, returns the indices of the 8 corners forming the cube.
@@ -209,6 +209,7 @@ def get_cubeperms_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
     position_idxs = [position_to_index(p, shape).item() for p in positions]  # indexes where cubes are constructed
 
     # create permutation dictionary to convert from positions_idxs back to cube indices
+    # this approach works because lattice translations are isomorphic to cube translations
     perm_dict = {}
     for i, idx in enumerate(position_idxs):
         perm_dict[idx] = i
@@ -362,7 +363,7 @@ def get_bonds_cubical2d(shape: jax.Array) -> jax.Array:
     return jnp.array(indices)
 
 
-def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
+def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:  # TODO: switch to jax arrays?
     """
     Retrieve the permutations of links between sites induced by the permutations of the sites.
     Args:
@@ -383,7 +384,16 @@ def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
     return link_perms
 
 
-def get_xstring_perms(shape: jax.Array):
+def get_xstring_perms(shape: jax.Array) -> jax.Array:
+    """
+    Get the permutations on x-strings / loops on the Toric Code model induced by translational symmetries.
+    Args:
+        shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
+
+    Returns:
+        Array of shape (n_symmetries, n_xstrings)
+
+    """
     base = jnp.arange(shape[1])  # identity permutation, number of x-strings is equal to extend in y dimension
     # proper (not identity) permutations, corresponding to translations in d=1 / y direction
     proper_perms = jnp.stack([(base - i) % shape[1] for i in range(shape[1])])
@@ -393,7 +403,16 @@ def get_xstring_perms(shape: jax.Array):
     return xstring_perms
 
 
-def get_ystring_perms(shape: jax.Array):
+def get_ystring_perms(shape: jax.Array) -> jax.Array:
+    """
+        Get the permutations on y-strings / loops on the Toric Code model induced by translational symmetries.
+        Args:
+            shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
+
+        Returns:
+            Array of shape (n_symmetries, n_ystrings)
+
+        """
     base = jnp.arange(shape[0])  # identity permutation, number of y-strings is equal to extend in x dimension
     # proper (not identity) permutations, corresponding to translations in d=0 / x direction
     proper_perms = jnp.stack([(base - i) % shape[0] for i in range(shape[0])])
@@ -402,7 +421,7 @@ def get_ystring_perms(shape: jax.Array):
     return ystring_perms
 
 
-def get_bondperms_cubical2d(permutations: np.ndarray) -> np.ndarray:
+def get_bondperms_cubical2d(permutations: np.ndarray) -> np.ndarray:  # TODO: switch to jax arrays?
     """
     Retrieve the permutations of nearest neighbor bonds induced by the permutations of the sites.
     Args:

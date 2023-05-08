@@ -2,7 +2,6 @@ import yaml
 import global_variables
 from tqdm import tqdm
 import time
-import netket as nk
 
 from typing import Callable
 
@@ -19,8 +18,9 @@ def parse_settings():
     return config
 
 
-def time_function(func: Callable, n_runs: int = 1, *args, **kwargs):
+def time_function(func: Callable, n_runs: int = 10, *args, **kwargs):
     """
+    Measure the average time it takes to execute a provided function over n_runs.
 
     Args:
         func: Function to benchmark.
@@ -37,4 +37,4 @@ def time_function(func: Callable, n_runs: int = 1, *args, **kwargs):
     for _ in tqdm(range(n_runs)):
         result = func(*args, **kwargs)
 
-    return result, round((time.perf_counter() - t0) / n_runs, 3)
+    return result, round((time.perf_counter() - t0) / n_runs, 4)

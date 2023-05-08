@@ -7,6 +7,15 @@ import geneqs
 
 # %%
 def plot_checkerboard(ax: plt.axis, L: int):
+    """
+    Plots the checkerboard model of extend L (shape=[L, L, L]) on a provided axis.
+    Args:
+        ax: Pyplot axis
+        L: Extend of the system.
+
+    Returns:
+
+    """
     shape = jnp.array([L, L, L])
     cube_graph_obc = nk.graph.Hypercube(length=shape[0].item()+1, n_dim=3, pbc=False)
     cube_graph_pbc = nk.graph.Hypercube(length=shape[0].item(), n_dim=3, pbc=True)

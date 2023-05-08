@@ -1,14 +1,22 @@
-# %%
 import numpy as np
-import jax.numpy as jnp
 import jax
-
-from matplotlib import pyplot as plt
 
 from typing import Union
 
+
 # %%
 def susc_from_mag(magnetizations: Union[jax.Array, np.ndarray], fields: Union[jax.Array, np.ndarray]):
+    """
+    Calculate the magnetic susceptibility from observed magnetization values via finite differences.
+    This function also returns the external field values for which the susceptibilites were evaluated.
+    Args:
+        magnetizations: Magnetization values for different external fields.
+        fields: Array of shape (n_fields, 3) containing for each magnetization the external field in x, y, z direction.
+
+    Returns:
+        susceptibility array (n_fields), susceptibility fields (n_fields, 3)
+
+    """
     
     assert len(magnetizations) == len(fields), "length of magnetizations and fields must be the same"
 

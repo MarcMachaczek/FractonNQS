@@ -75,21 +75,14 @@ class WeightedRule(MetropolisRule):
             # construct temporary rule state with correct sampler-state objects
             _state = state.replace(rule_state=state.rule_state[i])
 
-            sigmaps_i, log_prob_corr_i = self.rules[i].transition(
-                sampler, machine, parameters, _state, keys[i], sigma
-            )
+            sigmaps_i, log_prob_corr_i = self.rules[i].transition(sampler, machine, parameters, _state, keys[i], sigma)
 
             sigmaps.append(sigmaps_i)
             log_prob_corrs.append(log_prob_corr_i)
 
-        indices = jax.random.choice(
-            keys[-1],
-            N,
-            shape=(sampler.n_chains_per_rank,),
-            p=self.probabilities,
-        )
+        indices = jax.random.choice(keys[-1], N, shape=(sampler.n_chains_per_rank,), p=self.probabilities)
 
-        batch_select = jax.vmap(lambda s, i: s[i], in_axes=(1, 0), out_axes=0)
+        batch_select = jax.vmap(lambda s, idx: s[idx], in_axes=(1, 0), out_axes=0)
         sigmap = batch_select(jnp.stack(sigmaps), indices)  # sigmaps has dim (N, n_chains_per_rank, n_sites)
 
         # if not all log_prob_corr are 0, convert the Nones to 0s
@@ -111,7 +104,7 @@ class MultiRule(MetropolisRule):
     Updates/flips multiple spins according to update_clusters. One of the clusters provided is chosen at random,
     then all spins within that cluster are updated.
     """
-    update_clusters: jax.Array  # hashable array required? no bc not used as staticarg but dynamicarg instead
+    update_clusters: jax.Array  # hashable array required? no bc not used as staticarg, but dynamicarg instead
 
     def transition(self, sampler, machine, parameters, state, key, sigmas):
         # Deduce the number of possible clusters to be updated
@@ -123,10 +116,8 @@ class MultiRule(MetropolisRule):
         # Split the rng key into 2: one for each random operation
         key_indx, key_flip = jax.random.split(key, 2)
 
-        # Pick two random sites on every chain
-        indxs = jax.random.randint(
-            key_indx, shape=(n_chains, 1), minval=0, maxval=n_clusters-1
-        )
+        # Pick random cluster index on every chain
+        indxs = jax.random.randint(key_indx, shape=(n_chains, 1), minval=0, maxval=n_clusters-1)
 
         @jax.vmap
         def flip(sigma, cluster):

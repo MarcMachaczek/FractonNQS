@@ -15,6 +15,8 @@ class ToricCRBM(nn.Module):
     """
     Important: Network assumes the last two correlators provided are loop correlators to which additionall hidden units
     are attached exclusively.
+    Difference to regular CorrelationRBM: Two separate bias terms for single spins according to the two sublattices
+    of the Toric Code model; extra hidden units exclusively connected to the loop correlators.
     """
     # permutations of lattice sites corresponding to symmetries
     symmetries: HashableArray
@@ -196,6 +198,12 @@ class CorrelationRBM(nn.Module):
 
 # %%
 class ExplicitCorrelationRBM(nn.Module):
+    """
+    Difference to regular CorrelationRBM: Doesn't require the symmetries of the correlators features, they are
+    explicitly constructed by applying symmetry operations to the raw configurations and recomputing the correlator
+    features for each symmtry. This has strong impace on performance for large lattices but can be used as a
+    sanity check.
+    """
     # permutations of lattice sites corresponding to symmetries
     symmetries: HashableArray
     # correlators that serve as additional input for the cRBM
