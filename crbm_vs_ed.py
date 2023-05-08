@@ -47,8 +47,8 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 
-direction = np.array([0., 0., -0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 16) * direction).T
+direction = np.array([0., 0.8, 0]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 12) * direction).T
 
 observables = {}
 
@@ -70,7 +70,7 @@ diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, dia
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6), diag_shift=diag_shift_schedule, holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.001
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -131,7 +131,7 @@ for h in tqdm(field_strengths, "external_field"):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -203,7 +203,7 @@ plot = fig.add_subplot(111)
 rel_errors = np.asarray([np.abs(observables[tuple(h)]["energy_exact"] - observables[tuple(h)]["energy"].Mean) /
                          np.abs(observables[tuple(h)]["energy_exact"]) for h in field_strengths])
 
-plot.plot(obs_to_array[:, 2], rel_errors, marker="o", markersize=2)
+plot.plot(obs_to_array[:, 1], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)

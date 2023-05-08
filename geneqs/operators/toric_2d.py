@@ -17,6 +17,9 @@ class ToricCode2d(nk.operator.DiscreteOperator):
             self.h = (0., 0., 0.)
         else:
             self.h = h
+            
+        if h[1] != 0:
+            raise NotImplementedError
         # get corresponding indices on which the operators act on
         positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
         self.plaqs = jnp.stack([geneqs.utils.indexing.position_to_plaq(p, shape) for p in positions])
@@ -122,7 +125,7 @@ def toric2d_conns_and_mels(sigma: jax.Array,
     # n_sites mels corresponding to flipped stars
     star_mels = -jnp.ones(n_sites)
     # mel according to hx and hy, TODO: include hy and check chunking etc
-    field_mels = -hx * jnp.ones(2*n_sites) - hy * sigma * 1j
+    field_mels = -hx * jnp.ones(2*n_sites)  # - hy * sigma * 1j
     mels = jnp.hstack((diag_mel, star_mels, field_mels))
     return eta, mels
 

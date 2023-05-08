@@ -8,15 +8,15 @@ from global_variables import RESULTS_PATH
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
-L = 3
+L = 8
 field_direction = 0  # 0=x, 1=y, 2=z
 obs_list = []  # append multiple data to compare them each within one plot
-# obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_a1_observables"))
-# obs_list.append(
-#     np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx/L[{L} {L}]_ToricCRBM_a1_observables.txt"))
 
 obs_list.append(
-    np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_crbm_ed_test_hxhz_mc/ed_test_ToricCRBM_hdir[0.8 0.  0.8]_observables"))
+    np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx/L[{L} {L}]_ToricCRBM_a1_observables.txt"))
+
+# obs_list.append(
+#     np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_crbm_ed_test_hxhz_mc/ed_test_ToricCRBM_hdir[0.8 0.  0.8]_observables"))
 
 # obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_observables"))
 

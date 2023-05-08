@@ -61,8 +61,17 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
-direction = np.array([0.8, 0, 0]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 20) * direction).T
+direction = np.array([0.8, 0, 0.8]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 12) * direction).T
+
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
+                                                       [0.32, 0, 0.32],
+                                                       [0.33, 0, 0.33],
+                                                       [0.34, 0, 0.34],
+                                                       [0.35, 0, 0.35],
+                                                       [0.36, 0, 0.36]]))
+                           )
+field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = {}
 
@@ -72,8 +81,8 @@ min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. du
 n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 32
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
-chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
+chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
+n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
 # n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
 
 diag_shift_init = 1e-4
@@ -147,6 +156,13 @@ for h in tqdm(field_strengths, "external_field"):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    
+    samples = variational_gs.sample().reshape(-1, hilbert.size)
+    
+    conns, mels = toric.get_conn_padded(samples)
+    
+    print(samples.dtype, conns.dtype, mels.dtype)
+    print("shapes:", conns.shape, mels.shape)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -189,7 +205,7 @@ for h in tqdm(field_strengths, "external_field"):
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
-        plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}-{diag_shift_end}")
+        plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init} down to {diag_shift_end}")
         plot.legend()
         if save_results:
             fig.savefig(
@@ -219,9 +235,9 @@ if rank == 0:
 
     c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[0], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[1], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, 0], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, 1], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external field hx")
     plot.set_ylabel("magnetization")
