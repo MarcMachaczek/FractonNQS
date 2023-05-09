@@ -17,12 +17,13 @@ class ObservableEvaluator:
 
     def __post_init__(self):
         self.observables = OrderedDict(self.observables)
-        self.arrays = OrderedDict(self.array)
+        self.arrays = OrderedDict(self.arrays)
 
     def add_nk_obs(self, name: str, key, nk_obs: nk.stats):
         # add name if not present
         if name not in self.observables.keys():
             self.observables[name] = OrderedDict()
+            self.observables[f"{name}_var"] = OrderedDict()
 
         self.observables[name][key] = nk_obs.Mean.item()
         self.observables[f"{name}_var"][key] = nk_obs.Variance.item()
@@ -30,18 +31,20 @@ class ObservableEvaluator:
     def add_array(self, name: str, key, array):
         self.arrays[name] = array
 
-    def observables_to_array(self, names: Union[list[str, ...], str] = "all"):
+    def obs_to_array(self, names: Union[list[str, ...], str] = "all"):
         if names == "all":
             names = list(self.observables.keys())
+        elif type(names) == str:
+            names = [names]
 
         assert self.check_keys(names), f"keys for provided names {names} don't match"
 
-        obs_array = np.asarray(self.observables[names[0]].keys())
+        obs_array = np.asarray(list(self.observables[names[0]].keys()))
         
         for name in names:
             obs_values = []
             for key, value in self.observables[name].items():
-                obs_values.append(val)
+                obs_values.append(value)
             obs_values = np.asarray(obs_values).reshape(-1, 1)
             obs_array = np.concatenate((obs_array, obs_values), axis=1)
         
@@ -49,7 +52,6 @@ class ObservableEvaluator:
     
     def get_array(self, name):
         return self.arrays[name]
-        
 
     def check_keys(self, names: list[str, ...]):
         compatible = True
@@ -79,7 +81,13 @@ vqs = nk.vqs.MCState(sampler, model)
 value = vqs.expect(obs)
 
 test = {"a": 1, "b": 2, "c": {(0, 0): "in", (0, 1): "out"}}
-#
+
+# %%
+logger = ObservableEvaluator()
+logger.add_nk_obs("obs", (1, 2, 3), value)
+logger.add_nk_obs("obs", (2, 2, 3), value)
+logger.add_nk_obs("obs", (3, 2, 3), value)
+logger.obs_to_array("obs")
 
 # %%
 
