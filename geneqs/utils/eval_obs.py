@@ -13,49 +13,52 @@ from dataclasses import dataclass, field
 @dataclass
 class ObservableEvaluator:
     observables: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
+    arrays: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
 
     def __post_init__(self):
-        pass
+        self.observables = OrderedDict(self.observables)
+        self.arrays = OrderedDict(self.array)
 
-    def add_nk_obs(self, key, name: str, nk_obs: nk.stats):
-        # add key if not present
-        if key not in self.observables.keys():
-            self.observables[key] = {}
+    def add_nk_obs(self, name: str, key, nk_obs: nk.stats):
+        # add name if not present
+        if name not in self.observables.keys():
+            self.observables[name] = OrderedDict()
 
-        self.observables[key][name] = nk_obs.Mean.item()
-        self.observables[key][f"{name}_var"] = nk_obs.Variance.item()
+        self.observables[name][key] = nk_obs.Mean.item()
+        self.observables[f"{name}_var"][key] = nk_obs.Variance.item()
 
-    def add_array(self, key, name: str, array):
-        # add key if not present
-        if key not in self.observables.keys():
-            self.observables[key] = {}
+    def add_array(self, name: str, key, array):
+        self.arrays[name] = array
 
-        self.observables[key][name] = array
+    def observables_to_array(self, names: Union[list[str, ...], str] = "all"):
+        if names == "all":
+            names = list(self.observables.keys())
 
-    def get_observable(self, name):
-        var_value = True  # if corresponding error is saved
+        assert self.check_keys(names), f"keys for provided names {names} don't match"
 
-        name_obs = []
-        for keys, observables in self.observables.items():
-            name_obs.append(observables[name])
+        obs_array = np.asarray(self.observables[names[0]].keys())
+        
+        for name in names:
+            obs_values = []
+            for key, value in self.observables[name].items():
+                obs_values.append(val)
+            obs_values = np.asarray(obs_values).reshape(-1, 1)
+            obs_array = np.concatenate((obs_array, obs_values), axis=1)
+        
+        return obs_array
+    
+    def get_array(self, name):
+        return self.arrays[name]
+        
 
-            # check if var value for observable is present
-            if f"{name}_var" is not observables.keys():
-                var_value = False
-
-        if var_value:
-            name_obs_var = []
-            for keys, observables in self.observables.items():
-                name_obs_var.append(observables[f"{name}_var"])
-
-            return list[self.observables.keys()], name_obs, name_obs_var
-        else:
-            print(f"no var value was found for {name} observable")
-            return list[self.observables.keys()], name_obs, None
-
-    def to_txt(self, save_path: str):
-        rows = list(self.observables.keys())
-        pass
+    def check_keys(self, names: list[str, ...]):
+        compatible = True
+        keys = np.asarray(self.observables[names[0]].keys())
+        for name in names[1:]:
+            name_keys = np.asarray(self.observables[name].keys())
+            if not (name_keys == keys).all():
+                compatible = False
+        return compatible
 
     @classmethod
     def from_txt(cls, load_path: str):
