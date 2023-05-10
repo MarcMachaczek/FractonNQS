@@ -80,16 +80,47 @@ plt.show()
 fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_obs_comparison.pdf")
 
 # %% histograms
-# TODO: change to hists_
 # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
-energy_histograms = np.load(f"{save_dir}/hist_energy_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
-mag_histograms = np.load(f"{save_dir}/hist_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
-abs_mag_histograms = np.load(f"{save_dir}/hist_abs_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
-A_B_histograms = np.load(f"{save_dir}/hist_A_B_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+energy_histograms = np.load(f"{save_dir}/hists_energy_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+mag_histograms = np.load(f"{save_dir}/hists_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+abs_mag_histograms = np.load(f"{save_dir}/hists_abs_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+A_B_histograms = np.load(f"{save_dir}/hists_A_B_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
 
-fig = plt.figure(dpi=300, figsize=(26, 24))
+fig = plt.figure(dpi=300, figsize=(13, 12))
+fig.suptitle("Probability (histogram) plots for different observables and external field for the Toric Code")
+
 energy_hist = fig.add_subplot(221)
 mag_hist = fig.add_subplot(222)
 abs_mag_hist = fig.add_subplot(223)
 A_B_hist = fig.add_subplot(224)
 
+for hist in energy_histograms:
+    field, hist_values, bin_edges = hist[0], hist[1], hist[2]
+    edges = (bin_edges[1:] + bin_edges[:-1]) / 2
+    energy_hist.plot(edges, hist_values, label=f"h={tuple([round(h, 3) for h in field])}")
+    energy_hist.set_xlabel("energy per site")
+
+for hist in mag_histograms:
+    field, hist_values, bin_edges = hist[0], hist[1], hist[2]
+    edges = (bin_edges[1:] + bin_edges[:-1]) / 2
+    mag_hist.plot(edges, hist_values, label=f"h={tuple([round(h, 3) for h in field])}")
+    mag_hist.set_xlabel("magnetization")
+
+for hist in abs_mag_histograms:
+    field, hist_values, bin_edges = hist[0], hist[1], hist[2]
+    edges = (bin_edges[1:] + bin_edges[:-1]) / 2
+    abs_mag_hist.plot(edges, hist_values, label=f"h={tuple([round(h, 3) for h in field])}")
+    abs_mag_hist.set_xlabel("absolute magnetization")
+
+for hist in A_B_histograms:
+    field, hist_values, bin_edges = hist[0], hist[1], hist[2]
+    edges = (bin_edges[1:] + bin_edges[:-1]) / 2
+    A_B_hist.plot(edges, hist_values, label=f"h={tuple([round(h, 3) for h in field])}")
+    A_B_hist.set_xlabel("A_star - B_plaq")
+
+energy_hist.legend()
+mag_hist.legend()
+abs_mag_hist.legend()
+A_B_hist.legend()
+
+plt.show()

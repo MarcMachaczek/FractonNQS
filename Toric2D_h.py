@@ -182,7 +182,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
         variational_gs.n_samples = 2*n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         observables.add_hist("energy", h,
-                             np.histogram(variational_gs.local_estimators(toric), n_bins, density=True))
+                             np.histogram(variational_gs.local_estimators(toric) / hilbert.size, n_bins, density=True))
         observables.add_hist("mag", h,
                              np.histogram(variational_gs.local_estimators(magnetization), n_bins, density=True))
         observables.add_hist("abs_mag", h,
