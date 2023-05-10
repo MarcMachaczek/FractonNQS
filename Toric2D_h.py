@@ -62,21 +62,21 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 direction = np.array([0.8, 0, 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 3) * direction).T
+field_strengths = (np.linspace(0, 1, 12) * direction).T
 
-# field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
-#                                                         [0.32, 0, 0.32],
-#                                                         [0.33, 0, 0.33],
-#                                                         [0.34, 0, 0.34],
-#                                                         [0.35, 0, 0.35],
-#                                                         [0.36, 0, 0.36]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
+                                                       [0.32, 0, 0.32],
+                                                       [0.33, 0, 0.33],
+                                                       [0.34, 0, 0.34],
+                                                       [0.35, 0, 0.35],
+                                                       [0.36, 0, 0.36]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 hist_fields = tuple(np.arange(0, len(field_strengths), 1))  # for which fields indices histograms are created
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
 # %%  setting hyper-parameters
-n_iter = 20
+n_iter = 200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
@@ -214,12 +214,12 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     plot.legend()
     if save_results:
         fig.savefig(
-            f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+            f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
 # %%
 if save_results:
     save_array = observables.obs_to_array(separate_keys=False)
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", save_array,
+    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables", save_array,
                header=", ".join(observables.key_names + observables.obs_names))
 
     for hist_name, _ in observables.histograms.items():
@@ -246,4 +246,4 @@ plot.set_title(f"Magnetization vs external field in {direction.flatten()}-direct
 plot.set_xlim(0, field_strengths[-1][2])
 
 if save_results:
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
+    fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_magnetizations.pdf")

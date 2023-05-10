@@ -1,6 +1,7 @@
 import os
 from mpi4py import MPI
 
+comm = MPI.COMM_WORLD
 rank = MPI.COMM_WORLD.Get_rank()
 # supress warning about no cuda mpi version
 # we don't need that because jax handles that, we only want to run copies of a process with some communication
@@ -44,6 +45,10 @@ magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for 
 abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
+positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
+A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert, p, shape) for p in positions]) - \
+      1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
+
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
 link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
@@ -68,14 +73,15 @@ direction = np.array([0.8, 0, 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 12) * direction).T
 
 field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
-                                                       [0.32, 0, 0.32],
-                                                       [0.33, 0, 0.33],
-                                                       [0.34, 0, 0.34],
-                                                       [0.35, 0, 0.35],
-                                                       [0.36, 0, 0.36]])))
+                                                        [0.32, 0, 0.32],
+                                                        [0.33, 0, 0.33],
+                                                        [0.34, 0, 0.34],
+                                                        [0.35, 0, 0.35],
+                                                        [0.36, 0, 0.36]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+hist_fields = tuple(np.arange(0, len(field_strengths), 1))  # for which fields indices histograms are created
 
-observables = {}
+observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
 # %%  setting hyper-parameters
 n_iter = 500
@@ -85,7 +91,7 @@ n_samples = n_chains * 32
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
-# n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
+n_bins = 40  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -93,7 +99,10 @@ diag_shift_begin = int(n_iter / 3)
 diag_shift_steps = int(n_iter / 3)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6), diag_shift=diag_shift_schedule, holomorphic=True)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
+                                 solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6),
+                                 diag_shift=diag_shift_schedule,
+                                 holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.01
@@ -140,8 +149,8 @@ if pre_train:
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
-    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
     # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
@@ -149,12 +158,9 @@ if pre_train:
                                                  1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
 
-    # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
-    # pretrained_parameters = variational_gs.parameters
-
     print("\n pre-training finished")
 
-for h in tqdm(field_strengths, "external_field"):
+for i, h in enumerate(tqdm(field_strengths, "external_field")):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
@@ -163,24 +169,29 @@ for h in tqdm(field_strengths, "external_field"):
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
-        # print(f"pre_train energy after adding noise:{variational_gs.expect(toric).Mean.item().real}")
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
     variational_gs.chunk_size = chunk_size
     variational_gs.n_samples = n_expect
-    observables[h] = {}
 
     # calculate energy and specific heat / variance of energy
-    observables[h]["energy"] = variational_gs.expect(toric)
-
+    energy = variational_gs.expect(toric)
+    observables.add_nk_obs("energy", h, energy)
     # calculate magnetization
-    observables[h]["mag"] = variational_gs.expect(magnetization)
-    
+    observables.add_nk_obs("mag", h, variational_gs.expect(magnetization))
+    # calculate absolute magnetization
+    observables.add_nk_obs("abs_mag", h, variational_gs.expect(abs_magnetization))
     # calcualte wilson loop operator
-    observables[h]["wilson"] = variational_gs.expect(wilsonob)
+    observables.add_nk_obs("wilson", h, variational_gs.expect(wilsonob))
 
+    # gather local estimators as each rank calculates them based on their own samples_per_rank
+    if i in hist_fields:
+        energy_locests = comm.gather(np.asarray(variational_gs.local_estimators(toric) / hilbert.size), root=0)
+        mag_locests = comm.gather(np.asarray(variational_gs.local_estimators(magnetization)), root=0)
+        abs_mag_locests = comm.gather(np.asarray(variational_gs.local_estimators(abs_magnetization)), root=0)
+        A_B_locests = comm.gather(np.asarray(variational_gs.local_estimators(A_B)), root=0)
     # plot and save training data, save observables
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(12, 12))
@@ -190,43 +201,52 @@ for h in tqdm(field_strengths, "external_field"):
         plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
                       label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
-        E0 = observables[h]["energy"].Mean.item().real
-        err = observables[h]["energy"].Sigma.item().real
-
         fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
-                 f" {eval_model}, alpha={alpha},"
-                 f" n_discard={n_discard_per_chain},"
-                 f" n_chains={n_chains},"
-                 f" n_samples={n_samples} \n"
-                 f" pre_train={pre_train}, stddev={stddev}")
+                     f" {eval_model}, alpha={alpha},"
+                     f" n_discard={n_discard_per_chain},"
+                     f" n_chains={n_chains},"
+                     f" n_samples={n_samples} \n"
+                     f" pre_train={pre_train}, stddev={stddev}")
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
+
+        E0, err = energy.Mean.item().real, energy.Sigma.item().real
         plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                        f" down to {diag_shift_end}")
         plot.legend()
         if save_results:
             fig.savefig(
-                f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+                f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+
+        # create histograms
+        if i in hist_fields:
+            variational_gs.n_samples = 2 * n_samples
+            # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
+            observables.add_hist("energy", h, np.histogram(energy_locests, n_bins, density=True))
+            observables.add_hist("mag", h, np.histogram(mag_locests, n_bins, density=True))
+            observables.add_hist("abs_mag", h, np.histogram(abs_mag_locests, n_bins, density=True))
+            observables.add_hist("A_B", h, np.histogram(A_B_locests, n_bins, density=True))
 
         # save observables to file
         if save_results:
-            obs = observables[h]
-            obs_to_write = np.asarray([[*h] +
-                                      [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                                      [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real]])
-
-            with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt", "ab") as f:
-                if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt") == 0:
-                    np.savetxt(f, obs_to_write,
-                               header="hx, hy, hz, mag, mag_var, energy, energy_var")
+            save_array = observables.obs_to_array(separate_keys=False)[-1]
+            with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt", "ab") as f:
+                if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt") == 0:
+                    np.savetxt(f, save_array, header=", ".join(observables.key_names + observables.obs_names))
                 else:
-                    np.savetxt(f, obs_to_write)
+                    np.savetxt(f, save_array)
+
+# %% save histograms
+if rank == 0:
+    for hist_name, _ in observables.histograms.items():
+        np.save(f"{RESULTS_PATH}/toric2d_h/hists_{hist_name}_L{shape}_{eval_model}.npy",
+                observables.hist_to_array(hist_name))
 
 # %%
 # create and save magnetization plot
 if rank == 0:
-    obs_to_array = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables.txt")
+    obs_to_array = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt")
 
     fig = plt.figure(dpi=300, figsize=(10, 10))
     plot = fig.add_subplot(111)
@@ -239,10 +259,11 @@ if rank == 0:
 
     plot.set_xlabel("external field hx")
     plot.set_ylabel("magnetization")
-    plot.set_title(f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
+    plot.set_title(
+        f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
     plot.set_xlim(0, field_strengths[-1][2])
 
     if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")
+        fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_magnetizations.pdf")
 # took 02:50 till magnetization was calculated

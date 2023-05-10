@@ -213,13 +213,13 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     plot.legend()
     if save_results:
         fig.savefig(
-            f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+            f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
 # %%
 exact_energies = np.array(exact_energies)
 if save_results:
     save_array = np.concatenate((observables.obs_to_array(separate_keys=False), exact_energies), axis=1)
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", save_array,
+    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables", save_array,
                header=", ".join(observables.key_names + observables.obs_names + ["exact_energy"]))
 
     for hist_name, _ in observables.histograms.items():
