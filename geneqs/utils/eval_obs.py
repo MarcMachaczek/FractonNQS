@@ -11,27 +11,53 @@ from dataclasses import dataclass, field
 
 # %%
 @dataclass
-class ObservableEvaluator:
+class ObservableCollector:
+    key_names: Union[list[str, ...], tuple[str, ...]]
     observables: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
+    histograms: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
     arrays: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
 
     def __post_init__(self):
+        self.key_names = list(self.key_names)
         self.observables = OrderedDict(self.observables)
+        self.histograms = OrderedDict(self.histograms)
         self.arrays = OrderedDict(self.arrays)
 
+    @property
+    def obs_names(self):
+        return list(self.observables.keys())
+
+    @property
+    def hist_names(self):
+        return list(self.histograms.keys())
+
+    @property
+    def array_names(self):
+        return list(self.arrays.keys())
+
     def add_nk_obs(self, name: str, key, nk_obs: nk.stats):
+        assert len(key) == len(self.key_names), f"key {key} is not compatible with key_names {self.key_names}"
         # add name if not present
         if name not in self.observables.keys():
             self.observables[name] = OrderedDict()
             self.observables[f"{name}_var"] = OrderedDict()
 
-        self.observables[name][key] = nk_obs.Mean.item()
-        self.observables[f"{name}_var"][key] = nk_obs.Variance.item()
+        self.observables[name][key] = nk_obs.Mean.item().real
+        self.observables[f"{name}_var"][key] = nk_obs.Variance.item().real
 
-    def add_array(self, name: str, key, array):
+    def add_hist(self, name: str, key, histogram: tuple[np.ndarray, np.ndarray]):
+        assert len(key) == len(self.key_names), f"key {key} is not compatible with key_names {self.key_names}"
+
+        if name not in self.histograms.keys():
+            self.histograms[name] = OrderedDict()
+
+        hist, bin_edges = histogram[0], histogram[1]
+        self.histograms[name][key] = {"hist": hist, "bin_edges": bin_edges}
+
+    def add_array(self, name: str, array):
         self.arrays[name] = array
 
-    def obs_to_array(self, names: Union[list[str, ...], str] = "all"):
+    def obs_to_array(self, names: Union[list[str, ...], str] = "all", separate_keys: bool = True):
         if names == "all":
             names = list(self.observables.keys())
         elif type(names) == str:
@@ -39,18 +65,37 @@ class ObservableEvaluator:
 
         assert self.check_keys(names), f"keys for provided names {names} don't match"
 
-        obs_array = np.asarray(list(self.observables[names[0]].keys()))
-        
-        for name in names:
+        keys_array = np.asarray(list(self.observables[names[0]].keys()))
+        obs_array = np.asarray(list(self.observables[names[0]].values())).reshape(-1, 1)
+
+        for name in names[1:]:
             obs_values = []
             for key, value in self.observables[name].items():
                 obs_values.append(value)
             obs_values = np.asarray(obs_values).reshape(-1, 1)
             obs_array = np.concatenate((obs_array, obs_values), axis=1)
-        
-        return obs_array
-    
-    def get_array(self, name):
+
+        if separate_keys:
+            return keys_array, obs_array
+        return np.concatenate((keys_array, obs_array), axis=1)
+
+    def hist_to_array(self, name: str):
+        """
+        Returns the histograms identified by name over all keys.
+        Args:
+            name: name of the histograms
+
+        Returns:
+            key, histogram ndarray of shape (n_keys, 2) containing arrays
+
+        """
+        histograms = []
+        for key, val in self.histograms[name].items():
+            histograms.append(np.asarray([np.asarray(key), val["hist"], val["bin_edges"]], dtype=object))
+
+        return histograms
+
+    def get_array(self, name: str):
         return self.arrays[name]
 
     def check_keys(self, names: list[str, ...]):
@@ -62,35 +107,17 @@ class ObservableEvaluator:
                 compatible = False
         return compatible
 
+    def __repr__(self):
+        return f"saved observables: {list(self.observables.keys())} \n" \
+               f"saved histograms: {list(self.histograms.keys())} \n" \
+               f"saved arrays: {list(self.arrays.keys())}"
+
     @classmethod
     def from_txt(cls, load_path: str):
         pass
 
 
 # %%
-L = 3
-shape = jnp.array([L, L])
-square_graph = nk.graph.Square(length=L, pbc=True)
-hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
-
-obs = nk.operator.spin.sigmaz(hilbert, 0) * nk.operator.spin.sigmaz(hilbert, 1)
-sampler = nk.sampler.MetropolisLocal(hilbert, dtype=jnp.int8)
-model = nk.models.RBM(alpha=1)
-vqs = nk.vqs.MCState(sampler, model)
-
-value = vqs.expect(obs)
-
-test = {"a": 1, "b": 2, "c": {(0, 0): "in", (0, 1): "out"}}
-
-# %%
-logger = ObservableEvaluator()
-logger.add_nk_obs("obs", (1, 2, 3), value)
-logger.add_nk_obs("obs", (2, 2, 3), value)
-logger.add_nk_obs("obs", (3, 2, 3), value)
-logger.obs_to_array("obs")
-
-# %%
-
 def susc_from_mag(magnetizations: Union[jax.Array, np.ndarray], fields: Union[jax.Array, np.ndarray]):
     """
     Calculate the magnetic susceptibility from observed magnetization values via finite differences.

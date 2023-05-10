@@ -15,10 +15,10 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-save_results = False
+save_results = True
 pre_train = False
 
-random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 4  # size should be at least 3, else there are problems with pbc and indexing
@@ -30,6 +30,10 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
+
+positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
+A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert, p, shape) for p in positions]) - \
+      1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -58,27 +62,28 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 direction = np.array([0.8, 0, 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 12) * direction).T
+field_strengths = (np.linspace(0, 1, 3) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
-                                                       [0.32, 0, 0.32],
-                                                       [0.33, 0, 0.33],
-                                                       [0.34, 0, 0.34],
-                                                       [0.35, 0, 0.35],
-                                                       [0.36, 0, 0.36]])))
+# field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
+#                                                         [0.32, 0, 0.32],
+#                                                         [0.33, 0, 0.33],
+#                                                         [0.34, 0, 0.34],
+#                                                         [0.35, 0, 0.35],
+#                                                         [0.36, 0, 0.36]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+hist_fields = tuple(np.arange(0, len(field_strengths), 1))  # for which fields indices histograms are created
 
-observables = {}
+observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
 # %%  setting hyper-parameters
-n_iter = 400
+n_iter = 20
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
 n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
 chunk_size = 1024 * 8  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
-# n_sweeps will default to n_sites, every n_sweeps (updates) a sample will be generated
+n_bins = 40  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -86,7 +91,10 @@ diag_shift_begin = int(n_iter / 3)
 diag_shift_steps = int(n_iter / 3)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6), diag_shift=diag_shift_schedule, holomorphic=True)
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
+                                 solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6),
+                                 diag_shift=diag_shift_schedule,
+                                 holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.01
@@ -99,7 +107,7 @@ cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
                                alpha=alpha,
                                kernel_init=default_kernel_init,
                                bias_init=default_kernel_init,
-                               param_dtype=float)
+                               param_dtype=complex)
 
 model = cRBM
 eval_model = "ToricCRBM"
@@ -133,8 +141,8 @@ if pre_train:
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
-    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi/4)
-    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi/2)
+    exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
+    exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
     # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
@@ -142,12 +150,9 @@ if pre_train:
                                                  1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
 
-    # variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
-    # pretrained_parameters = variational_gs.parameters
-
     print("\n pre-training finished")
 
-for h in tqdm(field_strengths, "external_field"):
+for i, h in enumerate(tqdm(field_strengths, "external_field")):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
@@ -156,23 +161,34 @@ for h in tqdm(field_strengths, "external_field"):
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
-        # print(f"pre_train energy after adding noise:{variational_gs.expect(toric).Mean.item().real}")
 
     variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
     variational_gs.chunk_size = chunk_size
     variational_gs.n_samples = n_expect
-    observables[h] = {}
 
     # calculate energy and specific heat / variance of energy
-    observables[h]["energy"] = variational_gs.expect(toric)
-
+    energy = variational_gs.expect(toric)
+    observables.add_nk_obs("energy", h, energy)
     # calculate magnetization
-    observables[h]["mag"] = variational_gs.expect(magnetization)
-
+    observables.add_nk_obs("mag", h, variational_gs.expect(magnetization))
+    # calculate absolute magnetization
+    observables.add_nk_obs("abs_mag", h, variational_gs.expect(abs_magnetization))
     # calcualte wilson loop operator
-    observables[h]["wilson"] = variational_gs.expect(wilsonob)
+    observables.add_nk_obs("wilson", h, variational_gs.expect(wilsonob))
+
+    if i in hist_fields:
+        variational_gs.n_samples = 2*n_samples
+        # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
+        observables.add_hist("energy", h,
+                             np.histogram(variational_gs.local_estimators(toric), n_bins, density=True))
+        observables.add_hist("mag", h,
+                             np.histogram(variational_gs.local_estimators(magnetization), n_bins, density=True))
+        observables.add_hist("abs_mag", h,
+                             np.histogram(variational_gs.local_estimators(abs_magnetization), n_bins, density=True))
+        observables.add_hist("A_B", h,
+                             np.histogram(variational_gs.local_estimators(A_B), n_bins, density=True))
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -181,9 +197,6 @@ for h in tqdm(field_strengths, "external_field"):
     n_params = int(training_data["n_params"].value)
     plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
                   label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
-
-    E0 = observables[h]["energy"].Mean.item().real
-    err = observables[h]["energy"].Sigma.item().real
 
     fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
                  f" {eval_model}, alpha={alpha},"
@@ -194,45 +207,43 @@ for h in tqdm(field_strengths, "external_field"):
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
+
+    E0, err = energy.Mean.item().real, energy.Sigma.item().real
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                    f" down to {diag_shift_end}")
     plot.legend()
     if save_results:
         fig.savefig(
-                f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+            f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
 # %%
-obs_to_array = []
-for h, obs in observables.items():
-    obs_to_array.append([*h] +
-                        [obs["mag"].Mean.item().real, obs["mag"].Sigma.item().real] +
-                        [obs["energy"].Mean.item().real, obs["energy"].Sigma.item().real])
-obs_to_array = np.asarray(obs_to_array)
-
 if save_results:
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", obs_to_array,
-               header="hx, hy, hz, mag, mag_var, energy, energy_var")
-# mags = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magvals")
+    save_array = observables.obs_to_array(separate_keys=False)
+    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_observables", save_array,
+               header=", ".join(observables.key_names + observables.obs_names))
+
+    for hist_name, _ in observables.histograms.items():
+        np.save(f"{RESULTS_PATH}/toric2d_h/hists_{hist_name}_L{shape}_{eval_model}.npy",
+                observables.hist_to_array(hist_name))
 
 # %%
 # create and save magnetization plot
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
+c = "red"
 
-c = "red" if hx == 0. else "blue"
-for obs in obs_to_array:
-    plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+fields, mags = observables.obs_to_array(["mag", "mag_var"])
 
-plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+for field, mag in zip(fields, mags):
+    plot.errorbar(field[0], np.abs(mag[0]), yerr=mag[1], marker="o", markersize=2, color=c)
 
-plot.set_xlabel("external field hz")
+plot.plot(fields[:, 0], np.abs(mags[:, 0]), marker="o", markersize=2, color=c)
+
+plot.set_xlabel("external magnetic field")
 plot.set_ylabel("magnetization")
-plot.set_title(f"Magnetization vs external field in z-direction for ToricCode2d of size={shape} "
-               f"and hx={hx}")
+plot.set_title(f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
-plot.set_xlim(0, 0.5)
-plot.set_ylim(0, 1.)
-plt.show()
+plot.set_xlim(0, field_strengths[-1][2])
 
 if save_results:
     fig.savefig(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_a{alpha}_magnetizations.pdf")

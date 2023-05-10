@@ -8,19 +8,16 @@ from global_variables import RESULTS_PATH
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
-L = 8
-field_direction = 0  # 0=x, 1=y, 2=z
-obs_list = []  # append multiple data to compare them each within one plot
-
+L = 4
+eval_model = "ToricCRBM"
+save_dir = f"{RESULTS_PATH}/toric2d_h/test"
+obs_list = []
+# append multiple data to compare them each within one plot
 obs_list.append(
-    np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx/L[{L} {L}]_ToricCRBM_a1_observables.txt"))
-
-# obs_list.append(
-#     np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_crbm_ed_test_hxhz_mc/ed_test_ToricCRBM_hdir[0.8 0.  0.8]_observables"))
-
-# obs_list.append(np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L={L}_complex_crbm_hx03_4/L[{L} {L}]_cRBM_a1_observables"))
+    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_a1_observables.txt"))
 
 direction = obs_list[0][-1, :3]
+field_direction = 0  # 0=x, 1=y, 2=z
 # %% magnetizations comparison
 # obs columns: "hx, hy, hz, mag, mag_var, energy, energy_var, wilson, wilson_var"
 fig = plt.figure(dpi=300, figsize=(26, 24))
@@ -81,3 +78,18 @@ plot_spheat.set_title(
 plot_spheat.legend()
 plt.show()
 fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_obs_comparison.pdf")
+
+# %% histograms
+# TODO: change to hists_
+# shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
+energy_histograms = np.load(f"{save_dir}/hist_energy_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+mag_histograms = np.load(f"{save_dir}/hist_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+abs_mag_histograms = np.load(f"{save_dir}/hist_abs_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+A_B_histograms = np.load(f"{save_dir}/hist_A_B_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
+
+fig = plt.figure(dpi=300, figsize=(26, 24))
+energy_hist = fig.add_subplot(221)
+mag_hist = fig.add_subplot(222)
+abs_mag_hist = fig.add_subplot(223)
+A_B_hist = fig.add_subplot(224)
+
