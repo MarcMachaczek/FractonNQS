@@ -10,11 +10,11 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
 L = 4
 eval_model = "ToricCRBM"
-save_dir = f"{RESULTS_PATH}/toric2d_h/test"
+save_dir = f"{RESULTS_PATH}/toric2d_h"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_a1_observables.txt"))
+    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables.txt"))
 
 direction = obs_list[0][-1, :3]
 field_direction = 0  # 0=x, 1=y, 2=z
@@ -77,7 +77,7 @@ plot_spheat.set_title(
 
 plot_spheat.legend()
 plt.show()
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/L[{L} {L}]_cRBM_obs_comparison.pdf")
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/obs_comparison_L[{L} {L}]_cRBM.pdf")
 
 # %% histograms
 # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
@@ -124,3 +124,4 @@ abs_mag_hist.legend()
 A_B_hist.legend()
 
 plt.show()
+fig.savefig(f"{RESULTS_PATH}/toric2d_h/hist_comparison_L[{L} {L}]_cRBM.pdf")

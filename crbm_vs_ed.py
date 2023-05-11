@@ -55,8 +55,8 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 
-direction = np.array([0., 0.8, 0]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 12) * direction).T
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 10) * direction).T
 
 field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
                                                        [0.32, 0, 0.32],
@@ -74,10 +74,10 @@ exact_energies = []
 n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 80
+n_samples = n_chains * 60
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
-n_bins = 100  # number of bins for calculating histograms
+n_bins = 30  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -152,7 +152,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -178,7 +178,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     observables.add_nk_obs("wilson", h, variational_gs.expect(wilsonob))
 
     if i in hist_fields:
-        variational_gs.n_samples = 2*n_samples
+        variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         observables.add_hist("energy", h,
                              np.histogram(variational_gs.local_estimators(toric) / hilbert.size, n_bins, density=True))
