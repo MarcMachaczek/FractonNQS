@@ -18,7 +18,7 @@ from functools import partial
 save_results = True
 pre_train = False
 
-random_key = jax.random.PRNGKey(12345)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -64,19 +64,19 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
                                                        [0.34, 0, 0],
                                                        [0.35, 0, 0]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
-hist_fields = tuple(np.arange(0, len(field_strengths), 4))  # for which fields indices histograms are created
+hist_fields = tuple(np.arange(0, len(field_strengths), 5))  # for which fields indices histograms are created
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 exact_energies = []
 
 # %%  setting hyper-parameters
-n_iter = 400
+n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 60
-n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 72  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
-n_bins = 30  # number of bins for calculating histograms
+n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
