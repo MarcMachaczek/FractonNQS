@@ -68,18 +68,16 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-# h_c at 0.328474, for L=10 compute sigma_z average over different h
-direction = np.array([0.8, 0, 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 12) * direction).T
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
-                                                        [0.32, 0, 0.32],
-                                                        [0.33, 0, 0.33],
-                                                        [0.34, 0, 0.34],
-                                                        [0.35, 0, 0.35],
-                                                        [0.36, 0, 0.36]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
+                                                        [0.32, 0, 0],
+                                                        [0.33, 0, 0],
+                                                        [0.34, 0, 0],
+                                                        [0.35, 0, 0]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
-hist_fields = tuple(np.arange(0, len(field_strengths), 1))  # for which fields indices histograms are created
+hist_fields = tuple(np.arange(0, len(field_strengths), 5))  # for which fields indices histograms are created
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
@@ -91,7 +89,7 @@ n_samples = n_chains * 32
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
-n_bins = 40  # number of bins for calculating histograms
+n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -177,21 +175,28 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     variational_gs.n_samples = n_expect
 
     # calculate energy and specific heat / variance of energy
-    energy = variational_gs.expect(toric)
-    observables.add_nk_obs("energy", h, energy)
+    energy_nk = variational_gs.expect(toric)
+    observables.add_nk_obs("energy", h, energy_nk)
     # calculate magnetization
-    observables.add_nk_obs("mag", h, variational_gs.expect(magnetization))
+    magnetization_nk = variational_gs.expect(magnetization)
+    observables.add_nk_obs("mag", h, magnetization_nk)
     # calculate absolute magnetization
-    observables.add_nk_obs("abs_mag", h, variational_gs.expect(abs_magnetization))
+    abs_magnetization_nk = variational_gs.expect(abs_magnetization)
+    observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
     # calcualte wilson loop operator
-    observables.add_nk_obs("wilson", h, variational_gs.expect(wilsonob))
+    wilsonob_nk = variational_gs.expect(wilsonob)
+    observables.add_nk_obs("wilson", h, wilsonob_nk)
 
     # gather local estimators as each rank calculates them based on their own samples_per_rank
     if i in hist_fields:
-        energy_locests = comm.gather(np.asarray(variational_gs.local_estimators(toric) / hilbert.size), root=0)
-        mag_locests = comm.gather(np.asarray(variational_gs.local_estimators(magnetization)), root=0)
-        abs_mag_locests = comm.gather(np.asarray(variational_gs.local_estimators(abs_magnetization)), root=0)
-        A_B_locests = comm.gather(np.asarray(variational_gs.local_estimators(A_B)), root=0)
+        energy_locests = comm.gather(
+            np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64), root=0)
+        mag_locests = comm.gather(
+            np.asarray(variational_gs.local_estimators(magnetization).real, dtype=np.float64), root=0)
+        abs_mag_locests = comm.gather(
+            np.asarray(variational_gs.local_estimators(abs_magnetization).real, dtype=np.float64), root=0)
+        A_B_locests = comm.gather(
+            np.asarray(variational_gs.local_estimators(A_B).real, dtype=np.float64), root=0)
     # plot and save training data, save observables
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(12, 12))
@@ -211,7 +216,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
 
-        E0, err = energy.Mean.item().real, energy.Sigma.item().real
+        E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.item().real
         plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                        f" down to {diag_shift_end}")
         plot.legend()
@@ -221,12 +226,17 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
 
         # create histograms
         if i in hist_fields:
-            variational_gs.n_samples = 2 * n_samples
+            variational_gs.n_samples = n_samples
             # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-            observables.add_hist("energy", h, np.histogram(energy_locests, n_bins, density=True))
-            observables.add_hist("mag", h, np.histogram(mag_locests, n_bins, density=True))
-            observables.add_hist("abs_mag", h, np.histogram(abs_mag_locests, n_bins, density=True))
-            observables.add_hist("A_B", h, np.histogram(A_B_locests, n_bins, density=True))
+            observables.add_hist("energy", h, np.histogram((energy_locests - energy_nk.Mean.real) / hilbert.size,
+                                                           n_bins, density=True))
+            observables.add_hist("mag", h, np.histogram(mag_locests - magnetization_nk.Mean.real,
+                                                        n_bins, density=True))
+            observables.add_hist("abs_mag", h, np.histogram(abs_mag_locests - abs_magnetization_nk.Mean.real,
+                                                            n_bins, density=True))
+            A_B_nk = variational_gs.expect(A_B)
+            observables.add_hist("A_B", h, np.histogram(A_B_locests - A_B_nk.Mean.real,
+                                                        n_bins, density=True))
 
         # save observables to file
         if save_results:

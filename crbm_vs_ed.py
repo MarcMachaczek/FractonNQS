@@ -54,15 +54,14 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-
 direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 
 field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
-                                                       [0.32, 0, 0],
-                                                       [0.33, 0, 0],
-                                                       [0.34, 0, 0],
-                                                       [0.35, 0, 0]])))
+                                                        [0.32, 0, 0],
+                                                        [0.33, 0, 0],
+                                                        [0.34, 0, 0],
+                                                        [0.35, 0, 0]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 hist_fields = tuple(np.arange(0, len(field_strengths), 5))  # for which fields indices histograms are created
 
@@ -162,32 +161,43 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     variational_gs.n_samples = n_expect
 
     # calculate energy and specific heat / variance of energy
-    energy = variational_gs.expect(toric)
-    observables.add_nk_obs("energy", h, energy)
+    energy_nk = variational_gs.expect(toric)
+    observables.add_nk_obs("energy", h, energy_nk)
     # exactly diagonalize hamiltonian, find exact E0 and save it 
     toric_nk = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
     E0_exact = nk.exact.lanczos_ed(toric_nk, compute_eigenvectors=False)[0]
     exact_energies.append(E0_exact)
 
     # calculate magnetization
-    observables.add_nk_obs("mag", h, variational_gs.expect(magnetization))
+    magnetization_nk = variational_gs.expect(magnetization)
+    observables.add_nk_obs("mag", h, magnetization_nk)
     # calculate absolute magnetization
-    observables.add_nk_obs("abs_mag", h, variational_gs.expect(abs_magnetization))
+    abs_magnetization_nk = variational_gs.expect(abs_magnetization)
+    observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
     # calcualte wilson loop operator
-    observables.add_nk_obs("wilson", h, variational_gs.expect(wilsonob))
+    wilsonob_nk = variational_gs.expect(wilsonob)
+    observables.add_nk_obs("wilson", h, wilsonob_nk)
 
     if i in hist_fields:
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        observables.add_hist("energy", h,
-                             np.histogram(np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64) / hilbert.size,
-                             n_bins, density=True))
-        observables.add_hist("mag", h,
-                             np.histogram(variational_gs.local_estimators(magnetization).real, n_bins, density=True))
-        observables.add_hist("abs_mag", h,
-                             np.histogram(variational_gs.local_estimators(abs_magnetization).real, n_bins, density=True))
-        observables.add_hist("A_B", h,
-                             np.histogram(variational_gs.local_estimators(A_B).real, n_bins, density=True))
+        norm_e_locs = np.asarray((variational_gs.local_estimators(toric) - energy_nk.Mean).real,
+                                 dtype=np.float64)
+        observables.add_hist("energy", h, np.histogram(norm_e_locs / hilbert.size, n_bins, density=True))
+
+        norm_mag_locs = np.asarray((variational_gs.local_estimators(magnetization) - magnetization_nk.Mean).real,
+                                   dtype=np.float64)
+        observables.add_hist("mag", h, np.histogram(norm_mag_locs, n_bins, density=True))
+
+        norm_abs_mag_locs = np.asarray(
+            (variational_gs.local_estimators(abs_magnetization) - abs_magnetization_nk.Mean).real,
+            dtype=np.float64)
+        observables.add_hist("abs_mag", h, np.histogram(norm_abs_mag_locs, n_bins, density=True))
+
+        A_B_nk = variational_gs.expect(A_B)
+        norm_A_B_locs = np.asarray((variational_gs.local_estimators(A_B) - A_B_nk.Mean).real,
+                                   dtype=np.float64)
+        observables.add_hist("A_B", h, np.histogram(norm_A_B_locs, n_bins, density=True))
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(10, 10))
