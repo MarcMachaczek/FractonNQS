@@ -56,22 +56,21 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
 
 
 direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 10) * direction).T
+field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
-                                                       [0.32, 0, 0.32],
-                                                       [0.33, 0, 0.33],
-                                                       [0.34, 0, 0.34],
-                                                       [0.35, 0, 0.35],
-                                                       [0.36, 0, 0.36]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
+                                                       [0.32, 0, 0],
+                                                       [0.33, 0, 0],
+                                                       [0.34, 0, 0],
+                                                       [0.35, 0, 0]])))
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
-hist_fields = tuple(np.arange(0, len(field_strengths), 1))  # for which fields indices histograms are created
+hist_fields = tuple(np.arange(0, len(field_strengths), 4))  # for which fields indices histograms are created
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 exact_energies = []
 
 # %%  setting hyper-parameters
-n_iter = 500
+n_iter = 400
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 60
@@ -181,13 +180,14 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         observables.add_hist("energy", h,
-                             np.histogram(variational_gs.local_estimators(toric) / hilbert.size, n_bins, density=True))
+                             np.histogram(np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64) / hilbert.size,
+                             n_bins, density=True))
         observables.add_hist("mag", h,
-                             np.histogram(variational_gs.local_estimators(magnetization), n_bins, density=True))
+                             np.histogram(variational_gs.local_estimators(magnetization).real, n_bins, density=True))
         observables.add_hist("abs_mag", h,
-                             np.histogram(variational_gs.local_estimators(abs_magnetization), n_bins, density=True))
+                             np.histogram(variational_gs.local_estimators(abs_magnetization).real, n_bins, density=True))
         observables.add_hist("A_B", h,
-                             np.histogram(variational_gs.local_estimators(A_B), n_bins, density=True))
+                             np.histogram(variational_gs.local_estimators(A_B).real, n_bins, density=True))
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -216,7 +216,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
             f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
 # %%
-exact_energies = np.array(exact_energies)
+exact_energies = np.array(exact_energies).reshape(-1, 1)
 if save_results:
     save_array = np.concatenate((observables.obs_to_array(separate_keys=False), exact_energies), axis=1)
     np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables", save_array,
@@ -232,9 +232,9 @@ fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
 
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
-rel_errors = np.asarray([np.abs(exact_energies - energies) / np.abs(exact_energies) for h in field_strengths])
+rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 1], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, 0], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
@@ -247,3 +247,5 @@ plt.show()
 
 if save_results:
     fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_{eval_model}_hdir{direction.flatten()}.pdf")
+
+# %%
