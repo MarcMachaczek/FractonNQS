@@ -16,9 +16,9 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = False
+pre_train = True
 
-random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -55,7 +55,7 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 10
+n_iter = 600
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 60
@@ -75,7 +75,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -104,18 +104,18 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
-                                                        [0.32, 0, 0],
-                                                        [0.33, 0, 0],
-                                                        [0.34, 0, 0],
-                                                        [0.35, 0, 0]])))
+field_strengths = np.vstack((field_strengths, np.array([[0, 0, 0.31],
+                                                        [0, 0, 0.32],
+                                                        [0, 0, 0.33],
+                                                        [0, 0, 0.34],
+                                                        [0, 0, 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0, 0],
-                        [0.4, 0, 0],
-                        [0.5, 0, 0],
-                        [0.6, 0, 0]])
+hist_fields = np.array([[0, 0, 0.3],
+                        [0, 0, 0.4],
+                        [0, 0, 0.5],
+                        [0, 0, 0.6]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.vstack((field_strengths, hist_fields)), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
@@ -169,9 +169,8 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate energy and specific heat / variance of energy
     energy_nk = variational_gs.expect(toric)
     observables.add_nk_obs("energy", h, energy_nk)
-    # exactly diagonalize hamiltonian, find exact E0 and save it 
-    toric_nk = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
-    E0_exact = nk.exact.lanczos_ed(toric_nk, compute_eigenvectors=False)[0]
+    # exactly diagonalize hamiltonian, find exact E0 and save it
+    E0_exact = nk.exact.lanczos_ed(toric, compute_eigenvectors=False)[0]
     exact_energies.append(E0_exact)
 
     # calculate magnetization
@@ -188,16 +187,16 @@ for h in tqdm(field_strengths, "external_field"):
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)
-        observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=True))
+        observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
         mag_locs = np.asarray((variational_gs.local_estimators(magnetization)).real, dtype=np.float64)
-        observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=True))
+        observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
         abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)).real, dtype=np.float64)
-        observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=True))
+        observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
         A_B_locs = np.asarray((variational_gs.local_estimators(A_B)).real, dtype=np.float64)
-        observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=True))
+        observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=False))
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(12, 12))
@@ -244,7 +243,7 @@ plot = fig.add_subplot(111)
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
 rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 0], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, 2], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
