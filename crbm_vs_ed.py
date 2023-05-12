@@ -150,7 +150,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
