@@ -217,7 +217,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
 
-    E0, err = energy.Mean.item().real, energy.Sigma.item().real
+    E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.item().real
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                    f" down to {diag_shift_end}")
     plot.legend()
