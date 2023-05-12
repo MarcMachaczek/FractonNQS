@@ -185,7 +185,7 @@ for h in tqdm(field_strengths, "external_field"):
     wilsonob_nk = variational_gs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
-    if h in hist_fields:
+    if np.any((h == hist_fields).all(axis=1)):
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)

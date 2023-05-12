@@ -194,7 +194,7 @@ for h in tqdm(field_strengths, "external_field"):
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
     # gather local estimators as each rank calculates them based on their own samples_per_rank
-    if h in hist_fields:
+    if np.any((h == hist_fields).all(axis=1)):
         energy_locests = comm.gather(
             np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64), root=0)
         mag_locests = comm.gather(
@@ -231,7 +231,7 @@ for h in tqdm(field_strengths, "external_field"):
                 f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
         # create histograms
-        if h in hist_fields:
+        if np.any((h == hist_fields).all(axis=1)):
             variational_gs.n_samples = n_samples
             # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
             observables.add_hist("energy", h, np.histogram(energy_locests / hilbert.size, n_bins, density=True))
