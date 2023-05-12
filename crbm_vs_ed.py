@@ -150,7 +150,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -217,7 +217,7 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
 
-    E0, err = energy.Mean.item().real, energy.Sigma.item().real
+    E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.item().real
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                    f" down to {diag_shift_end}")
     plot.legend()
