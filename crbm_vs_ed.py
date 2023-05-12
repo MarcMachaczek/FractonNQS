@@ -54,20 +54,6 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
-
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
-                                                        [0.32, 0, 0],
-                                                        [0.33, 0, 0],
-                                                        [0.34, 0, 0],
-                                                        [0.35, 0, 0]])))
-field_strengths = field_strengths[field_strengths[:, 0].argsort()]
-hist_fields = tuple(np.arange(0, len(field_strengths), 5))  # for which fields indices histograms are created
-
-observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
-exact_energies = []
-
 # %%  setting hyper-parameters
 n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
@@ -117,6 +103,26 @@ transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
+# define fields for which to trian the NQS and get observables
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 9) * direction).T
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
+                                                        [0.32, 0, 0],
+                                                        [0.33, 0, 0],
+                                                        [0.34, 0, 0],
+                                                        [0.35, 0, 0]])))
+# for which fields indices histograms are created
+hist_fields = np.array([[0.3, 0, 0],
+                        [0.4, 0, 0],
+                        [0.5, 0.1, 0],
+                        [0.6, 0, 0]])
+# make sure hist fields are contained in field_strengths and sort final field array
+field_strengths = np.unique(np.vstack((field_strengths, hist_fields)))
+field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+
+observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
+exact_energies = []
+
 # %%
 if pre_train:
     print(f"pre-training for {n_iter} iterations on the pure model")
@@ -144,7 +150,7 @@ if pre_train:
 
     print("\n pre-training finished")
 
-for i, h in enumerate(tqdm(field_strengths, "external_field")):
+for h in enumerate(tqdm(field_strengths, "external_field")):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
@@ -178,29 +184,23 @@ for i, h in enumerate(tqdm(field_strengths, "external_field")):
     wilsonob_nk = variational_gs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
-    if i in hist_fields:
+    if h in hist_fields:
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        norm_e_locs = np.asarray((variational_gs.local_estimators(toric) - energy_nk.Mean).real,
-                                 dtype=np.float64)
-        observables.add_hist("energy", h, np.histogram(norm_e_locs / hilbert.size, n_bins, density=True))
+        e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)
+        observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=True))
 
-        norm_mag_locs = np.asarray((variational_gs.local_estimators(magnetization) - magnetization_nk.Mean).real,
-                                   dtype=np.float64)
-        observables.add_hist("mag", h, np.histogram(norm_mag_locs, n_bins, density=True))
+        mag_locs = np.asarray((variational_gs.local_estimators(magnetization)).real, dtype=np.float64)
+        observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=True))
 
-        norm_abs_mag_locs = np.asarray(
-            (variational_gs.local_estimators(abs_magnetization) - abs_magnetization_nk.Mean).real,
-            dtype=np.float64)
-        observables.add_hist("abs_mag", h, np.histogram(norm_abs_mag_locs, n_bins, density=True))
+        abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)).real, dtype=np.float64)
+        observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=True))
 
-        A_B_nk = variational_gs.expect(A_B)
-        norm_A_B_locs = np.asarray((variational_gs.local_estimators(A_B) - A_B_nk.Mean).real,
-                                   dtype=np.float64)
-        observables.add_hist("A_B", h, np.histogram(norm_A_B_locs, n_bins, density=True))
+        A_B_locs = np.asarray((variational_gs.local_estimators(A_B)).real, dtype=np.float64)
+        observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=True))
 
     # plot and save training data, save observables
-    fig = plt.figure(dpi=300, figsize=(10, 10))
+    fig = plt.figure(dpi=300, figsize=(12, 12))
     plot = fig.add_subplot(111)
 
     n_params = int(training_data["n_params"].value)
@@ -256,6 +256,4 @@ plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field 
 plt.show()
 
 if save_results:
-    fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_{eval_model}_hdir{direction.flatten()}.pdf")
-
-# %%
+    fig.savefig(f"{RESULTS_PATH}/toric2d_h/Relative_Error_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")

@@ -109,7 +109,7 @@ plot_spheat.legend()
 plt.show()
 fig.savefig(f"{RESULTS_PATH}/toric2d_h/obs_comparison_L[{L} {L}]_cRBM.pdf")
 
-# %% histograms
+# %%%%%%%%%%%%%%% HISTOGRAMS %%%%%%%%%%%%%%% #
 # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
 energy_histograms = np.load(f"{save_dir}/hists_energy_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
 mag_histograms = np.load(f"{save_dir}/hists_mag_L[{L} {L}]_{eval_model}.npy", allow_pickle=True)
