@@ -164,7 +164,7 @@ if pre_train:
 
     print("\n pre-training finished")
 
-for h in enumerate(tqdm(field_strengths, "external_field")):
+for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)

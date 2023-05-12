@@ -55,7 +55,7 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 500
+n_iter = 10
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 60
@@ -114,7 +114,7 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
 # for which fields indices histograms are created
 hist_fields = np.array([[0.3, 0, 0],
                         [0.4, 0, 0],
-                        [0.5, 0.1, 0],
+                        [0.5, 0, 0],
                         [0.6, 0, 0]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.vstack((field_strengths, hist_fields)), axis=0)
@@ -150,13 +150,13 @@ if pre_train:
 
     print("\n pre-training finished")
 
-for h in enumerate(tqdm(field_strengths, "external_field")):
+for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
@@ -184,7 +184,7 @@ for h in enumerate(tqdm(field_strengths, "external_field")):
     wilsonob_nk = variational_gs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
-    if h in hist_fields:
+    if np.any((h == hist_fields).all(axis=1)):
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)

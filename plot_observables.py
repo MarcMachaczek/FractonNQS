@@ -9,6 +9,7 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
 L = 3
+hilbert_size = 2 * L ** 2
 eval_model = "ToricCRBM"
 save_dir = f"{RESULTS_PATH}/toric2d_h"
 obs_list = []
@@ -124,11 +125,14 @@ mag_hist = fig.add_subplot(222)
 abs_mag_hist = fig.add_subplot(223)
 A_B_hist = fig.add_subplot(224)
 
+obs = obs_list[0]
 for hist in energy_histograms:
     field, hist_values, bin_edges = hist[0], hist[1], hist[2]
-    edges = (bin_edges[1:] + bin_edges[:-1]) / 2
-    energy_hist.plot(edges, hist_values, label=f"h={tuple([round(h, 3) for h in field])}")
-    energy_hist.set_xlabel("energy per site")
+    e_mean = obs[np.argwhere((obs[:, :3]==field).all(axis=1)), 3].item()
+    edges = (bin_edges[1:] + bin_edges[:-1]) / 2 - e_mean / hilbert_size
+    hist_values_rescaled = hist_values / np.max(hist_values)
+    energy_hist.plot(edges, hist_values_rescaled, label=f"h={tuple([round(h, 3) for h in field])}")
+    energy_hist.set_xlabel("energy per site with mean subtracted")
 
 for hist in mag_histograms:
     field, hist_values, bin_edges = hist[0], hist[1], hist[2]
@@ -145,7 +149,8 @@ for hist in abs_mag_histograms:
 for hist in A_B_histograms:
     field, hist_values, bin_edges = hist[0], hist[1], hist[2]
     edges = (bin_edges[1:] + bin_edges[:-1]) / 2
-    A_B_hist.plot(edges, hist_values, label=f"h={tuple([round(h, 3) for h in field])}")
+    hist_values_rescaled = hist_values / np.max(hist_values)
+    A_B_hist.plot(edges, hist_values_rescaled, label=f"h={tuple([round(h, 3) for h in field])}")
     A_B_hist.set_xlabel("A_star - B_plaq")
 
 energy_hist.legend()
