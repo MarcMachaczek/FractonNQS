@@ -8,9 +8,9 @@ def random_split_like_tree(rng_key, target=None, treedef=None):
     return jax.tree_util.tree_unflatten(treedef, keys)
 
 
-def tree_random_normal_like(rng_key, target):
+def tree_random_normal_like(rng_key, target, stddev):
     keys_tree = random_split_like_tree(rng_key, target)
     return jax.tree_util.tree_map(
-        lambda leaf, key: jax.random.normal(key, leaf.shape, leaf.dtype),
+        lambda leaf, key: stddev * jax.random.normal(key, leaf.shape, leaf.dtype),
         target,
         keys_tree)
