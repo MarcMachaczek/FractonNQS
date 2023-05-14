@@ -16,9 +16,9 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = False
+pre_train = True
 
-random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -55,7 +55,7 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 1000
+n_iter = 800
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 60
@@ -95,7 +95,7 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             param_dtype=complex)
 
 model = cRBM
-eval_model = "ToricRBM"
+eval_model = "ToricCRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -137,7 +137,8 @@ if pre_train:
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    sampler_exact = nk.sampler.ExactSampler(hilbert)
+    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     noise_generator = jax.nn.initializers.normal(stddev)
@@ -148,13 +149,15 @@ if pre_train:
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
-    exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
+    exact_weights = gs_params["symm_kernel"]
     exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
-    # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
+    
+    variational_gs.parameters = pretrained_parameters
+    print("init energy", variational_gs.expect(toric))
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
