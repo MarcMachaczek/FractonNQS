@@ -137,11 +137,10 @@ if pre_train:
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
-    noise_generator = jax.nn.initializers.normal(stddev)
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    gs_real = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, variational_gs.parameters)
-    gs_complex = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, variational_gs.parameters)
-    gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, gs_real, gs_complex)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, variational_gs.parameters, stddev)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, variational_gs.parameters, stddev)
+    gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
@@ -149,9 +148,11 @@ if pre_train:
     exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
-    # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
+
+    variational_gs.parameters = pretrained_parameters
+    print("init energy", variational_gs.expect(toric))
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)

@@ -148,7 +148,7 @@ if pre_train:
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
-    exact_weights = gs_params["symm_kernel"]
+    exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
     exact_weights = exact_weights.at[0, plaq_idxs].set(1j * jnp.pi / 4)
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
