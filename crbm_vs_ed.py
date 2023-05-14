@@ -75,7 +75,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -134,17 +134,18 @@ exact_energies = []
 
 # %%
 if pre_train:
-    print(f"pre-training for {n_iter} iterations on the pure model")
-
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    # exact ground state parameters for the 2d toric code
+    # exact ground state parameters for the 2d toric code, start with just noisy parameters
     noise_generator = jax.nn.initializers.normal(stddev)
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    gs_params = jax.tree_util.tree_map(lambda p: jnp.zeros_like(p), variational_gs.parameters)
+    gs_real = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, variational_gs.parameters)
+    gs_complex = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, variational_gs.parameters)
+    gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, gs_real, gs_complex)
+    # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
     star_idxs = toric.stars[0].reshape(1, -1)
     exact_weights = jnp.zeros_like(variational_gs.parameters["symm_kernel"], dtype=complex)
@@ -153,11 +154,7 @@ if pre_train:
 
     # add noise to non-zero parameters
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
-    gs_params = jax.tree_util.tree_map(lambda p: p + noise_generator(noise_key_real, p.shape) +
-                                                 1j * noise_generator(noise_key_complex, p.shape), gs_params)
     pretrained_parameters = gs_params
-
-    print("\n pre-training finished")
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
