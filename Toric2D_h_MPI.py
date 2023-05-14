@@ -2,6 +2,7 @@ import os
 from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
+n_ranks = comm.Get_size()
 rank = MPI.COMM_WORLD.Get_rank()
 # supress warning about no cuda mpi version
 # we don't need that because jax handles that, we only want to run copies of a process with some communication
@@ -75,7 +76,7 @@ n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~
 n_samples = n_chains * 32
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 12  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -129,10 +130,10 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
 # for which fields indices histograms are created
 hist_fields = np.array([[0.3, 0, 0],
                         [0.4, 0, 0],
-                        [0.5, 0.1, 0],
+                        [0.5, 0, 0],
                         [0.6, 0, 0]])
 # make sure hist fields are contained in field_strengths and sort final field array
-field_strengths = np.unique(np.vstack((field_strengths, hist_fields)), axis=0)
+field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
@@ -241,7 +242,7 @@ for h in tqdm(field_strengths, "external_field"):
 
         # save observables to file
         if save_results:
-            save_array = observables.obs_to_array(separate_keys=False)[-1]
+            save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
             with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt") == 0:
                     np.savetxt(f, save_array, header=", ".join(observables.key_names + observables.obs_names))

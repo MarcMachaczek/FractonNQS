@@ -24,7 +24,7 @@ class ToricCode2d(nk.operator.DiscreteOperator):
 
     @property
     def dtype(self):
-        return complex
+        return complex if self.h[1] != 0 else float
 
     @property
     def is_hermitian(self):
