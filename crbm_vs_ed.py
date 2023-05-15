@@ -16,7 +16,7 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = True
+pre_train = False
 
 random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
 
@@ -58,7 +58,7 @@ correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permut
 n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 60
+n_samples = n_chains * 80
 n_discard_per_chain = 32  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
@@ -75,10 +75,10 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.000001
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
-alpha = 2
+alpha = 1
 cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
                                correlators=correlators,
                                correlator_symmetries=correlator_symmetries,
@@ -94,8 +94,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = cRBM
-eval_model = "ToricCRBM"
+model = RBMSymm
+eval_model = "SymmCRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -112,21 +112,21 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
 #                                                         [0.32, 0., 0.],
 #                                                         [0.33, 0., 0.],
 #                                                         [0.34, 0., 0.],
 #                                                         [0.35, 0., 0.]])))
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
-                                                        [0., 0., 0.33],
-                                                        [0., 0., 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
+                                                        [0.33, 0., 0.],
+                                                        [0.35, 0., 0.]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0., 0.2],
-                        [0., 0., 0.3],
-                        [0., 0., 0.4],
-                        [0., 0., 0.5]])
+hist_fields = np.array([[0.2, 0., 0.],
+                        [0.3, 0., 0.],
+                        [0.4, 0., 0.],
+                        [0.5, 0., 0.]])
 
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
@@ -255,7 +255,7 @@ plot = fig.add_subplot(111)
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
 rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 2], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, 0], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
