@@ -76,7 +76,7 @@ n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~
 n_samples = n_chains * 32
 n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -160,8 +160,17 @@ if pre_train:
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
 
-    variational_gs.parameters = pretrained_parameters
-    print("init energy", variational_gs.expect(toric))
+#     variational_gs.parameters = pretrained_parameters
+#     print("init energy", variational_gs.expect(toric))
+    
+#     conns, mels = toric.get_conn_padded(variational_gs.sample().reshape(-1, hilbert.size))
+#     print("conns shape", conns.shape, conns.dtype)
+    
+#     e_locs = np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64)
+#     print("per rank shape of locs", e_locs.shape)
+#     energy_locests = np.asarray(comm.gather(e_locs, root=0))
+#     if rank == 0:
+#         print("rank 0 shape", energy_locests.shape)
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
@@ -191,9 +200,10 @@ for h in tqdm(field_strengths, "external_field"):
     # calcualte wilson loop operator
     wilsonob_nk = variational_gs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
-
+    
     # gather local estimators as each rank calculates them based on their own samples_per_rank
     if np.any((h == hist_fields).all(axis=1)):
+        variational_gs.n_samples = n_samples
         energy_locests = comm.gather(
             np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64), root=0)
         mag_locests = comm.gather(
@@ -202,6 +212,7 @@ for h in tqdm(field_strengths, "external_field"):
             np.asarray(variational_gs.local_estimators(abs_magnetization).real, dtype=np.float64), root=0)
         A_B_locests = comm.gather(
             np.asarray(variational_gs.local_estimators(A_B).real, dtype=np.float64), root=0)
+    
     # plot and save training data, save observables
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(12, 12))
@@ -233,10 +244,10 @@ for h in tqdm(field_strengths, "external_field"):
         if np.any((h == hist_fields).all(axis=1)):
             variational_gs.n_samples = n_samples
             # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-            observables.add_hist("energy", h, np.histogram(energy_locests / hilbert.size, n_bins, density=True))
-            observables.add_hist("mag", h, np.histogram(mag_locests, n_bins, density=True))
-            observables.add_hist("abs_mag", h, np.histogram(abs_mag_locests, n_bins, density=True))
-            observables.add_hist("A_B", h, np.histogram(A_B_locests, n_bins, density=True))
+            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins, density=False))
+            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins, density=False))
+            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins, density=False))
+            observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins, density=False))
 
         # save observables to file
         if save_results:

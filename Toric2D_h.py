@@ -187,16 +187,16 @@ for h in tqdm(field_strengths, "external_field"):
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
         e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)
-        observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=True))
+        observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
         mag_locs = np.asarray((variational_gs.local_estimators(magnetization)).real, dtype=np.float64)
-        observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=True))
+        observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
         abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)).real, dtype=np.float64)
-        observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=True))
+        observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
         A_B_locs = np.asarray((variational_gs.local_estimators(A_B)).real, dtype=np.float64)
-        observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=True))
+        observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=False))
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(12, 12))
