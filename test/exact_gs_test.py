@@ -22,18 +22,20 @@ square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
-link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
-link_perms = HashableArray(link_perms.astype(int))
+link_perms = HashableArray(geneqs.utils.indexing.get_linkperms_cubical2d(shape, shift=1))
 
+bl_bonds, lt_bonds, tr_bonds, rb_bonds = geneqs.utils.indexing.get_bonds_cubical2d(shape)
+bl_perms, lt_perms, tr_perms, rb_perms = geneqs.utils.indexing.get_bondperms_cubical2d(shape)
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
-               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)),  # bond correlators
+               HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds),
                HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators
+               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators)
 
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
-                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)),
+                         HashableArray(bl_perms), HashableArray(lt_perms),
+                         HashableArray(tr_perms), HashableArray(rb_perms),
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                          HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 

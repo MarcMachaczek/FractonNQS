@@ -25,10 +25,9 @@ square_graph.draw(ax)
 plt.show()
 
 # get (specific) symmetries of the model, in our case translations
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
-link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
+perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
+link_perms = nk.utils.HashableArray(geneqs.utils.indexing.get_linkperms_cubical2d(shape, shift=1))
 # must be hashable to be included as flax.module attribute
-link_perms = nk.utils.HashableArray(link_perms.astype(int))
 
 # %%
 # setting hyper-parameters

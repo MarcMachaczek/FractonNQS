@@ -26,8 +26,8 @@ square_graph.draw(ax)
 plt.show()
 
 # get (specific) symmetries of the model, in our case translations
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape)
-link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(perms)
+perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
+link_perms = geneqs.utils.indexing.get_linkperms_cubical2d(shape, shift=1)
 # must be hashable to be included as flax.module attribute
 # noinspection PyArgumentList
 link_perms = HashableArray(jnp.asarray(link_perms.astype(int)))  # hashable jax.Array,e.g.jit needs taht for static_args
@@ -50,20 +50,20 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense, diag_shift=d
 # define model parameters
 alpha = 1
 
-# TODO: Difference to Valenti are the visible bias terms. This doesn't yet seem to impact performance substantially.
-# for regular spin terms, a change in model itself is required. for bonds, provide separate corrs for each bond class
-
+bl_bonds, lt_bonds, tr_bonds, rb_bonds = geneqs.utils.indexing.get_bonds_cubical2d(shape)
+bl_perms, lt_perms, tr_perms, rb_perms = geneqs.utils.indexing.get_bondperms_cubical2d(shape)
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
+               HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds),
                HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)),  # y-string correlators
-               HashableArray(geneqs.utils.indexing.get_bonds_cubical2d(shape)))  # bond correlators
+               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators)
 
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
+                         HashableArray(bl_perms), HashableArray(lt_perms),
+                         HashableArray(tr_perms), HashableArray(rb_perms),
                          HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical2d(perms)))
+                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 cRBM = geneqs.models.CorrelationRBM(symmetries=link_perms,
                                     correlators=correlators,

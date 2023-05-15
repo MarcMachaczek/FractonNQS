@@ -206,7 +206,7 @@ def get_cubeperms_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
                              for z in range(shape[2])
                              if (x + y + z) % shift == 0])
 
-    position_idxs = [position_to_index(p, shape).item() for p in positions]  # indexes where cubes are constructed
+    position_idxs = [position_to_index(p, shape).item() for p in positions]  # indices where cubes are constructed
 
     # create permutation dictionary to convert from positions_idxs back to cube indices
     # this approach works because lattice translations are isomorphic to cube translations
@@ -339,35 +339,41 @@ def get_stars_cubical2d(shape: jax.Array) -> jax.Array:
     return jnp.stack([position_to_star(p, shape) for p in positions])
 
 
-def get_bonds_cubical2d(shape: jax.Array) -> jax.Array:
+def get_bonds_cubical2d(shape: jax.Array) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     """
     Get indices of all bonds on the two-dimensional lattice where qubits are placed on the edges (with PBC).
     Args:
         shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
 
     Returns:
-        Array with all indices of shape (n_bonds, 2)
+        4 arrays containing the bond indices corresponding to the 4 distinct "bond-sublattices", aka the 4 subgroups
+        of bonds connected by the symmetries, that is bottom-left, left-top, top-right, right-bottom within one
+        plaquette structure (returned in this order).
 
     """
-    indices = []
+    bl_indices = []
+    lt_indices = []
+    tr_indices = []
+    rb_indices = []
     positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
     for position in positions:
         right = (position + jnp.array([1, 0])) % shape[0]  # location to the right of position (PBC)
         top = (position + jnp.array([0, 1])) % shape[1]  # location to the top of position (PBC)
 
-        indices.append([edge_to_index(position, 0, shape), edge_to_index(position, 1, shape)])  # bot * left
-        indices.append([edge_to_index(position, 1, shape), edge_to_index(top, 0, shape)])  # left * top
-        indices.append([edge_to_index(top, 0, shape), edge_to_index(right, 1, shape)])  # top * right
-        indices.append([edge_to_index(right, 1, shape), edge_to_index(position, 0, shape)])  # right * bot
+        bl_indices.append([edge_to_index(position, 0, shape), edge_to_index(position, 1, shape)])  # bot * left
+        lt_indices.append([edge_to_index(position, 1, shape), edge_to_index(top, 0, shape)])  # left * top
+        tr_indices.append([edge_to_index(top, 0, shape), edge_to_index(right, 1, shape)])  # top * right
+        rb_indices.append([edge_to_index(right, 1, shape), edge_to_index(position, 0, shape)])  # right * bot
 
-    return jnp.array(indices)
+    return jnp.array(bl_indices), jnp.array(lt_indices), jnp.array(tr_indices), jnp.array(rb_indices)
 
 
-def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:  # TODO: switch to jax arrays?
+def get_linkperms_cubical2d(shape: jax.Array, shift: int = 1) -> jax.Array:
     """
     Retrieve the permutations of links between sites induced by the permutations of the sites.
     Args:
-        permutations: Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
+        shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
+        shift: Only include translations by n=shift steps
 
     Returns:
         Array with permutations of the links/edges with dimensions (n_permutations, n_edges)
@@ -375,12 +381,12 @@ def get_linkperms_cubical2d(permutations: np.ndarray) -> np.ndarray:  # TODO: sw
     """
     # note: use netket graph stuff to get complete graph automorphisms, but there we have less control over symmetries
     # now get permutations on the link level
-    n_spins = 2 * permutations.shape[1]
-    link_perms = np.zeros(shape=(permutations.shape[0], n_spins))
+    permutations = get_translations_cubical2d(shape, shift)
+    n_spins = 2 * jnp.product(shape)
+    link_perms = jnp.zeros(shape=(permutations.shape[0], n_spins), dtype=jnp.int32)
     for i, perm in enumerate(permutations):
-        link_perm = [[p * 2, p * 2 + 1] for p in perm]
-        link_perms[i] = np.asarray(link_perm, dtype=int).flatten()
-
+        link_perm = jnp.array([[p * 2, p * 2 + 1] for p in perm], dtype=jnp.int32).flatten()
+        link_perms = link_perms.at[i, :].set(link_perm)
     return link_perms
 
 
@@ -421,20 +427,17 @@ def get_ystring_perms(shape: jax.Array) -> jax.Array:
     return ystring_perms
 
 
-def get_bondperms_cubical2d(permutations: np.ndarray) -> np.ndarray:  # TODO: switch to jax arrays?
+def get_bondperms_cubical2d(shape: jax.Array) -> Tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
     """
     Retrieve the permutations of nearest neighbor bonds induced by the permutations of the sites.
     Args:
-        permutations: Array with permutations of the lattice sites with dimensions (n_permutations, n_sites)
+        shape: Size of the 2d lattice. Array with entries [x_0 extend, x_1 extend]
 
     Returns:
-        Array with permutations of the bonds with dimensions (n_permutations, n_bonds)
+        4 Arrays with permutations of the bl, lt, tr, rb bonds with dimensions (n_permutations, n_bonds)
+        Each of the 4 bond sublattices actually permutes just according to the translations so this function is
+        trivial, however, it serves to create a uniform UI.
 
     """
-    n_bonds = 4 * permutations.shape[1]
-    bond_perms = np.zeros(shape=(permutations.shape[0], n_bonds), dtype=int)
-    for i, perm in enumerate(permutations):
-        bond_perm = [[p * 4, p * 4 + 1, p * 4 + 2, p * 4 + 3] for p in perm]
-        bond_perms[i] = np.asarray(bond_perm, dtype=int).flatten()
-
-    return bond_perms
+    perms = jnp.asarray(get_translations_cubical2d(shape, shift=1))
+    return perms, perms, perms, perms
