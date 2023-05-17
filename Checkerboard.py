@@ -23,7 +23,7 @@ L = 4  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
-magnetization = geneqs.operators.observables.Magnetization(hilbert)
+magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -38,10 +38,10 @@ perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
 perms = HashableArray(perms.astype(int))
 
 # noinspection PyArgumentList
-correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2)),)
+correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2)))
 
 # noinspection PyArgumentList
-correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, shift=2)),)
+correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, shift=2)))
 
 # h_c at 0.328474, for L=10 compute sigma_z average over different h
 hx = 0.0

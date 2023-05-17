@@ -221,6 +221,50 @@ def get_cubeperms_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
     return jnp.asarray(cube_perms)
 
 
+def position_to_string_sites(position: jax.Array, direction: int, shape: jax.Array) -> jax.Array:
+    """
+    From a position and direction on a cubical lattice, returns the indices of the sites forming a string (with PBC)
+    along the specified direction.
+    Args:
+        position: Position of the star. Array with entries [x_0 index, x_1 index, x_2_extend]
+        direction: Specifies the direction. Starts from zero = x_0 direction, then one = x_1 direction etc.
+        shape: Size of the lattice. Array with entries [x_0 extend, x_1 extend, x_2_extend]
+
+    Returns:
+        The indices forming the string.
+
+    """
+    assert direction < len(position), f"direction not maching with dimension, should be smaller than {len(position)}"
+    indices = []
+    for i in range(shape[direction]):
+        next_pos = position.at[direction].set((position.at[direction].get() + i) % shape[direction])
+        indices.append(position_to_index(next_pos, shape))
+    return jnp.array(indices)
+
+
+def get_strings_cubical3d(direction: int, shape: jax.Array) -> jax.Array:
+    """
+    Get the indices of all strings formed by sites around the three-dimensional lattice (with PBC)
+    into the specified direction.
+    Args:
+        direction: Specifies the direction. Starts from zero = x_0 direction, then one = x_1 direction etc.
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+
+    Returns:
+        Array with all indices of shape (n_strings, string_length)
+
+    """
+    string_indices = []
+    position = jnp.zeros_like(shape)
+    for i in range(shape[(direction + 1) % 3]):
+        for j in range(shape[(direction + 2) % 3]):
+            position = position.at[(direction + 1) % 3].set(i)
+            position = position.at[(direction + 2) % 3].set(j)
+            string_indices.append(position_to_string_sites(position, direction, shape))
+
+    return jnp.stack(string_indices)
+
+
 # %%  Utilities specifically for the 2 dimensional toric code
 def position_to_plaq(position: jax.Array, shape: jax.Array) -> jax.Array:
     """
@@ -270,7 +314,7 @@ def position_to_star(position: jax.Array, shape: jax.Array) -> jax.Array:
     return indices
 
 
-def position_to_string(position: jax.Array, direction: int, shape: jax.Array) -> jax.Array:
+def position_to_string_edges(position: jax.Array, direction: int, shape: jax.Array) -> jax.Array:
     """
     From a position and direction on a cubical lattice, returns the indices of the edges forming a string (with PBC)
     along the specified direction.
@@ -283,6 +327,7 @@ def position_to_string(position: jax.Array, direction: int, shape: jax.Array) ->
         The indices forming the string.
 
     """
+    assert direction < len(position), f"direction not maching with dimension, should be smaller than {len(position)}"
     indices = []
     for i in range(shape[direction]):
         next_pos = position.at[direction].set((position.at[direction].get() + i) % shape[direction])
@@ -304,8 +349,8 @@ def get_strings_cubical2d(direction: int, shape: jax.Array) -> jax.Array:
     """
     string_indices = []
     position = jnp.zeros_like(shape)
-    for i in range(shape[(direction + 1) % 2]):
-        string_indices.append(position_to_string(position, direction, shape))
+    for _ in range(shape[(direction + 1) % 2]):
+        string_indices.append(position_to_string_edges(position, direction, shape))
         position = position.at[(direction + 1) % 2].add(1)
 
     return jnp.stack(string_indices)
