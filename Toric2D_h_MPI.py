@@ -33,10 +33,10 @@ from functools import partial
 save_results = True
 pre_train = False
 
-random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(421435634)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 8  # size should be at least 3, else there are problems with pbc and indexing
+L = 3  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -75,7 +75,7 @@ n_iter = 500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 32
-n_discard_per_chain = 64  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
@@ -111,7 +111,9 @@ eval_model = "ToricCRBM"
 single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.25), [single_rule, vertex_rule, xstring_rule])
+ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
+                                                          [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # learning rate scheduling
 lr_init = 0.01
@@ -121,18 +123,18 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
-                                                        [0.32, 0, 0],
-                                                        [0.33, 0, 0],
-                                                        [0.34, 0, 0],
-                                                        [0.35, 0, 0]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
+                                                        [0., 0, 0.32],
+                                                        [0., 0, 0.33],
+                                                        [0., 0, 0.34],
+                                                        [0., 0, 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0, 0],
-                        [0.4, 0, 0],
-                        [0.5, 0, 0],
-                        [0.6, 0, 0]])
+hist_fields = np.array([[0., 0, 0.28],
+                        [0., 0, 0.3],
+                        [0., 0, 0.34],
+                        [0., 0, 0.5]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
@@ -275,16 +277,16 @@ if rank == 0:
 
     c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[0], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, 0], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external magnetic field")
     plot.set_ylabel("magnetization")
     plot.set_title(
         f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
-    plot.set_xlim(0, field_strengths[-1][2])
+    plot.set_xlim(0, field_strengths[-1][02])
 
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/toric2d_h/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")

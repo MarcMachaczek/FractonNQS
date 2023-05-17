@@ -95,8 +95,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = RBMSymm
-eval_model = "SymmCRBM"
+model = cRBM
+eval_model = "ToricCRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -114,21 +114,21 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
 #                                                         [0.32, 0., 0.],
 #                                                         [0.33, 0., 0.],
 #                                                         [0.34, 0., 0.],
 #                                                         [0.35, 0., 0.]])))
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
-                                                        [0.33, 0., 0.],
-                                                        [0.35, 0., 0.]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
+                                                        [0., 0., 0.33],
+                                                        [0., 0., 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.2, 0., 0.],
-                        [0.3, 0., 0.],
-                        [0.4, 0., 0.],
-                        [0.5, 0., 0.]])
+hist_fields = np.array([[0., 0., 0.2],
+                        [0., 0., 0.3],
+                        [0., 0., 0.4],
+                        [0., 0., 0.5]])
 
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
@@ -165,8 +165,9 @@ if pre_train:
     print("init energy", variational_gs.expect(toric))
 
 for h in tqdm(field_strengths, "external_field"):
-    h = tuple(h)
+    h = tuple(-h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
+    toric  = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
@@ -257,7 +258,7 @@ plot = fig.add_subplot(111)
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
 rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 0], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, 2], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)

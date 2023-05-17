@@ -52,8 +52,10 @@ def loop_gs(v_state: nk.vqs.MCState,
             times["pre_sample"] = time.time()
             v_state.sample()
             times["pre_expectgrad"] = time.time()
-
+            
+            # the forces part of this crashes mpi when np > 2
             energy, gradients = v_state.expect_and_grad(hamiltonian)
+            
             e_nan, e_inf = contains_naninf(energy.mean)
             g_nan, g_inf = contains_naninf(gradients)
 

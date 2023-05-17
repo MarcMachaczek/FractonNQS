@@ -54,10 +54,10 @@ class ToricCRBM(nn.Module):
         symm_kernel = self.param("symm_kernel", self.kernel_init, (self.features, self.n_sites), self.param_dtype)
 
         # take care of possibly different dtypes (e.g. x is float while parameters are complex)
-        x, symm_kernel, hidden_bias = promote_dtype(x, symm_kernel, hidden_bias, dtype=None)
+        x, hidden_bias, symm_kernel = promote_dtype(x, hidden_bias, symm_kernel, dtype=None)
 
         # convert kernel to dense kernel of shape (features, n_symmetries, n_sites)
-        symm_kernel = jnp.take(symm_kernel, self.symmetries.__array__(), axis=1)
+        symm_kernel = jnp.take(symm_kernel, self.symmetries.wrapped, axis=1)
 
         # x has shape (batch, n_sites), kernel has shape (features, n_symmetries, n_sites)
         # theta has shape (batch, features, n_symmetries)
@@ -70,13 +70,15 @@ class ToricCRBM(nn.Module):
 
         for i, correlator in enumerate(self.correlators):
             # initialize "visible" bias and kernel matrix for correlator
-            correlator = correlator.__array__()  # convert hashable array to (usable) jax.Array
+            correlator = correlator.wrapped  # convert hashable array to (usable) jax.Array
             corr_bias = self.param(f"corr{i}_bias", self.bias_init, (1,), self.param_dtype)
             corr_kernel = self.param(f"corr{i}_kernel", self.kernel_init, (self.features, len(correlator)),
                                      self.param_dtype)
+            
+            x, corr_bias, corr_kernel = promote_dtype(x, corr_bias, corr_kernel, dtype=None)
 
             # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
-            corr_kernel = jnp.take(corr_kernel, self.correlator_symmetries[i].__array__(), axis=1)
+            corr_kernel = jnp.take(corr_kernel, self.correlator_symmetries[i].wrapped, axis=1)
 
             # correlator has shape (n_corrs, degree), e.g. n_corrs=L²=n_site/2 and degree=4 for plaquettes
             corr_values = jnp.take(x, correlator, axis=1).prod(axis=2)  # shape (batch, n_corrs)
@@ -88,34 +90,38 @@ class ToricCRBM(nn.Module):
             bias += corr_bias * jnp.sum(corr_values, axis=(1,))
 
         self.sow("intermediates", "activation_inputs", theta)
-        theta = self.activation(theta)
-        self.sow("intermediates", "activation_outputs", theta)
-        theta = jnp.sum(theta, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
+        out = self.activation(theta)
+        self.sow("intermediates", "activation_outputs", out)
+        out = jnp.sum(out, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
+        out += bias
 
         # add loop features corresponding to hidden units only connected to loops
         for i, (loop_corr, loop_symmetries) in enumerate(zip(self.correlators[-2:], self.correlator_symmetries[-2:])):
             # initialize "visible" bias and kernel matrix for loop correlator
-            loop_corr = loop_corr.__array__()  # convert hashable array to (usable) jax.Array
+            loop_corr = loop_corr.wrapped  # convert hashable array to (usable) jax.Array
             loop_hidden_bias = self.param(f"loop{i}_hidden_bias", self.bias_init, (self.features,), self.param_dtype)
             loop_kernel = self.param(f"loop{i}_kernel", self.kernel_init, (self.features, len(loop_corr)),
                                      self.param_dtype)
+            
+            x, loop_hidden_bias, loop_kernel = promote_dtype(x, loop_hidden_bias, loop_kernel, dtype=None)
 
             # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
-            loop_kernel = jnp.take(loop_kernel, loop_symmetries.__array__(), axis=1)
+            loop_kernel = jnp.take(loop_kernel, loop_symmetries.wrapped, axis=1)
 
             # loop_corr has shape (n_corrs, degree)
             loop_values = jnp.take(x, loop_corr, axis=1).prod(axis=2)  # shape (batch, n_corrs)
 
             # loop_values has shape (batch, n_corrs)
             # kernel has shape (features, n_loop_symmetries, n_corrs)
-            # theta has shape (batch, features, n_symmetries)
+            # loop_theta has shape (batch, features, n_symmetries)
             loop_theta = jax.lax.dot_general(loop_values, loop_kernel, (((1,), (2,)), ((), ())),
                                              precision=self.precision)
             loop_theta += jnp.expand_dims(loop_hidden_bias, 1)
-            theta += jnp.sum(self.activation(loop_theta), axis=(1, 2))
+            loop_out = jnp.sum(self.activation(loop_theta), axis=(1, 2))
+            # this last line causes mpi allreduce error code 15
+            out += loop_out
 
-        theta += bias
-        return theta
+        return out
 
 
 # %%
@@ -158,7 +164,7 @@ class CorrelationRBM(nn.Module):
         x, symm_kernel, hidden_bias = promote_dtype(x, symm_kernel, hidden_bias, dtype=None)
 
         # convert kernel to dense kernel of shape (features, n_symmetries, n_sites)
-        symm_kernel = jnp.take(symm_kernel, self.symmetries.__array__(), axis=1)
+        symm_kernel = jnp.take(symm_kernel, self.symmetries.wrapped, axis=1)
 
         # x has shape (batch, n_sites), kernel has shape (features, n_symmetries, n_sites)
         # theta has shape (batch, features, n_symmetries)
@@ -171,13 +177,13 @@ class CorrelationRBM(nn.Module):
 
         for i, correlator in enumerate(self.correlators):
             # initialize "visible" bias and kernel matrix for correlator
-            correlator = correlator.__array__()  # convert hashable array to (usable) jax.Array
+            correlator = correlator.wrapped  # convert hashable array to (usable) jax.Array
             corr_bias = self.param(f"corr{i}_bias", self.bias_init, (1,), self.param_dtype)
             corr_kernel = self.param(f"corr{i}_kernel", self.kernel_init, (self.features, len(correlator)),
                                      self.param_dtype)
 
             # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
-            corr_kernel = jnp.take(corr_kernel, self.correlator_symmetries[i].__array__(), axis=1)
+            corr_kernel = jnp.take(corr_kernel, self.correlator_symmetries[i].wrapped, axis=1)
 
             # correlator has shape (n_corrs, degree), e.g. n_corrs=L²=n_site/2 and degree=4 for plaquettes
             corr_values = jnp.take(x, correlator, axis=1).prod(axis=2)  # shape (batch, n_corrs)
@@ -233,7 +239,7 @@ class ExplicitCorrelationRBM(nn.Module):
     @nn.compact
     def __call__(self, x_in):
         # x_in shape (batch, n_sites)
-        perm_x = jnp.take(x_in, jnp.asarray(self.symmetries), axis=1)  # perm_x shape (batch, n_symmetries, n_sites)
+        perm_x = jnp.take(x_in, self.symmetries.wrapped, axis=1)  # perm_x shape (batch, n_symmetries, n_sites)
 
         x = nn.Dense(name="Dense_SingleSpin",
                      features=self.features,
@@ -252,7 +258,7 @@ class ExplicitCorrelationRBM(nn.Module):
         for i, correlator in enumerate(self.correlators):
             # before product, has shape (batch, n_symmetries, n_corrs, n_spins_in_corr)
             # where n_corrs corresponds to e.g. the number of plaquettes, bonds, loops etc. in one configuration
-            corr_values = jnp.take(perm_x, jnp.asarray(correlator), axis=2).prod(axis=3)
+            corr_values = jnp.take(perm_x, correlator.wrapped, axis=2).prod(axis=3)
             x += nn.Dense(name=f"Dense_Correlator{i}",
                           features=self.features,
                           use_bias=False,
