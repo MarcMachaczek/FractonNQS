@@ -256,13 +256,77 @@ def get_strings_cubical3d(direction: int, shape: jax.Array) -> jax.Array:
     """
     string_indices = []
     position = jnp.zeros_like(shape)
-    for i in range(shape[(direction + 1) % 3]):
-        for j in range(shape[(direction + 2) % 3]):
-            position = position.at[(direction + 1) % 3].set(i)
-            position = position.at[(direction + 2) % 3].set(j)
+    sub_shape = jnp.delete(shape, direction)
+    sub_dims = jnp.delete(jnp.arange(3), direction)
+    for i in range(sub_shape[0]):
+        for j in range(sub_shape[1]):
+            position = position.at[sub_dims[0]].set(i)
+            position = position.at[sub_dims[1]].set(j)
             string_indices.append(position_to_string_sites(position, direction, shape))
 
     return jnp.stack(string_indices)
+
+
+def get_xstring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
+    """
+    Get the permutations on x-strings / loops on the Checkerboard model induced by translational symmetries.
+    Args:
+        shift: Only include translations by n=shift steps
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+
+    Returns:
+        Array of shape (n_symmetries, n_xstrings)
+
+    """
+    # non-trivial permutations, corresponding to translations in y and z directions
+    proper_perms = get_translations_cubical2d(shape=shape[1:], shift=shift)
+    # stack them as many times as we have x translations, x_translation leave the correlators invariant
+    xstring_perms = jnp.tile(proper_perms, (int(shape[0] / shift), 1))
+    return xstring_perms
+
+
+def get_ystring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
+    """
+    Get the permutations on y-strings / loops on the Checkerboard model induced by translational symmetries.
+    Args:
+        shift: Only include translations by n=shift steps
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+
+    Returns:
+        Array of shape (n_symmetries, n_xstrings)
+
+    """
+    xz_shape = shape[jnp.array([0, 2])]
+    base = np.arange(np.product(xz_shape))
+    x_perms = []
+    for i in range(0, shape[0], shift):
+        # append twice to account for y translations that leave the strings invariant
+        x_perms.append(cubical_translation(base.reshape(-1, 1), xz_shape, 0, i).flatten())
+        x_perms.append(cubical_translation(base.reshape(-1, 1), xz_shape, 0, i).flatten())
+    xz_perms = []
+    for x_perm in x_perms:
+        for j in range(0, shape[2], shift):
+            xz_perms.append(cubical_translation(x_perm.reshape(-1, 1), xz_shape, 1, j).flatten())
+    ystring_perms = np.stack(xz_perms)
+    return jnp.asarray(ystring_perms)
+
+
+def get_zstring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
+    """
+    Get the permutations on z-strings / loops on the Checkerboard model induced by translational symmetries.
+    Args:
+        shift: Only include translations by n=shift steps
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+
+    Returns:
+        Array of shape (n_symmetries, n_xstrings)
+
+    """
+    # non-trivial permutations, corresponding to translations in x and y directions
+    proper_perms = get_translations_cubical2d(shape=shape[:-1], shift=shift)
+    # repeat them as many times as we have z translations, z_translation leave the correlators invariant
+    zstring_perms = jnp.repeat(proper_perms, int(shape[2] / shift), axis=0)
+    return zstring_perms
 
 
 # %%  Utilities specifically for the 2 dimensional toric code
