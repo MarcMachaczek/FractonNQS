@@ -35,7 +35,7 @@ class ToricLoopCRBM(nn.Module):
     # feature density. Number of features equal to alpha * input.shape[-1]
     alpha: Union[float, int] = 1
     # Numerical precision of the computation see :class:`jax.lax.Precision` for details
-    precision: Any = None
+    precision: Any = "highest"
 
     # Initializer for the Dense layer matrix
     kernel_init: Callable = default_kernel_init

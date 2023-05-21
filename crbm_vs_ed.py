@@ -37,23 +37,25 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
+# noinspection PyArgumentList
 link_perms = HashableArray(geneqs.utils.indexing.get_linkperms_cubical2d(shape, shift=1))
-# must be hashable to be included as flax.module attribute
 
 bl_bonds, lt_bonds, tr_bonds, rb_bonds = geneqs.utils.indexing.get_bonds_cubical2d(shape)
 bl_perms, lt_perms, tr_perms, rb_perms = geneqs.utils.indexing.get_bondperms_cubical2d(shape)
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
-               HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds),
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-               HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators)
+               HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds))
 
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
                          HashableArray(bl_perms), HashableArray(lt_perms),
-                         HashableArray(tr_perms), HashableArray(rb_perms),
-                         HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
-                         HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
+                         HashableArray(tr_perms), HashableArray(rb_perms))
+# noinspection PyArgumentList
+loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
+         HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators
+# noinspection PyArgumentList
+loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
+                   HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
 n_iter = 500
@@ -80,13 +82,15 @@ stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
-cRBM = geneqs.models.ToricCRBM(symmetries=link_perms,
-                               correlators=correlators,
-                               correlator_symmetries=correlator_symmetries,
-                               alpha=alpha,
-                               kernel_init=default_kernel_init,
-                               bias_init=default_kernel_init,
-                               param_dtype=complex)
+cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
+                                   correlators=correlators,
+                                   correlator_symmetries=correlator_symmetries,
+                                   loops=loops,
+                                   loop_symmetries=loop_symmetries,
+                                   alpha=alpha,
+                                   kernel_init=default_kernel_init,
+                                   bias_init=default_kernel_init,
+                                   param_dtype=complex)
 
 RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             alpha=alpha,
