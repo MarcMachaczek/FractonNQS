@@ -36,7 +36,7 @@ pre_train = False
 random_key = jax.random.PRNGKey(421435634)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 3  # size should be at least 3, else there are problems with pbc and indexing
+L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -77,7 +77,7 @@ n_chains = 256 * 2  # total number of MCMC chains, when runnning on GPU choose ~
 n_samples = n_chains * 32
 n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_chains * 32  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -125,16 +125,17 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 # define fields for which to trian the NQS and get observables
 direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
-                                                        [0., 0, 0.32],
-                                                        [0., 0, 0.33],
-                                                        [0., 0, 0.34],
-                                                        [0., 0, 0.35]])))
+field_strengths[:, 0] = 0.3
+field_strengths = np.vstack((field_strengths, np.array([[0.3, 0, 0.31],
+                                                        [0.3, 0, 0.32],
+                                                        [0.3, 0, 0.33],
+                                                        [0.3, 0, 0.34],
+                                                        [0.3, 0, 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.28],
-                        [0., 0, 0.3],
-                        [0., 0, 0.34],
-                        [0., 0, 0.5]])
+hist_fields = np.array([[0.3, 0, 0.28],
+                        [0.3, 0, 0.31],
+                        [0.3, 0, 0.34],
+                        [0.3, 0, 0.45]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
@@ -286,7 +287,7 @@ if rank == 0:
     plot.set_title(
         f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
-    plot.set_xlim(0, field_strengths[-1][02])
+    plot.set_xlim(0, field_strengths[-1][2])
 
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/toric2d_h/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")

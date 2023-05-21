@@ -11,11 +11,12 @@ import os
 comm = MPI.COMM_WORLD
 size = comm.Get_size()
 rank = comm.Get_rank()
-os.environ["CUDA_VISIBLE_DEVICES"] = str(comm.Get_rank())
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = str(comm.Get_rank())
 
 import jax
 import jax.numpy as jnp
-
+jax.distributed.initialize()
 # a = jnp.ones(3)
 
 # if jax.distributed.initialize() is not set, jax doesn't see the other processes eg if np==2, jax local devices will be equal to global devices
@@ -28,6 +29,6 @@ import jax.numpy as jnp
 
 
 # print(f"rank {rank} with jax_global_devices: {jax.devices()}")
-print(f"rank {rank} with size {size}, jax_local_devices: {jax.local_devices()})")
+print(f"rank {rank} with size {size}, jax_local_devices: {jax.local_devices()}), jax global devices: {jax.devices()}")
 
 # %%
