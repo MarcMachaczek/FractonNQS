@@ -16,7 +16,7 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = False
+pre_train = True
 
 random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
 
@@ -58,11 +58,11 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 500
+n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 256 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 80
-n_discard_per_chain = 32  # should be small for using many chains, default is 10% of n_samples
+n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = n_chains * 40
+n_discard_per_chain = 96  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
@@ -78,7 +78,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -129,10 +129,10 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
                                                         [0., 0., 0.33],
                                                         [0., 0., 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0., 0.2],
-                        [0., 0., 0.3],
-                        [0., 0., 0.4],
-                        [0., 0., 0.5]])
+hist_fields = np.array([[0., 0., 0.3],
+                        [0., 0., 0.31],
+                        [0., 0., 0.32],
+                        [0., 0., 0.3]])
 
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
@@ -169,7 +169,7 @@ if pre_train:
     print("init energy", variational_gs.expect(toric))
 
 for h in tqdm(field_strengths, "external_field"):
-    h = tuple(-h)
+    h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     toric  = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)

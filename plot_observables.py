@@ -8,14 +8,14 @@ from global_variables import RESULTS_PATH
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
-L = 8
+L = 3
 hilbert_size = 2 * L ** 2
 eval_model = "ToricCRBM"
 save_dir = f"{RESULTS_PATH}/toric2d_h"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables.txt"))
+    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables"))
 
 direction = obs_list[0][-1, :3]
 field_direction = 2  # 0=x, 1=y, 2=z

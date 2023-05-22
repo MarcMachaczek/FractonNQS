@@ -48,7 +48,7 @@ class ToricCRBM(nn.Module):
 
     def setup(self):
         self.n_symm, self.n_sites = self.symmetries.wrapped.shape
-        self.features = 1  # int(self.alpha * self.n_sites / self.n_symm)
+        self.features = 2  # int(self.alpha * self.n_sites / self.n_symm)
 
     @nn.compact
     def __call__(self, x):
@@ -65,7 +65,7 @@ class ToricCRBM(nn.Module):
         # theta has shape (batch, features, n_symmetries)
         theta = jax.lax.dot_general(x, symm_kernel, (((1,), (2,)), ((), ())))
 
-        for i, (correlator, correlator_symmetry) in enumerate(zip(self.correlators, self.correlator_symmetries)):
+        for i, (correlator, correlator_symmetry) in enumerate(zip(self.correlators[:-1], self.correlator_symmetries[:-1])):
             # initialize "visible" bias and kernel matrix for correlator
             # correlator = correlator.wrapped  # convert hashable array to (usable) jax.Array
             correlator = jnp.array([[1, 2, 3, 4] for _ in range(int(N/2))])
@@ -89,7 +89,7 @@ class ToricCRBM(nn.Module):
         out = self.activation(theta)
         out = jnp.sum(out, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
 
-        for i, (loop_corr, loop_symmetries) in enumerate(zip(self.correlators, self.correlator_symmetries)):
+        for i, (loop_corr, loop_symmetries) in enumerate(zip(self.correlators[1:], self.correlator_symmetries[1:])):
             # initialize "visible" bias and kernel matrix for loop correlator
             # loop_corr = loop_corr.wrapped  # convert hashable array to (usable) jax.Array
             loop_corr = jnp.array([[1, 2, 3, 4] for _ in range(int(N/2))])
@@ -169,13 +169,15 @@ ham = sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 perms = jnp.stack([(jnp.arange(int(N/2)) + i) % int(N/2) for i in range(int(N/2))], axis=0)
 perms = HashableArray(perms)
+perms2 = HashableArray(perms)
 link_perms = jnp.stack([(jnp.arange(int(N)) + i) % N for i in range(int(N/2))], axis=0)
 link_perms = HashableArray(link_perms)
 plaqs = jnp.array([[1, 2, 3, 4] for _ in range(int(N/2))])
 plaqs = HashableArray(plaqs)
+plaqs2 = HashableArray(plaqs)
 
-correlators = (plaqs,)
-correlator_symmetries = (perms,)
+correlators = (plaqs, plaqs2)
+correlator_symmetries = (perms, perms2)
 
 model = ToricCRBM(symmetries=link_perms,
                   correlators=correlators,
