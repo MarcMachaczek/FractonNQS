@@ -42,7 +42,7 @@ square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 # define some observables
-magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
+magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmax(hilbert, i) for i in range(hilbert.size)])
 abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
@@ -76,7 +76,7 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
 n_iter = 900
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(n_chains * 32 / n_ranks)
+n_samples = int(n_chains * 64 / n_ranks)
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
@@ -116,7 +116,7 @@ single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1),
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # learning rate scheduling
@@ -127,18 +127,18 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.31],
-                                                        [0.32, 0, 0.32],
-                                                        [0.33, 0, 0.33],
-                                                        [0.34, 0, 0.34],
-                                                        [0.35, 0, 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0.],
+                                                        [0.32, 0, 0.],
+                                                        [0.33, 0, 0.],
+                                                        [0.34, 0, 0.],
+                                                        [0.35, 0, 0.]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.30, 0, 0.30],
-                        [0.39, 0, 0.39],
-                        [0.42, 0, 0.42],
-                        [0.60, 0, 0.60]])
+hist_fields = np.array([[0.30, 0, 0.],
+                        [0.39, 0, 0.],
+                        [0.42, 0, 0.],
+                        [0.60, 0, 0.]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]

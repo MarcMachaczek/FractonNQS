@@ -16,7 +16,7 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = True
+pre_train = False
 
 random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
 
@@ -44,10 +44,12 @@ bl_bonds, lt_bonds, tr_bonds, rb_bonds = geneqs.utils.indexing.get_bonds_cubical
 bl_perms, lt_perms, tr_perms, rb_perms = geneqs.utils.indexing.get_bondperms_cubical2d(shape)
 # noinspection PyArgumentList
 correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
+               HashableArray(geneqs.utils.indexing.get_stars_cubical2d(shape)),
                HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds))
 
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
+                         HashableArray(jnp.asarray(perms)),
                          HashableArray(bl_perms), HashableArray(lt_perms),
                          HashableArray(tr_perms), HashableArray(rb_perms))
 # noinspection PyArgumentList
@@ -58,12 +60,13 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 1000
+n_iter = 1200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 40
 n_discard_per_chain = 96  # should be small for using many chains, default is 10% of n_samples
-n_expect = n_samples * 16  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
+chunk_size = n_samples
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -75,10 +78,10 @@ diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, dia
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6),
                                  diag_shift=diag_shift_schedule,
-                                 holomorphic=True)
+                                 holomorphic=False)
 
 # define correlation enhanced RBM
-stddev = 0.001
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -118,21 +121,21 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
 #                                                         [0.32, 0., 0.],
 #                                                         [0.33, 0., 0.],
 #                                                         [0.34, 0., 0.],
 #                                                         [0.35, 0., 0.]])))
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
-                                                        [0., 0., 0.33],
-                                                        [0., 0., 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.31],
+                                                        [0.33, 0., 0.33],
+                                                        [0.35, 0., 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0., 0.3],
-                        [0., 0., 0.31],
-                        [0., 0., 0.32],
-                        [0., 0., 0.3]])
+hist_fields = np.array([[0.3, 0., 0.3],
+                        [0.39, 0., 0.39],
+                        [0.41, 0., 0.41],
+                        [0.6, 0., 0.6]])
 
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
@@ -184,6 +187,7 @@ for h in tqdm(field_strengths, "external_field"):
 
     # calculate observables, therefore set some params of vqs
     variational_gs.n_samples = n_expect
+    variational_gs.chunk_size = chunk_size
 
     # calculate energy and specific heat / variance of energy
     energy_nk = variational_gs.expect(toric)
@@ -268,7 +272,7 @@ plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
 plot.set_xlabel("external field")
 plot.set_ylabel("relative error")
-plot.set_title(f"Relative error of cRBM for the 2d Toric code vs external field in {direction.flatten()} "
+plot.set_title(f"Relative error of {eval_model} for the 2d Toric code vs external field in {direction.flatten()} "
                f"direction on a 3x3 lattice")
 
 plt.show()
