@@ -199,6 +199,18 @@ def get_cubes_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
 
 
 def get_cubeperms_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
+    """
+        Retrieve the permutations of cube correlators induced by permutations on sites with shift on a 3d
+        cubical lattice with PBC.
+
+        Args:
+            shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+            shift: Only include translations by n=shift steps
+
+        Returns:
+            Array of shape (n_symmetries, n_cubes)
+
+        """
     positions = jnp.asarray([(x, y, z)
                              for x in range(shape[0])
                              for y in range(shape[1])
