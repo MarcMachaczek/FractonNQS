@@ -108,7 +108,7 @@ def get_translations_cubical2d(shape: ArrayLike, shift: int) -> np.ndarray:
     """
     assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
     base = np.arange(np.product(shape)).reshape(-1, 1)
-    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
+    permutations = np.zeros(shape=(int(np.product(shape) / shift ** len(shape)), np.product(shape)), dtype=int)
     p = 0
     for i in range(0, shape[0], shift):
         for j in range(0, shape[1], shift):
@@ -132,7 +132,7 @@ def get_translations_cubical3d(shape: ArrayLike, shift: int) -> np.ndarray:
     """
     assert np.all(shape % shift == 0), f"Provided shape {shape} and shift {shift} are not compatible"
     base = np.arange(np.product(shape)).reshape(-1, 1)
-    permutations = np.zeros(shape=(int(np.product(shape)/shift**len(shape)), np.product(shape)), dtype=int)
+    permutations = np.zeros(shape=(int(np.product(shape) / shift ** len(shape)), np.product(shape)), dtype=int)
     p = 0
     for i in range(0, shape[0], shift):
         for j in range(0, shape[1], shift):
@@ -199,7 +199,6 @@ def get_cubes_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
 
 
 def get_cubeperms_cubical3d(shape: jax.Array, shift: int) -> jax.Array:
-
     positions = jnp.asarray([(x, y, z)
                              for x in range(shape[0])
                              for y in range(shape[1])
@@ -271,8 +270,8 @@ def get_xstring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
     """
     Get the permutations on x-strings / loops on the Checkerboard model induced by translational symmetries.
     Args:
-        shift: Only include translations by n=shift steps
         shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+        shift: Only include translations by n=shift steps
 
     Returns:
         Array of shape (n_symmetries, n_xstrings)
@@ -289,8 +288,8 @@ def get_ystring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
     """
     Get the permutations on y-strings / loops on the Checkerboard model induced by translational symmetries.
     Args:
-        shift: Only include translations by n=shift steps
         shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+        shift: Only include translations by n=shift steps
 
     Returns:
         Array of shape (n_symmetries, n_xstrings)
@@ -315,8 +314,8 @@ def get_zstring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
     """
     Get the permutations on z-strings / loops on the Checkerboard model induced by translational symmetries.
     Args:
-        shift: Only include translations by n=shift steps
         shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+        shift: Only include translations by n=shift steps
 
     Returns:
         Array of shape (n_symmetries, n_xstrings)
@@ -327,6 +326,52 @@ def get_zstring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
     # repeat them as many times as we have z translations, z_translation leave the correlators invariant
     zstring_perms = jnp.repeat(proper_perms, int(shape[2] / shift), axis=0)
     return zstring_perms
+
+
+def get_bonds_cubical3d(shape: jax.Array) -> jax.Array:
+    """
+    Retrieve all neirest neighbor bonds on a 3d cubical lattice with PBC.
+    Args:
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+
+    Returns:
+        Array of shape (n_bonds, 2)
+
+    """
+    positions = jnp.array([[x, y, z]
+                           for x in range(shape[0])
+                           for y in range(shape[1])
+                           for z in range(shape[2])])
+    bonds = []
+    for p in positions:
+        px = p.at[0].set((p.at[0].get() + 1) % shape[0])
+        py = p.at[1].set((p.at[1].get() + 1) % shape[1])
+        pz = p.at[2].set((p.at[2].get() + 1) % shape[2])
+        bonds.append([position_to_index(p, shape), position_to_index(px, shape)])
+        bonds.append([position_to_index(p, shape), position_to_index(py, shape)])
+        bonds.append([position_to_index(p, shape), position_to_index(pz, shape)])
+    return jnp.array(bonds)
+
+
+def get_bondperms_cubical3d(shape: jax.Array, shift: int = 2) -> jax.Array:
+    """
+    Retrieve the permutations of neirest neighbor bonds induced by permutations on sites with shift on a 3d
+    cubical lattice with PBC.
+
+    Args:
+        shape: Size of the 3d lattice. Array with entries [x_0 extend, x_1 extend, x_2 extend]
+        shift: Only include translations by n=shift steps
+
+    Returns:
+        Array of shape (n_symmetries, n_bonds)
+
+    """
+    perms = get_translations_cubical3d(shape, shift=shift)
+    bond_perms = []
+    for perm in perms:
+        bond_perm = jnp.array([[3 * p, 3 * p + 1, 3 * p + 2] for p in perm], dtype=jnp.int32).flatten()
+        bond_perms.append(bond_perm)
+    return jnp.vstack(bond_perms)
 
 
 # %%  Utilities specifically for the 2 dimensional toric code
