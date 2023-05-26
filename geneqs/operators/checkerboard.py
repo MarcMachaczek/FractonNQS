@@ -18,9 +18,6 @@ class Checkerboard(nk.operator.DiscreteOperator):
         else:
             self.h = h
 
-        if h[1] != 0:
-            raise NotImplementedError
-
         # get corresponding indices on which the operators act on
         positions = jnp.asarray([(x, y, z)
                                  for x in range(shape[0])
@@ -119,8 +116,8 @@ def checkerboard_conns_and_mels(sigma: jax.Array,
     diag_mel = -jnp.sum(jnp.product(sigma.at[cubes].get(), axis=1)) + hz * jnp.sum(sigma)
     # n_sites mels corresponding to flipped cubes
     cube_mels = -jnp.ones(n_cubes)
-    # mel according to hx and hy, TODO: include hy and check chunking behaviour
-    field_mels = -hx * jnp.ones(n_sites)  # - hy * sigma * 1j
+    # mel according to hx and hy
+    field_mels = -hx * jnp.ones(n_sites) - hy * sigma * 1j
     mels = jnp.hstack((diag_mel, cube_mels, field_mels))
     return eta, mels
 
@@ -150,7 +147,7 @@ def e_loc(logpsi, pars, sigma, extra_args):
 
 
 def get_netket_checkerboard(hilbert, shape: jax.Array, h: Tuple[float, float, float]):
-    ha_netketlocal = nk.operator.LocalOperator(hilbert, dtype=float)
+    ha_netketlocal = nk.operator.LocalOperator(hilbert, dtype=complex)
     hx, hy, hz = h
 
     # get corresponding indices on which the operators act on
@@ -186,7 +183,7 @@ def get_netket_xcube(hilbert, position: jax.Array, shape: jax.Array):
     """
     cube_operator = nk.operator.LocalOperator(hilbert, dtype=float)
     cube = geneqs.utils.indexing.position_to_cube(position, shape)
-    cube_operator += math.prod([nk.operator.spin.sigmax(hi, idx.item()) for idx in cube])
+    cube_operator += math.prod([nk.operator.spin.sigmax(hilbert, idx.item()) for idx in cube])
     return cube_operator
 
 
@@ -205,5 +202,5 @@ def get_netket_zcube(hilbert, position: jax.Array, shape: jax.Array):
     """
     cube_operator = nk.operator.LocalOperator(hilbert, dtype=float)
     cube = geneqs.utils.indexing.position_to_cube(position, shape)
-    cube_operator += math.prod([nk.operator.spin.sigmaz(hi, idx.item()) for idx in cube])
+    cube_operator += math.prod([nk.operator.spin.sigmaz(hilbert, idx.item()) for idx in cube])
     return cube_operator

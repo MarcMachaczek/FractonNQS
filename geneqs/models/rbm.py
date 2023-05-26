@@ -80,11 +80,13 @@ class CheckerLoopCRBM(nn.Module):
 
             # correlator has shape (n_corrs, degree), e.g. n_corrs=L⁴/2 and degree=8 for cubes
             corr_values = jnp.take(x, correlator, axis=1).prod(axis=2)  # shape (batch, n_corrs)
+            # jax.debug.print("corr{0}_values: {1}", i, corr_values)
 
             # corr_values has shape (batch, n_corrs)
             # kernel has shape (features, n_correlator_symmetries, n_corrs)
             # theta has shape (batch, features, n_symmetries)
             theta += jax.lax.dot_general(corr_values, corr_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+            # jax.debug.print("theta{0}_values: {1}", i, theta)
             bias += corr_bias * jnp.sum(corr_values, axis=(1,))
 
         # add loop features corresponding to hidden units only connected to loops
