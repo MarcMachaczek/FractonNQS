@@ -251,7 +251,7 @@ for h in tqdm(field_strengths, "external_field"):
 exact_energies = np.array(exact_energies).reshape(-1, 1)
 if save_results:
     save_array = np.concatenate((observables.obs_to_array(separate_keys=False), exact_energies), axis=1)
-    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables", save_array,
+    np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt", save_array,
                header=", ".join(observables.key_names + observables.obs_names + ["exact_energy"]))
 
     for hist_name, _ in observables.histograms.items():
