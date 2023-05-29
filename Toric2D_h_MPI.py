@@ -127,18 +127,19 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
-                                                        [0., 0, 0.32],
-                                                        [0., 0, 0.33],
-                                                        [0., 0, 0.34],
-                                                        [0., 0, 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.35, 0, 0.35],
+                                                        [0.37, 0, 0.37],
+                                                        [0.39, 0, 0.39],
+                                                        [0.41, 0, 0.41],
+                                                        [0.43, 0, 0.43]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.3],
-                        [0., 0, 0.31],
-                        [0., 0, 0.32],
-                        [0., 0, 0.35]])
+hist_fields = np.array([[0.35, 0, 0.35],
+                        [0.39, 0, 0.39],
+                        [0.4, 0, 0.4],
+                        [0.42, 0, 0.42],
+                        [0.5, 0, 0.5]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
