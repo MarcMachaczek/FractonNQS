@@ -15,7 +15,7 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-save_results = False
+save_results = True
 pre_train = False
 
 random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
@@ -55,7 +55,7 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
                    HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
 
 # %%  setting hyper-parameters
-n_iter = 200
+n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
@@ -76,7 +76,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.008
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1 / 4
@@ -100,7 +100,7 @@ xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
 zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
 # noinspection PyArgumentList
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.8, 0.15, 0.05, 0.05, 0.05),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05, 0.05),
                                                           [single_rule,
                                                            cube_rule,
                                                            xstring_rule,
@@ -114,27 +114,28 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
-                                                        [0.32, 0, 0],
-                                                        [0.33, 0, 0],
-                                                        [0.34, 0, 0],
-                                                        [0.35, 0, 0]])))
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 20) * direction).T
+# field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
+#                                                         [0.32, 0, 0],
+#                                                         [0.33, 0, 0],
+#                                                         [0.34, 0, 0],
+#                                                         [0.35, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0, 0],
-                        [0.4, 0, 0],
-                        [0.5, 0.1, 0],
-                        [0.6, 0, 0]])
+hist_fields = np.array([[0., 0, 0.3],
+                        [0., 0, 0.4],
+                        [0., 0, 0.42],
+                        [0., 0, 0.6]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
+
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
 # %%
 if pre_train:
-    checkerboard = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
+    checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
@@ -154,7 +155,7 @@ if pre_train:
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
-    checkerboard = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
+    checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
@@ -219,7 +220,7 @@ for h in tqdm(field_strengths, "external_field"):
 # %%
 if save_results:
     save_array = observables.obs_to_array(separate_keys=False)
-    np.savetxt(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_observables", save_array,
+    np.savetxt(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_observables.txt", save_array,
                header=", ".join(observables.key_names + observables.obs_names))
 
     for hist_name, _ in observables.histograms.items():
@@ -243,7 +244,7 @@ plot.set_xlabel("external magnetic field")
 plot.set_ylabel("magnetization")
 plot.set_title(f"Magnetization vs external field in {direction.flatten()}-direction for Checkerboard of size={shape}")
 
-plot.set_xlim(0, field_strengths[-1][2])
+plot.set_xlim(0, field_strengths[-1][0])
 
 if save_results:
     fig.savefig(f"{RESULTS_PATH}/checkerboard/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
