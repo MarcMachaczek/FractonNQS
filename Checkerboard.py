@@ -129,7 +129,7 @@ hist_fields = np.array([[0., 0, 0.3],
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 
-field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+field_strengths = field_strengths[field_strengths[:, 2].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 

@@ -252,10 +252,10 @@ for h in tqdm(field_strengths, "external_field"):
         if np.any((h == hist_fields).all(axis=1)):
             variational_gs.n_samples = n_samples
             # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins, density=False))
-            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins, density=False))
-            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins, density=False))
-            observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins, density=False))
+            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
+            observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
 
         # save observables to file
         if save_results:
@@ -295,4 +295,3 @@ if rank == 0:
 
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/toric2d_h/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
-# took 02:50 till magnetization was calculated
