@@ -42,7 +42,7 @@ cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
 
 # define some observables
-magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
+magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmax(hilbert, i) for i in range(hilbert.size)])
 abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -123,7 +123,7 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 20) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
 #                                                         [0.32, 0, 0],
@@ -131,13 +131,13 @@ field_strengths = (np.linspace(0, 1, 20) * direction).T
 #                                                         [0.34, 0, 0],
 #                                                         [0.35, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.3],
-                        [0., 0, 0.4],
-                        [0., 0, 0.42],
-                        [0., 0, 0.6]])
+hist_fields = np.array([[0.3, 0, 0.],
+                        [0.4, 0, 0.],
+                        [0.42, 0, 0.],
+                        [0.6, 0, 0.]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
-field_strengths = field_strengths[field_strengths[:, 2].argsort()]
+field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
@@ -221,7 +221,7 @@ for h in tqdm(field_strengths, "external_field"):
         plot.legend()
         if save_results:
             fig.savefig(
-                f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+                f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
         # create histograms
         if np.any((h == hist_fields).all(axis=1)):
@@ -256,9 +256,9 @@ if rank == 0:
 
     c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[0], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, 0], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external magnetic field")
     plot.set_ylabel("magnetization")
