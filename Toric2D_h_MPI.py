@@ -22,6 +22,7 @@ from netket.utils import HashableArray
 
 import geneqs
 from geneqs.utils.training import loop_gs
+from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -143,6 +144,9 @@ hist_fields = np.array([[0.35, 0, 0.35],
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+# TODO: remove this after testing
+hist_fields = np.array([[0.4, 0, 0.4]])
+field_strengths = hist_fields
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
@@ -212,14 +216,15 @@ for h in tqdm(field_strengths, "external_field"):
     # gather local estimators as each rank calculates them based on their own samples_per_rank
     if np.any((h == hist_fields).all(axis=1)):
         variational_gs.n_samples = n_samples
+        random_key, init_state_key = jax.random.split(random_key)
         energy_locests = comm.gather(
-            np.asarray(variational_gs.local_estimators(toric).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, toric).real, dtype=np.float64), root=0)
         mag_locests = comm.gather(
-            np.asarray(variational_gs.local_estimators(magnetization).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, magnetization).real, dtype=np.float64), root=0)
         abs_mag_locests = comm.gather(
-            np.asarray(variational_gs.local_estimators(abs_magnetization).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, abs_magnetization).real, dtype=np.float64), root=0)
         A_B_locests = comm.gather(
-            np.asarray(variational_gs.local_estimators(A_B).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, A_B).real, dtype=np.float64), root=0)
     
     # plot and save training data, save observables
     if rank == 0:
@@ -252,10 +257,10 @@ for h in tqdm(field_strengths, "external_field"):
         if np.any((h == hist_fields).all(axis=1)):
             variational_gs.n_samples = n_samples
             # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
-            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
-            observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
+            observables.add_hist("energy", h, np.histogram(energy_locests / hilbert.size, n_bins))
+            observables.add_hist("mag", h, np.histogram(mag_locests, n_bins))
+            observables.add_hist("abs_mag", h, np.histogram(abs_mag_locests, n_bins))
+            observables.add_hist("A_B", h, np.histogram(A_B_locests, n_bins))
 
         # save observables to file
         if save_results:

@@ -137,3 +137,68 @@ def susc_from_mag(magnetizations: Union[jax.Array, np.ndarray], fields: Union[ja
     sus_fields = (fields[1:] + fields[:-1]) / 2
 
     return sus, sus_fields
+
+
+# %%
+def locests_from_startstate(vqs: nk.vqs.MCState,
+                            operator: nk.operator.AbstractOperator,
+                            initial_state_batch: jax.Array,
+                            n_discard: int = 512) -> jax.Array:
+    """
+    Get vqs.n_samples local estimators from VQS for operator by sampling from a specified initial state.
+    Args:
+        vqs: Variational Quantum State
+        operator: The operator for which to calculate the local estimators
+        initial_state_batch: The specified initial state, must have dimensions (n_chains_per_rank, hilbert.size)
+        n_discard: Number of samples to discard before calculating local estimators. This should be much higher than
+        the setting used for training as more updates are required to thermalize some initial state.
+
+    Returns:
+        The local estimators.
+
+    """
+    old_batch = vqs.sampler_state.σ
+    old_n_discard = vqs.n_discard_per_chain
+    vqs.reset()
+    vqs.sampler_state = vqs.sampler_state.replace(σ=initial_state_batch)
+    vqs.n_discard_per_chain = n_discard
+    locests = vqs.local_estimators(operator)
+
+    vqs.reset()
+    vqs.sampler_state = vqs.sampler_state.replace(σ=old_batch)
+    vqs.n_discard_per_chain = old_n_discard
+    return locests
+
+
+def get_locests_mixed(rng_key,
+                      vqs: nk.vqs.MCState,
+                      operator: nk.operator.AbstractOperator,
+                      n_discard: int = 512) -> jax.Array:
+    """
+    A convienience function that calculates local estimators from VQS for operator from three different initial
+    configurations:
+    1) the samples "learned" during the training process
+    2) a "cold" spin configuration with all spins pointing down
+    3) random spin configurations
+    Args:
+        rng_key:
+        vqs:
+        operator:
+        n_discard:
+
+    Returns:
+        The local estimators.
+
+    """
+
+    n_chains = vqs.sampler.n_chains_per_rank
+    hilbert_size = vqs.hilbert.size
+
+    cold_batch = -jnp.ones(shape=(n_chains, hilbert_size), dtype=jnp.int8)
+    random_batch = 2 * jax.random.randint(rng_key, (n_chains, hilbert_size), 0, 1, dtype=jnp.int8) - 1
+
+    converged_locests = vqs.local_estimators(operator)
+    cold_locests = locests_from_startstate(vqs, operator, cold_batch, n_discard)
+    random_locests = locests_from_startstate(vqs, operator, random_batch, n_discard)
+    locests = jnp.concatenate((converged_locests, cold_locests, random_locests), axis=0).flatten()
+    return locests

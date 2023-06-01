@@ -7,6 +7,7 @@ from netket.utils import HashableArray
 
 import geneqs
 from geneqs.utils.training import loop_gs
+from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -190,17 +191,22 @@ for h in tqdm(field_strengths, "external_field"):
 
     if np.any((h == hist_fields).all(axis=1)):
         variational_gs.n_samples = n_samples
+        random_key, init_state_key = jax.random.split(random_key)
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)
+        e_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, toric).real,
+                            dtype=np.float64)
         observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
-        mag_locs = np.asarray((variational_gs.local_estimators(magnetization)).real, dtype=np.float64)
+        mag_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, magnetization).real,
+                              dtype=np.float64)
         observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
-        abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)).real, dtype=np.float64)
+        abs_mag_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, abs_magnetization).real,
+                                  dtype=np.float64)
         observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
-        A_B_locs = np.asarray((variational_gs.local_estimators(A_B)).real, dtype=np.float64)
+        A_B_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, A_B).real,
+                              dtype=np.float64)
         observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=False))
 
     # plot and save training data, save observables
