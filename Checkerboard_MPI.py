@@ -124,7 +124,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define fields for which to trian the NQS and get observables
 direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 20) * direction).T
+field_strengths = (np.linspace(0, 1, 16) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
 #                                                         [0.32, 0, 0],
 #                                                         [0.33, 0, 0],

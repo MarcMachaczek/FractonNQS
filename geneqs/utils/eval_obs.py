@@ -143,7 +143,7 @@ def susc_from_mag(magnetizations: Union[jax.Array, np.ndarray], fields: Union[ja
 def locests_from_startstate(vqs: nk.vqs.MCState,
                             operator: nk.operator.AbstractOperator,
                             initial_state_batch: jax.Array,
-                            n_discard: int = 512) -> jax.Array:
+                            n_discard: int = 256) -> jax.Array:
     """
     Get vqs.n_samples local estimators from VQS for operator by sampling from a specified initial state.
     Args:
@@ -173,7 +173,7 @@ def locests_from_startstate(vqs: nk.vqs.MCState,
 def get_locests_mixed(rng_key,
                       vqs: nk.vqs.MCState,
                       operator: nk.operator.AbstractOperator,
-                      n_discard: int = 512) -> jax.Array:
+                      n_discard: int = 256) -> jax.Array:
     """
     A convienience function that calculates local estimators from VQS for operator from three different initial
     configurations:
