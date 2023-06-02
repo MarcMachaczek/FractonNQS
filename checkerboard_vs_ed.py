@@ -26,7 +26,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.product(shape).item())
 
 # define some observables
 magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
+abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
 perms = nk.utils.HashableArray(perms.astype(int))

@@ -44,7 +44,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 # define some observables
 magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
+abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
@@ -219,13 +219,13 @@ for h in tqdm(field_strengths, "external_field"):
         variational_gs.n_samples = n_samples
         random_key, init_state_key = jax.random.split(random_key)
         energy_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, variational_gs, toric).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, toric), dtype=np.float64), root=0)
         mag_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, variational_gs, magnetization).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, magnetization), dtype=np.float64), root=0)
         abs_mag_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, variational_gs, abs_magnetization).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, abs_magnetization), dtype=np.float64), root=0)
         A_B_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, variational_gs, A_B).real, dtype=np.float64), root=0)
+            np.asarray(get_locests_mixed(init_state_key, variational_gs, A_B), dtype=np.float64), root=0)
     
     # plot and save training data, save observables
     if rank == 0:
