@@ -27,8 +27,8 @@ cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
 
 # define some observables
-magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
+magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmax(hilbert, i) for i in range(hilbert.size)])
+abs_magnetization = geneqs.operators.observables.AbsXMagnetization(hilbert)
 
 # visualize the graph
 fig = plt.figure(figsize=(10, 10), dpi=300)
@@ -114,7 +114,7 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 20) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
 #                                                         [0.32, 0, 0],
@@ -122,10 +122,10 @@ field_strengths = (np.linspace(0, 1, 20) * direction).T
 #                                                         [0.34, 0, 0],
 #                                                         [0.35, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.3],
-                        [0., 0, 0.4],
-                        [0., 0, 0.42],
-                        [0., 0, 0.6]])
+hist_fields = np.array([[0.3, 0, 0.],
+                        [0.4, 0, 0.],
+                        [0.45, 0, 0.],
+                        [0.6, 0, 0.]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 
@@ -182,13 +182,13 @@ for h in tqdm(field_strengths, "external_field"):
     if np.any((h == hist_fields).all(axis=1)):
         variational_gs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray((variational_gs.local_estimators(checkerboard)).real, dtype=np.float64)
+        e_locs = np.asarray((variational_gs.local_estimators(checkerboard)), dtype=np.float64)
         observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
-        mag_locs = np.asarray((variational_gs.local_estimators(magnetization)).real, dtype=np.float64)
+        mag_locs = np.asarray((variational_gs.local_estimators(magnetization)), dtype=np.float64)
         observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
-        abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)).real, dtype=np.float64)
+        abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)), dtype=np.float64)
         observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
     # plot and save training data

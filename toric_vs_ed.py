@@ -28,7 +28,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 # define some observables
 magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
+abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])

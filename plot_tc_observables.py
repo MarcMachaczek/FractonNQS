@@ -43,7 +43,8 @@ for i, obs in enumerate(obs_list):
     for ob in obs:
         plot_abs_mag.errorbar(ob[field_direction], ob[7], yerr=ob[8], marker="o", markersize=2, color=cmap(i))
 
-    plot_abs_mag.plot(obs[:, field_direction], obs[:, 7], marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
+    plot_abs_mag.plot(obs[:, field_direction], obs[:, 7], marker="o", markersize=2, color=cmap(i),
+                      label=f"h={obs[-1][:3]}")
 
 plot_abs_mag.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_abs_mag.set_ylabel("absolute magnetization")
@@ -55,8 +56,9 @@ plot_abs_mag.legend()
 plot_sus = fig.add_subplot(323)
 
 for i, obs in enumerate(obs_list):
-    sus, sus_fields = geneqs.utils.eval_obs.susc_from_mag(magnetizations=obs[:, 5], fields=obs[:, :3])
-    plot_sus.plot(sus_fields[:, field_direction], sus, marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
+    sus, sus_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs[:, 5], fields=obs[:, :3])
+    plot_sus.plot(sus_fields[:, field_direction], sus, marker="o", markersize=2, color=cmap(i),
+                  label=f"h={obs[-1][:3]}")
 
 plot_sus.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_sus.set_ylabel("susceptibility of magnetization")
@@ -71,7 +73,8 @@ for i, obs in enumerate(obs_list):
     for ob in obs:
         plot_wilson.errorbar(ob[field_direction], ob[9], yerr=ob[10], marker="o", markersize=2, color=cmap(i))
 
-    plot_wilson.plot(obs[:, field_direction], obs[:, 9], marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
+    plot_wilson.plot(obs[:, field_direction], obs[:, 9], marker="o", markersize=2, color=cmap(i),
+                     label=f"h={obs[-1][:3]}")
 
 plot_wilson.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_wilson.set_ylabel("wilson loop < prod A_s * prod B_p >")
@@ -128,7 +131,7 @@ A_B_hist = fig.add_subplot(224)
 obs = obs_list[0]
 for hist in energy_histograms:
     field, hist_values, bin_edges = np.round(hist[0], 3), hist[1], hist[2]
-    e_mean = obs[np.argwhere((np.round(obs[:, :3], 3)==field).all(axis=1)), 3].item()
+    e_mean = obs[np.argwhere(np.all(np.round(obs[:, :3], 3) == field, axis=1)), 3].item()
     edges = (bin_edges[1:] + bin_edges[:-1]) / 2 - e_mean / hilbert_size
     hist_values_rescaled = hist_values / np.sum(hist_values)
     energy_hist.plot(edges, hist_values_rescaled, label=f"h={tuple([round(h, 3) for h in field])}")

@@ -118,25 +118,26 @@ class ObservableCollector:
 
 
 # %%
-def susc_from_mag(magnetizations: Union[jax.Array, np.ndarray], fields: Union[jax.Array, np.ndarray]):
+def derivative_fd(observable: Union[jax.Array, np.ndarray], fields: Union[jax.Array, np.ndarray]):
     """
-    Calculate the magnetic susceptibility from observed magnetization values via finite differences.
-    This function also returns the external field values for which the susceptibilites were evaluated.
+    Calculate the derivative of observable values via finite differences.
+    This function also returns the external "field" values for which the differences were evaluated.
     Args:
-        magnetizations: Magnetization values for different external fields.
+        observable: Observable values for different external fields.
         fields: Array of shape (n_fields, 3) containing for each magnetization the external field in x, y, z direction.
+        Actually, this also works for arbitrary second dimension.
 
     Returns:
-        susceptibility array (n_fields), susceptibility fields (n_fields, 3)
+        derivative array (n_fields), susceptibility fields (n_fields, 3)
 
     """
     
-    assert len(magnetizations) == len(fields), "length of magnetizations and fields must be the same"
+    assert len(observable) == len(fields)
 
-    sus = (magnetizations[1:] - magnetizations[:-1]) / np.linalg.norm(fields[1:] - fields[:-1], axis=1)
-    sus_fields = (fields[1:] + fields[:-1]) / 2
+    derivative = (observable[1:] - observable[:-1]) / np.linalg.norm(fields[1:] - fields[:-1], axis=1)
+    derivative_fields = (fields[1:] + fields[:-1]) / 2
 
-    return sus, sus_fields
+    return derivative, derivative_fields
 
 
 # %%
@@ -201,4 +202,4 @@ def get_locests_mixed(rng_key,
     cold_locests = locests_from_startstate(vqs, operator, cold_batch, n_discard)
     random_locests = locests_from_startstate(vqs, operator, random_batch, n_discard)
     locests = jnp.concatenate((converged_locests, cold_locests, random_locests), axis=0).flatten()
-    return locests
+    return locests.real

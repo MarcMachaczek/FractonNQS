@@ -29,7 +29,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 # define some observables
 magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsMagnetization(hilbert)
+abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
@@ -193,19 +193,19 @@ for h in tqdm(field_strengths, "external_field"):
         variational_gs.n_samples = n_samples
         random_key, init_state_key = jax.random.split(random_key)
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, toric).real,
+        e_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, toric),
                             dtype=np.float64)
         observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
-        mag_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, magnetization).real,
+        mag_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, magnetization),
                               dtype=np.float64)
         observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
-        abs_mag_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, abs_magnetization).real,
+        abs_mag_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, abs_magnetization),
                                   dtype=np.float64)
         observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
-        A_B_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, A_B).real,
+        A_B_locs = np.asarray(get_locests_mixed(init_state_key, variational_gs, A_B),
                               dtype=np.float64)
         observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=False))
 
