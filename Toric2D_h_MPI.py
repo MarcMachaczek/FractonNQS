@@ -145,7 +145,8 @@ hist_fields = np.array([[0.35, 0, 0.35],
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 # TODO: remove this after testing
-hist_fields = np.array([[0.4, 0, 0.4]])
+hist_fields = np.array([[0.4, 0, 0.4],
+                       [0.42, 0, 0.42]])
 field_strengths = hist_fields
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
@@ -257,10 +258,10 @@ for h in tqdm(field_strengths, "external_field"):
         if np.any((h == hist_fields).all(axis=1)):
             variational_gs.n_samples = n_samples
             # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-            observables.add_hist("energy", h, np.histogram(energy_locests / hilbert.size, n_bins))
-            observables.add_hist("mag", h, np.histogram(mag_locests, n_bins))
-            observables.add_hist("abs_mag", h, np.histogram(abs_mag_locests, n_bins))
-            observables.add_hist("A_B", h, np.histogram(A_B_locests, n_bins))
+            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
+            observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
 
         # save observables to file
         if save_results:
