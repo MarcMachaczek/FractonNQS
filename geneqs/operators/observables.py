@@ -38,7 +38,7 @@ class AbsZMagnetization(nk.operator.DiscreteOperator):
             connected states or "kets" eta, corresponding matrix elements mels
 
         """
-        return abs_zmagnetization_conns_and_mels(sigma)
+        return abs_zmagnetization_conns_and_mels(sigma.reshape(-1, sigma.shape[-1]))
 
     def get_conn_flattened(self, x, sections):
         eta, mels = abs_zmagnetization_conns_and_mels(x)
@@ -84,7 +84,7 @@ class AbsXMagnetization(nk.operator.DiscreteOperator):
             connected states or "kets" eta, corresponding matrix elements mels
 
         """
-        return abs_xmagnetization_conns_and_mels(sigma)
+        return abs_xmagnetization_conns_and_mels(sigma.reshape(-1, sigma.shape[-1]))
 
     def get_conn_flattened(self, x, sections):
         eta, mels = abs_xmagnetization_conns_and_mels(x)
@@ -103,7 +103,7 @@ class AbsXMagnetization(nk.operator.DiscreteOperator):
 
 class AbsYMagnetization(nk.operator.DiscreteOperator):
     """
-    Operator corresponing to the absolute magnetization of a state. For regular magnetization simply use NetKet loca
+    Operator corresponing to the absolute magnetization of a state. For regular magnetization simply use NetKet local
     operators.
     """
 
@@ -130,7 +130,7 @@ class AbsYMagnetization(nk.operator.DiscreteOperator):
             connected states or "kets" eta, corresponding matrix elements mels
 
         """
-        return abs_ymagnetization_conns_and_mels(sigma)
+        return abs_ymagnetization_conns_and_mels(sigma.reshape(-1, sigma.shape[-1]))
 
     def get_conn_flattened(self, x, sections):
         eta, mels = abs_ymagnetization_conns_and_mels(x)

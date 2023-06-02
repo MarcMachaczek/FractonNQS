@@ -123,13 +123,13 @@ field_strengths = (np.linspace(0, 1, 20) * direction).T
 #                                                         [0.35, 0, 0]])))
 # for which fields indices histograms are created
 hist_fields = np.array([[0.3, 0, 0.],
-                        [0.4, 0, 0.],
-                        [0.45, 0, 0.],
+                        [0.43, 0, 0.],
+                        [0.44, 0, 0.],
                         [0.6, 0, 0.]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 
-field_strengths = field_strengths[field_strengths[:, 2].argsort()]
+field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
