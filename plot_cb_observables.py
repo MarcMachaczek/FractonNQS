@@ -23,7 +23,7 @@ field_direction = 0  # 0=x, 1=y, 2=z
 
 # %% magnetizations comparison
 # obs columns: "hx, hy, hz, energy, energy_var, mag, mag_var, abs_mag, abs_mag_var, (exact_energy)"
-fig = plt.figure(dpi=300, figsize=(30, 22))
+fig = plt.figure(dpi=300, figsize=(34, 22))
 plot_mag = fig.add_subplot(231)
 
 for i, obs in enumerate(obs_list):

@@ -3,10 +3,10 @@ import jax.numpy as jnp
 import netket as nk
 import optax
 from netket.utils import HashableArray
-
+from matplotlib import pyplot as plt
 import geneqs
 
-stddev = 0.0001
+stddev = 0.001
 default_kernel_init = jax.nn.initializers.normal(stddev)
 random_key = jax.random.PRNGKey(420)
 # some common parameters
@@ -49,7 +49,7 @@ xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
 zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
 # noinspection PyArgumentList
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.8, 0.15, 0.05, 0.05, 0.05),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.08, 0.08, 0.09),
                                                           [single_rule,
                                                            cube_rule,
                                                            xstring_rule,
@@ -81,6 +81,12 @@ samples = vqs.sample().reshape(-1, hilbert.size)
 
 e_exact = vqs.expect(nk_checkerboard)
 print(e_exact)
+
+# %%
+fig = plt.figure(figsize=(10, 10), dpi=300)
+ax = fig.add_subplot(projection='3d')
+geneqs.utils.plotting.plot_checkerboard(ax, L)
+plt.show()
 
 # %% Test for the Checkerboard model
 L = 4  # this translates to L+1 without PBC
