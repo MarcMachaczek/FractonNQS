@@ -15,10 +15,10 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-save_results = False
+save_results = True
 pre_train = False
 
-random_key = jax.random.PRNGKey(12344567)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -28,7 +28,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 # define some observables
 magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
+abs_magnetization = geneqs.operators.observables.AbsXMagnetization(hilbert)
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
@@ -121,14 +121,14 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
-                                                        [0., 0., 0.33],
-                                                        [0., 0., 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
+                                                        [0.33, 0., 0.],
+                                                        [0.35, 0., 0.]])))
 
-field_strengths = field_strengths[field_strengths[:, 2].argsort()]
+field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 exact_energies = []
@@ -237,7 +237,7 @@ plot = fig.add_subplot(111)
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
 rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 2], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, 0], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
