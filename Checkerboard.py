@@ -16,7 +16,7 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = False
+pre_init = False
 
 random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
 
@@ -134,61 +134,65 @@ field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
 # %%
-if pre_train:
+if pre_init:
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    # exact ground state parameters for the 2d toric code, start with just noisy parameters
+    # exact ground state parameters for the checkerboard model, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, variational_gs.parameters, stddev)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, variational_gs.parameters, stddev)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
+    cube_idx = checkerboard.cubes[jnp.array([0, 2, 8, 10])]
+    exact_weights = jnp.zeros_like(vqs.parameters["symm_kernel"], dtype=complex)
+    exact_weights = exact_weights.at[jnp.arange(4).reshape(-1, 1), cube_idx].set(1j * jnp.pi / 4)
+    exact_weights = exact_weights.at[(jnp.arange(4) + 4).reshape(-1, 1), cube_idx].set(1j * jnp.pi / 4)
 
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
 
-    variational_gs.parameters = pretrained_parameters
-    print("init energy", variational_gs.expect(checkerboard))
+    vqs.parameters = pretrained_parameters
+    print("init energy", vqs.expect(checkerboard))
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    if pre_train:
-        variational_gs.parameters = pretrained_parameters
+    if pre_init:
+        vqs.parameters = pretrained_parameters
 
-    variational_gs, training_data = loop_gs(variational_gs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
-    variational_gs.chunk_size = chunk_size
-    variational_gs.n_samples = n_expect
+    vqs.chunk_size = chunk_size
+    vqs.n_samples = n_expect
 
     # calculate energy and specific heat / variance of energy
-    energy_nk = variational_gs.expect(checkerboard)
+    energy_nk = vqs.expect(checkerboard)
     observables.add_nk_obs("energy", h, energy_nk)
     # calculate magnetization
-    magnetization_nk = variational_gs.expect(magnetization)
+    magnetization_nk = vqs.expect(magnetization)
     observables.add_nk_obs("mag", h, magnetization_nk)
     # calculate absolute magnetization
-    abs_magnetization_nk = variational_gs.expect(abs_magnetization)
+    abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
 
     if np.any((h == hist_fields).all(axis=1)):
-        variational_gs.n_samples = n_samples
+        vqs.n_samples = n_samples
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray((variational_gs.local_estimators(checkerboard)), dtype=np.float64)
+        e_locs = np.asarray((vqs.local_estimators(checkerboard)), dtype=np.float64)
         observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
-        mag_locs = np.asarray((variational_gs.local_estimators(magnetization)), dtype=np.float64)
+        mag_locs = np.asarray((vqs.local_estimators(magnetization)), dtype=np.float64)
         observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
-        abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)), dtype=np.float64)
+        abs_mag_locs = np.asarray((vqs.local_estimators(abs_magnetization)), dtype=np.float64)
         observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
     # plot and save training data
@@ -204,7 +208,7 @@ for h in tqdm(field_strengths, "external_field"):
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_train={pre_train}, stddev={stddev}")
+                 f" pre_train={pre_init}, stddev={stddev}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")

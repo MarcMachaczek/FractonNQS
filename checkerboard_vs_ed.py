@@ -16,7 +16,7 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = False
+pre_init = False
 
 random_key = jax.random.PRNGKey(12344567)  # this can be used to make results deterministic, but so far is not used
 
@@ -128,25 +128,28 @@ observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "
 exact_energies = []
 
 # %%
-if pre_train:
+if pre_init:
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    # exact ground state parameters for the 2d toric code, start with just noisy parameters
+    # exact ground state parameters for the checkerboard model, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, variational_gs.parameters, stddev)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, variational_gs.parameters, stddev)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
+    cube_idx = checkerboard.cubes[jnp.array([0, 2, 8, 10])]
+    exact_weights = jnp.zeros_like(vqs.parameters["symm_kernel"], dtype=complex)
+    exact_weights = exact_weights.at[jnp.arange(4).reshape(-1, 1), cube_idx].set(1j * jnp.pi / 4)
+    exact_weights = exact_weights.at[(jnp.arange(4) + 4).reshape(-1, 1), cube_idx].set(1j * jnp.pi / 4)
 
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
 
-    variational_gs.parameters = pretrained_parameters
-    print("init energy", variational_gs.expect(checkerboard))
+    vqs.parameters = pretrained_parameters
+    print("init energy", vqs.expect(checkerboard))
 
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
@@ -155,30 +158,30 @@ for h in tqdm(field_strengths, "external_field"):
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    variational_gs = nk.vqs.ExactState(hilbert, model)
+    vqs = nk.vqs.ExactState(hilbert, model)
 
-    if pre_train:
-        variational_gs.parameters = pretrained_parameters
+    if pre_init:
+        vqs.parameters = pretrained_parameters
 
     # use driver gs if vqs is exact_state aka full_summation_state
-    variational_gs, training_data = driver_gs(variational_gs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    vqs, training_data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
-    # variational_gs.n_samples = n_expect
-    # variational_gs.chunk_size = chunk_size
+    # vqs.n_samples = n_expect
+    # vqs.chunk_size = chunk_size
 
     # calculate energy and specific heat / variance of energy
-    energy_nk = variational_gs.expect(checkerboard)
+    energy_nk = vqs.expect(checkerboard)
     observables.add_nk_obs("energy", h, energy_nk)
     # exactly diagonalize hamiltonian, find exact E0 and save it
     E0_exact = nk.exact.lanczos_ed(checkerboard, compute_eigenvectors=False)[0]
     exact_energies.append(E0_exact)
 
     # calculate magnetization
-    magnetization_nk = variational_gs.expect(magnetization)
+    magnetization_nk = vqs.expect(magnetization)
     observables.add_nk_obs("mag", h, magnetization_nk)
     # calculate absolute magnetization
-    abs_magnetization_nk = variational_gs.expect(abs_magnetization)
+    abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
 
     # plot and save training data, save observables
@@ -194,7 +197,7 @@ for h in tqdm(field_strengths, "external_field"):
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_train={pre_train}, stddev={stddev}")
+                 f" pre_train={pre_init}, stddev={stddev}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
