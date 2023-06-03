@@ -16,9 +16,9 @@ from tqdm import tqdm
 from functools import partial
 
 save_results = True
-pre_train = False
+pre_train = True
 
-random_key = jax.random.PRNGKey(420)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(12344567)  # this can be used to make results deterministic, but so far is not used
 
 # %%
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -60,10 +60,10 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 1200
+n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 40
+n_samples = n_chains * 20
 n_discard_per_chain = 96  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
@@ -78,7 +78,7 @@ diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, dia
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6),
                                  diag_shift=diag_shift_schedule,
-                                 holomorphic=False)
+                                 holomorphic=True)
 
 # define correlation enhanced RBM
 stddev = 0.01
@@ -121,25 +121,25 @@ transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 # field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
 #                                                         [0.32, 0., 0.],
 #                                                         [0.33, 0., 0.],
 #                                                         [0.34, 0., 0.],
 #                                                         [0.35, 0., 0.]])))
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.31],
-                                                        [0.33, 0., 0.33],
-                                                        [0.35, 0., 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
+                                                        [0., 0., 0.33],
+                                                        [0., 0., 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0., 0.3],
-                        [0.39, 0., 0.39],
-                        [0.41, 0., 0.41],
-                        [0.6, 0., 0.6]])
+hist_fields = np.array([[0., 0., 0.3],
+                        [0., 0., 0.39],
+                        [0., 0., 0.41],
+                        [0., 0., 0.6]])
 
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
-field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+field_strengths = field_strengths[field_strengths[:, 2].argsort()]
 
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
