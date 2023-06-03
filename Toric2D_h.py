@@ -127,7 +127,7 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
 # for which fields indices histograms are created
 hist_fields = np.array([[0.3, 0, 0],
                         [0.4, 0, 0],
-                        [0.5, 0.1, 0],
+                        [0.5, 0, 0],
                         [0.6, 0, 0]])
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
@@ -214,7 +214,7 @@ for h in tqdm(field_strengths, "external_field"):
     plot = fig.add_subplot(111)
 
     n_params = int(training_data["n_params"].value)
-    plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
+    plot.errorbar(training_data["Energy"].iters, training_data["Energy"].Mean, yerr=training_data["Energy"].Sigma,
                   label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
     fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"

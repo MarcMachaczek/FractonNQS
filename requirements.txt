@@ -18,7 +18,7 @@ markdown-it-py==2.2.0
 matplotlib==3.7.1
 mdurl==0.1.2
 msgpack==1.0.5
-NetKet==3.7
+NetKet==3.8
 numba==0.56.4
 numba4jax==0.0.10.post1
 numpy==1.23.5

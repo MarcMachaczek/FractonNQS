@@ -233,7 +233,7 @@ for h in tqdm(field_strengths, "external_field"):
         plot = fig.add_subplot(111)
 
         n_params = int(training_data["n_params"].value)
-        plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
+        plot.errorbar(training_data["Energy"].iters, training_data["Energy"].Mean, yerr=training_data["Energy"].Sigma,
                       label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
         fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"

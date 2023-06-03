@@ -85,7 +85,7 @@ def loop_gs(v_state: nk.vqs.MCState,
             p_update_time = times["final"] - times["post_sr"]
             total_time = times["final"] - times["pre_sample"]
 
-            log_data = {"energy": energy}
+            log_data = {"Energy": energy}
             log_data["times"] = {"sampling": sampling_time,
                                  "expect_grad": expect_grad_time,
                                  "sr": sr_time,
@@ -94,7 +94,7 @@ def loop_gs(v_state: nk.vqs.MCState,
             callback_stop = not cb(epoch, log_data, v_state)
             log(epoch, log_data, v_state)
 
-            loss = log_data["energy"]
+            loss = log_data["Energy"]
             pbar.set_postfix_str(f"Energy = {loss}, time ratios:"
                                  f" sampling = {round(sampling_time/total_time, 2)},"
                                  f" ex_grad = {round(expect_grad_time/total_time, 2)},"
@@ -176,8 +176,10 @@ class LoopCallback:
         """
         if step == 1:
             log_data["n_params"] = v_state.n_parameters
-        sampler_state = v_state.sampler_state
-        if not v_state.sampler.is_exact:
+
+        is_mc = isinstance(v_state, nk.vqs.MCState) and (not v_state.sampler.is_exact)
+        if is_mc:
+            sampler_state = v_state.sampler_state
             log_data["acceptance_rate"] = sampler_state.acceptance.item()
 
         loss = np.real(getattr(log_data["energy"], self.monitor))
@@ -231,8 +233,10 @@ class DriverCallback:
         """
         if step == 1:
             log_data["n_params"] = driver._variational_state.n_parameters
-        sampler_state = driver._variational_state.sampler_state
-        if not driver._variational_state.sampler.is_exact:
+
+        is_mc = isinstance(driver, nk.vqs.MCState) and (not driver._variational_state.sampler.is_exact)
+        if is_mc:
+            sampler_state = driver._variational_state.sampler_state
             log_data["acceptance_rate"] = sampler_state.acceptance.item()
 
         loss = np.real(getattr(log_data[driver._loss_name], self.monitor))

@@ -6,7 +6,7 @@ import netket as nk
 from netket.utils import HashableArray
 
 import geneqs
-from geneqs.utils.training import loop_gs
+from geneqs.utils.training import loop_gs, driver_gs
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -15,8 +15,8 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-save_results = True
-pre_train = True
+save_results = False
+pre_train = False
 
 random_key = jax.random.PRNGKey(12344567)  # this can be used to make results deterministic, but so far is not used
 
@@ -60,11 +60,11 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 1000
+n_iter = 800
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 20
-n_discard_per_chain = 96  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
 n_bins = 20  # number of bins for calculating histograms
@@ -81,7 +81,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.01
+stddev = 0.008
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
@@ -123,24 +123,12 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 # define fields for which to trian the NQS and get observables
 direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-# field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
-#                                                         [0.32, 0., 0.],
-#                                                         [0.33, 0., 0.],
-#                                                         [0.34, 0., 0.],
-#                                                         [0.35, 0., 0.]])))
+
 field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
                                                         [0., 0., 0.33],
                                                         [0., 0., 0.35]])))
-# for which fields indices histograms are created
-hist_fields = np.array([[0., 0., 0.3],
-                        [0., 0., 0.39],
-                        [0., 0., 0.41],
-                        [0., 0., 0.6]])
 
-# make sure hist fields are contained in field_strengths and sort final field array
-field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 2].argsort()]
-
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 exact_energies = []
@@ -174,20 +162,22 @@ if pre_train:
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
-    toric  = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
+    toric_nk = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    variational_gs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    variational_gs = nk.vqs.ExactState(hilbert, model)
 
     if pre_train:
         variational_gs.parameters = pretrained_parameters
 
-    variational_gs, training_data = loop_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
+    # use driver gs if vqs is exact_state aka full_summation_state
+    variational_gs, training_data = driver_gs(variational_gs, toric, optimizer, preconditioner, n_iter, min_iter)
 
     # calculate observables, therefore set some params of vqs
-    variational_gs.n_samples = n_expect
-    variational_gs.chunk_size = chunk_size
+    # variational_gs.n_samples = n_expect
+    # variational_gs.chunk_size = chunk_size
 
     # calculate energy and specific heat / variance of energy
     energy_nk = variational_gs.expect(toric)
@@ -206,27 +196,12 @@ for h in tqdm(field_strengths, "external_field"):
     wilsonob_nk = variational_gs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
-    if np.any((h == hist_fields).all(axis=1)):
-        variational_gs.n_samples = n_samples
-        # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray((variational_gs.local_estimators(toric)).real, dtype=np.float64)
-        observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
-
-        mag_locs = np.asarray((variational_gs.local_estimators(magnetization)).real, dtype=np.float64)
-        observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
-
-        abs_mag_locs = np.asarray((variational_gs.local_estimators(abs_magnetization)).real, dtype=np.float64)
-        observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
-
-        A_B_locs = np.asarray((variational_gs.local_estimators(A_B)).real, dtype=np.float64)
-        observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=False))
-
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(12, 12))
     plot = fig.add_subplot(111)
 
     n_params = int(training_data["n_params"].value)
-    plot.errorbar(training_data["energy"].iters, training_data["energy"].Mean, yerr=training_data["energy"].Sigma,
+    plot.errorbar(training_data["Energy"].iters, training_data["Energy"].Mean, yerr=training_data["Energy"].Sigma,
                   label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
 
     fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
@@ -239,7 +214,7 @@ for h in tqdm(field_strengths, "external_field"):
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")
 
-    E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.item().real
+    E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.real
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                    f" down to {diag_shift_end}")
     plot.legend()
@@ -253,10 +228,6 @@ if save_results:
     save_array = np.concatenate((observables.obs_to_array(separate_keys=False), exact_energies), axis=1)
     np.savetxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt", save_array,
                header=", ".join(observables.key_names + observables.obs_names + ["exact_energy"]))
-
-    for hist_name, _ in observables.histograms.items():
-        np.save(f"{RESULTS_PATH}/toric2d_h/hists_{hist_name}_L{shape}_{eval_model}.npy",
-                observables.hist_to_array(hist_name))
 
 # %%
 # create and save relative error plot
