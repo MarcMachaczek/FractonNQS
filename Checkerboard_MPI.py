@@ -38,7 +38,7 @@ pre_init = False
 random_key = jax.random.PRNGKey(42)  # this can be used to make results deterministic, but so far is not used
 
 # %%
-L = 4  # this translates to L+1 without PBC
+L = 6  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)

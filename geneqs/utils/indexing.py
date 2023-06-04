@@ -311,9 +311,9 @@ def get_ystring_perms3d(shape: jax.Array, shift: int = 2) -> jax.Array:
     base = np.arange(np.product(xz_shape))
     x_perms = []
     for i in range(0, shape[0], shift):
-        # append twice to account for y translations that leave the strings invariant
-        x_perms.append(cubical_translation(base.reshape(-1, 1), xz_shape, 0, i).flatten())
-        x_perms.append(cubical_translation(base.reshape(-1, 1), xz_shape, 0, i).flatten())
+        # append n=<translations in y direction> times to account for y translations that leave the strings invariant
+        for _ in range(0, shape[1], shift):
+            x_perms.append(cubical_translation(base.reshape(-1, 1), xz_shape, 0, i).flatten())
     xz_perms = []
     for x_perm in x_perms:
         for j in range(0, shape[2], shift):
