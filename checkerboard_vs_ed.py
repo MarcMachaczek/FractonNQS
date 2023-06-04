@@ -36,7 +36,7 @@ correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, 2)
                HashableArray(geneqs.utils.indexing.get_bonds_cubical3d(shape)))
 # noinspection PyArgumentList
 correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
-                          HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
+                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
 # noinspection PyArgumentList
 loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
          HashableArray(geneqs.utils.indexing.get_strings_cubical3d(1, shape)),

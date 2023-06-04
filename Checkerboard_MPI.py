@@ -54,8 +54,8 @@ perms = nk.utils.HashableArray(perms.astype(int))
 correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, 2)),
                HashableArray(geneqs.utils.indexing.get_bonds_cubical3d(shape)))
 # noinspection PyArgumentList
-correlators_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
-                          HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
+correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
+                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
 # noinspection PyArgumentList
 loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
          HashableArray(geneqs.utils.indexing.get_strings_cubical3d(1, shape)),
@@ -93,7 +93,7 @@ default_kernel_init = jax.nn.initializers.normal(stddev)
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
                                      correlators=correlators,
-                                     correlator_symmetries=correlators_symmetries,
+                                     correlator_symmetries=correlator_symmetries,
                                      loops=loops,
                                      loop_symmetries=loop_symmetries,
                                      alpha=alpha,
@@ -282,4 +282,3 @@ if rank == 0:
 
     if save_results:
         fig.savefig(f"{RESULTS_PATH}/checkerboard/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
-

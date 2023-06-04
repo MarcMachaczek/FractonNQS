@@ -29,7 +29,7 @@ class CheckerLoopCRBM(nn.Module):
     param_dtype: Any = jnp.float64
     # The nonlinear activation function
     activation: Any = nknn.log_cosh
-    # feature density. Number of features equal to alpha * input.shape[-1]
+    # feature density. Number of features equal to alpha * n_sites / n_symm
     alpha: Union[float, int] = 1
     # Numerical precision of the computation see :class:`jax.lax.Precision` for details
     precision: Any = "highest"
@@ -145,7 +145,7 @@ class ToricLoopCRBM(nn.Module):
     param_dtype: Any = jnp.float64
     # The nonlinear activation function
     activation: Any = nknn.log_cosh
-    # feature density. Number of features equal to alpha * input.shape[-1]
+    # feature density. Number of features equal to alpha * n_sites / n_symm
     alpha: Union[float, int] = 1
     # Numerical precision of the computation see :class:`jax.lax.Precision` for details
     precision: Any = "highest"
@@ -252,7 +252,7 @@ class CorrelationRBM(nn.Module):
     param_dtype: Any = jnp.float64
     # The nonlinear activation function
     activation: Any = nknn.log_cosh
-    # feature density. Number of features equal to alpha * input.shape[-1]
+    # feature density. Number of features equal to alpha * n_sites / n_symm
     alpha: Union[float, int] = 1
     # Numerical precision of the computation see :class:`jax.lax.Precision` for details
     precision: Any = None
@@ -334,7 +334,7 @@ class ExplicitCorrelationRBM(nn.Module):
     param_dtype: Any = jnp.float64
     # The nonlinear activation function
     activation: Any = nknn.log_cosh
-    # feature density. Number of features equal to alpha * input.shape[-1]
+    # feature density. Number of features equal to alpha * n_sites / n_symm
     alpha: Union[float, int] = 1
     # Numerical precision of the computation see :class:`jax.lax.Precision` for details
     precision: Any = None
