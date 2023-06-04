@@ -49,7 +49,7 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
 loop_symmetries = ()  # for reason, see loops
 
 # %%  setting hyper-parameters
-n_iter = 800
+n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 40
@@ -70,13 +70,13 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.008
+stddev = 0.1
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=correlators,
-                                     correlator_symmetries=correlators_symmetries,
+                                     correlators=(),
+                                     correlator_symmetries=(),
                                      loops=loops,
                                      loop_symmetries=loop_symmetries,
                                      alpha=alpha,
@@ -92,7 +92,7 @@ RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             param_dtype=complex)
 
 model = cRBM
-eval_model = "CheckerCRBM"
+eval_model = "cRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -118,9 +118,9 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.31],
-                                                        [0., 0., 0.33],
-                                                        [0., 0., 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
+                                                        [0., 0., 0.44],
+                                                        [0., 0., 0.46]])))
 
 field_strengths = field_strengths[field_strengths[:, 2].argsort()]
 
