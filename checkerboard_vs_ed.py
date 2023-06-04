@@ -35,7 +35,7 @@ perms = nk.utils.HashableArray(perms.astype(int))
 correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, 2)),
                HashableArray(geneqs.utils.indexing.get_bonds_cubical3d(shape)))
 # noinspection PyArgumentList
-correlators_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
+correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
                           HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
 # noinspection PyArgumentList
 loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
@@ -70,13 +70,13 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.1
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=(),
-                                     correlator_symmetries=(),
+                                     correlators=(correlators[0]),
+                                     correlator_symmetries=(correlator_symmetries[0]),
                                      loops=loops,
                                      loop_symmetries=loop_symmetries,
                                      alpha=alpha,
@@ -91,8 +91,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = cRBM
-eval_model = "cRBM"
+model = RBMSymm
+eval_model = "RBMSymm"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
