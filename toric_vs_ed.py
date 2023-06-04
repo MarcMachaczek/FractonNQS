@@ -43,13 +43,11 @@ link_perms = HashableArray(geneqs.utils.indexing.get_linkperms_cubical2d(shape, 
 bl_bonds, lt_bonds, tr_bonds, rb_bonds = geneqs.utils.indexing.get_bonds_cubical2d(shape)
 bl_perms, lt_perms, tr_perms, rb_perms = geneqs.utils.indexing.get_bondperms_cubical2d(shape)
 # noinspection PyArgumentList
-correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators
-               HashableArray(geneqs.utils.indexing.get_stars_cubical2d(shape)),
+correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators,
                HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds))
 
 # noinspection PyArgumentList
-correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites
-                         HashableArray(jnp.asarray(perms)),
+correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites,
                          HashableArray(bl_perms), HashableArray(lt_perms),
                          HashableArray(tr_perms), HashableArray(rb_perms))
 # noinspection PyArgumentList
@@ -60,14 +58,13 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 # %%  setting hyper-parameters
-n_iter = 800
+n_iter = 2000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 20
 n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
-n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -81,15 +78,15 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # define correlation enhanced RBM
-stddev = 0.008
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
-                                   correlator_symmetries=correlator_symmetries,
-                                   loops=loops,
-                                   loop_symmetries=loop_symmetries,
+                                   correlator_symmetries=correlators,
+                                   loops=(),
+                                   loop_symmetries=(),
                                    alpha=alpha,
                                    kernel_init=default_kernel_init,
                                    bias_init=default_kernel_init,
@@ -102,8 +99,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = cRBM
-eval_model = "ToricCRBM"
+model = RBMSymm
+eval_model = "RBMSymm"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -115,20 +112,19 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.1
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.001
+lr_end = 0.01
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
+direction = np.array([0., 0., 0.7]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 8) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0.31, 0., 0.],
-                                                        [0.33, 0., 0.],
-                                                        [0.35, 0., 0.]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.32],
+                                                        [0., 0., 0.35]])))
 
-field_strengths = field_strengths[field_strengths[:, 0].argsort()]
+field_strengths = field_strengths[field_strengths[:, 2].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 exact_energies = []
@@ -238,7 +234,7 @@ plot = fig.add_subplot(111)
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
 rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 0], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, 2], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)

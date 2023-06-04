@@ -49,17 +49,16 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
 loop_symmetries = ()  # for reason, see loops
 
 # %%  setting hyper-parameters
-n_iter = 1000
+n_iter = 2000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 40
 n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
-n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
-diag_shift_end = 1e-5
+diag_shift_end = 1e-6
 diag_shift_begin = int(n_iter / 3)
 diag_shift_steps = int(n_iter / 3)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
@@ -75,8 +74,8 @@ default_kernel_init = jax.nn.initializers.normal(stddev)
 
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=(correlators[0]),
-                                     correlator_symmetries=(correlator_symmetries[0]),
+                                     correlators=(correlators[0],),
+                                     correlator_symmetries=(correlator_symmetries[0],),
                                      loops=loops,
                                      loop_symmetries=loop_symmetries,
                                      alpha=alpha,
@@ -91,8 +90,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = RBMSymm
-eval_model = "RBMSymm"
+model = cRBM
+eval_model = "cRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -109,14 +108,14 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05
                                                            zstring_rule])
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.001
+lr_end = 0.01
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
+direction = np.array([0., 0., 0.7]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 8) * direction).T
 
 field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
                                                         [0., 0., 0.44],
@@ -131,8 +130,10 @@ exact_energies = []
 if pre_init:
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
-    sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    sampler_exact = nk.sampler.ExactSampler(hilbert)
+    vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
+    vqs = nk.vqs.ExactState(hilbert, model, seed=random_key)
 
     # exact ground state parameters for the checkerboard model, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
