@@ -105,3 +105,4 @@ sigma = jnp.stack((sigma1, sigma2), axis=0)
 # y = cRBM.apply({"params": vqs.parameters}, sigma)
 
 vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
+

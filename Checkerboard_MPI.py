@@ -195,9 +195,10 @@ for h in tqdm(field_strengths, "external_field"):
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
 
     if np.any((h == save_fields).all(axis=1)) and save_results:
-        filename = f"{eval_model}_vqs_L{shape}_h{tuple([round(hi, 3) for hi in h])}.mpack"
-        with open(f"{RESULTS_PATH}/checkerboard/{filename}", 'wb') as file:
+        filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
+        with open(f"{RESULTS_PATH}/checkerboard/vqs_{filename}.mpack", 'wb') as file:
             file.write(flax.serialization.to_bytes(vqs))
+        geneqs.utils.model_surgery.params_to_txt(vqs, f"{RESULTS_PATH}/checkerboard/params_{filename}.txt")
 
     if np.any((h == hist_fields).all(axis=1)):
         vqs.n_samples = n_samples
