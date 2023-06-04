@@ -158,7 +158,8 @@ for h in tqdm(field_strengths, "external_field"):
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    vqs = nk.vqs.ExactState(hilbert, model)
+    random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
+    vqs = nk.vqs.ExactState(hilbert, model, seed=random_key)
 
     if pre_init:
         vqs.parameters = pretrained_parameters
@@ -197,7 +198,7 @@ for h in tqdm(field_strengths, "external_field"):
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_train={pre_init}, stddev={stddev}")
+                 f" pre_init={pre_init}, stddev={stddev}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")

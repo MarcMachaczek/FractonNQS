@@ -182,7 +182,7 @@ class LoopCallback:
             sampler_state = v_state.sampler_state
             log_data["acceptance_rate"] = sampler_state.acceptance.item()
 
-        loss = np.real(getattr(log_data["energy"], self.monitor))
+        loss = np.real(getattr(log_data["Energy"], self.monitor))
         if loss < self._best_val:
             self._best_val = loss
             self._best_iter = step

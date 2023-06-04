@@ -16,6 +16,7 @@ import jax
 # jax.distributed.initialize()
 import jax.numpy as jnp
 import optax
+import flax
 
 import netket as nk
 from netket.utils import HashableArray
@@ -136,8 +137,9 @@ hist_fields = np.array([[0.3, 0, 0.],
                         [0.43, 0, 0.],
                         [0.44, 0, 0.],
                         [0.6, 0, 0.]])
+save_fields = hist_fields
 # make sure hist fields are contained in field_strengths and sort final field array
-field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
+field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
@@ -192,6 +194,11 @@ for h in tqdm(field_strengths, "external_field"):
     abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
 
+    if np.any((h == save_fields).all(axis=1)) and save_results:
+        filename = f"{eval_model}_vqs_L{shape}_h{tuple([round(hi, 3) for hi in h])}.mpack"
+        with open(f"{RESULTS_PATH}/checkerboard/{filename}", 'wb') as file:
+            file.write(flax.serialization.to_bytes(vqs))
+
     if np.any((h == hist_fields).all(axis=1)):
         vqs.n_samples = n_samples
         random_key, init_state_key = jax.random.split(random_key)
@@ -216,7 +223,7 @@ for h in tqdm(field_strengths, "external_field"):
                      f" n_discard={n_discard_per_chain},"
                      f" n_chains={n_chains},"
                      f" n_samples={n_samples} \n"
-                     f" pre_train={pre_init}, stddev={stddev}")
+                     f" pre_init={pre_init}, stddev={stddev}")
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")

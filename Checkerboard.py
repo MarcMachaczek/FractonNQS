@@ -1,12 +1,14 @@
 import jax
 import jax.numpy as jnp
 import optax
+import flax
 
 import netket as nk
 from netket.utils import HashableArray
 
 import geneqs
 from geneqs.utils.training import loop_gs
+from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -126,9 +128,9 @@ hist_fields = np.array([[0.3, 0, 0.],
                         [0.43, 0, 0.],
                         [0.44, 0, 0.],
                         [0.6, 0, 0.]])
+save_fields = hist_fields
 # make sure hist fields are contained in field_strengths and sort final field array
-field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
-
+field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
@@ -183,16 +185,22 @@ for h in tqdm(field_strengths, "external_field"):
     abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
 
+    if np.any((h == save_fields).all(axis=1)) and save_results:
+        filename = f"{eval_model}_vqs_L{shape}_h{tuple([round(hi, 3) for hi in h])}.mpack"
+        with open(f"{RESULTS_PATH}/checkerboard/{filename}", 'wb') as file:
+            file.write(flax.serialization.to_bytes(vqs))
+
     if np.any((h == hist_fields).all(axis=1)):
         vqs.n_samples = n_samples
+        random_key, init_state_key = jax.random.split(random_key)
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray((vqs.local_estimators(checkerboard)), dtype=np.float64)
+        e_locs = np.asarray(get_locests_mixed(init_state_key, vqs, checkerboard), dtype=np.float64)
         observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
-        mag_locs = np.asarray((vqs.local_estimators(magnetization)), dtype=np.float64)
+        mag_locs = np.asarray(get_locests_mixed(init_state_key, vqs, magnetization), dtype=np.float64)
         observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
-        abs_mag_locs = np.asarray((vqs.local_estimators(abs_magnetization)), dtype=np.float64)
+        abs_mag_locs = np.asarray(get_locests_mixed(init_state_key, vqs, abs_magnetization), dtype=np.float64)
         observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
     # plot and save training data
@@ -208,7 +216,7 @@ for h in tqdm(field_strengths, "external_field"):
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_train={pre_init}, stddev={stddev}")
+                 f" pre_init={pre_init}, stddev={stddev}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")

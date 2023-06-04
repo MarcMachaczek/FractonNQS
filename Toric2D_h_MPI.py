@@ -16,6 +16,7 @@ import jax
 # jax.distributed.initialize()
 import jax.numpy as jnp
 import optax
+import flax
 
 import netket as nk
 from netket.utils import HashableArray
@@ -141,8 +142,9 @@ hist_fields = np.array([[0.35, 0, 0.35],
                         [0.4, 0, 0.4],
                         [0.42, 0, 0.42],
                         [0.5, 0, 0.5]])
+save_fields = hist_fields
 # make sure hist fields are contained in field_strengths and sort final field array
-field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields)), 3), axis=0)
+field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 0].argsort()]
 
 # TODO: remove this after testing
@@ -205,6 +207,11 @@ for h in tqdm(field_strengths, "external_field"):
     # calcualte wilson loop operator
     wilsonob_nk = vqs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
+
+    if np.any((h == save_fields).all(axis=1)) and save_results:
+        filename = f"{eval_model}_vqs_L{shape}_h{tuple([round(hi, 3) for hi in h])}.mpack"
+        with open(f"{RESULTS_PATH}/toric2d_h/{filename}", 'wb') as file:
+            file.write(flax.serialization.to_bytes(vqs))
     
     # gather local estimators as each rank calculates them based on their own samples_per_rank
     if np.any((h == hist_fields).all(axis=1)):
@@ -233,7 +240,7 @@ for h in tqdm(field_strengths, "external_field"):
                      f" n_discard={n_discard_per_chain},"
                      f" n_chains={n_chains},"
                      f" n_samples={n_samples} \n"
-                     f" pre_train={pre_init}, stddev={stddev}")
+                     f" pre_init={pre_init}, stddev={stddev}")
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
