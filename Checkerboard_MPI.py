@@ -119,7 +119,7 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.08, 0.08
                                                            zstring_rule])
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.001
+lr_end = 0.01
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
