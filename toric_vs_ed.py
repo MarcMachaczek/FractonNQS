@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import optax
+import flax
 
 import netket as nk
 from netket.utils import HashableArray
@@ -124,6 +125,11 @@ field_strengths = (np.linspace(0, 1, 8) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.32],
                                                         [0., 0., 0.35]])))
 
+save_fields = np.array([[0.1, 0, 0.],
+                        [0.33, 0, 0.],
+                        [0.7, 0, 0.]])
+
+field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 2].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
@@ -135,7 +141,9 @@ if pre_init:
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
-    vqs = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
+    vqs = nk.vqs.ExactState(hilbert, model, seed=random_key)
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
@@ -151,7 +159,7 @@ if pre_init:
 
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
     pretrained_parameters = gs_params
-    
+
     vqs.parameters = pretrained_parameters
     print("init energy", vqs.expect(toric))
 
@@ -192,6 +200,12 @@ for h in tqdm(field_strengths, "external_field"):
     # calcualte wilson loop operator
     wilsonob_nk = vqs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
+
+    if np.any((h == save_fields).all(axis=1)) and save_results:
+        filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
+        with open(f"{RESULTS_PATH}/toric2d_h/vqs_{filename}.mpack", 'wb') as file:
+            file.write(flax.serialization.to_bytes(vqs))
+        geneqs.utils.model_surgery.params_to_txt(vqs, f"{RESULTS_PATH}/toric2d_h/params_{filename}.txt")
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(12, 12))

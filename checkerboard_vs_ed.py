@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 import optax
+import flax
 
 import netket as nk
 from netket.utils import HashableArray
@@ -41,12 +42,10 @@ correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubic
 loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
          HashableArray(geneqs.utils.indexing.get_strings_cubical3d(1, shape)),
          HashableArray(geneqs.utils.indexing.get_strings_cubical3d(2, shape)))
-loops = ()  # loop correlators don't work (yet) if L < 3 in that direction, also not very important for that system size
 # noinspection PyArgumentList
 loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape, 2)),
                    HashableArray(geneqs.utils.indexing.get_ystring_perms3d(shape, 2)),
                    HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
-loop_symmetries = ()  # for reason, see loops
 
 # %%  setting hyper-parameters
 n_iter = 2000
@@ -76,8 +75,8 @@ alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
                                      correlators=(correlators[0],),
                                      correlator_symmetries=(correlator_symmetries[0],),
-                                     loops=loops,
-                                     loop_symmetries=loop_symmetries,
+                                     loops=(),
+                                     loop_symmetries=(),
                                      alpha=alpha,
                                      kernel_init=default_kernel_init,
                                      bias_init=default_kernel_init,
@@ -121,6 +120,11 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
                                                         [0., 0., 0.44],
                                                         [0., 0., 0.46]])))
 
+save_fields = np.array([[0.1, 0, 0.],
+                        [0.43, 0, 0.],
+                        [0.7, 0, 0.]])
+
+field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, 2].argsort()]
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
@@ -185,6 +189,12 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate absolute magnetization
     abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
+
+    if np.any((h == save_fields).all(axis=1)) and save_results:
+        filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
+        with open(f"{RESULTS_PATH}/checkerboard/vqs_{filename}.mpack", 'wb') as file:
+            file.write(flax.serialization.to_bytes(vqs))
+        geneqs.utils.model_surgery.params_to_txt(vqs, f"{RESULTS_PATH}/checkerboard/params_{filename}.txt")
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(12, 12))
