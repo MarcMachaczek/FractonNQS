@@ -68,11 +68,11 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
 # %%  setting hyper-parameters
 n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(n_chains * 64 / n_ranks)
+n_chains = 2 * 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = int(n_chains * 32 / n_ranks)
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
-chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
+chunk_size = int(n_samples / 2)  # doesn't work for gradient operations, need to check why!
+n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -111,7 +111,7 @@ xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
 zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
 # noinspection PyArgumentList
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05, 0.05),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.08, 0.08, 0.09),
                                                           [single_rule,
                                                            cube_rule,
                                                            xstring_rule,
@@ -174,6 +174,7 @@ for h in tqdm(field_strengths, "external_field"):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs.chunk_size = chunk_size
 
     if pre_init:
         vqs.parameters = pretrained_parameters
