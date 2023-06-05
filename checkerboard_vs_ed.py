@@ -244,7 +244,7 @@ plot.set_ylim(1e-7, 1e-1)
 plot.set_xlabel("external field")
 plot.set_ylabel("relative error")
 plot.set_title(f"Relative error of {eval_model} for the checkerboard model vs external field in {direction.flatten()} "
-               f"direction on a 3x3 lattice")
+               f"direction on a {shape} lattice")
 
 plt.show()
 

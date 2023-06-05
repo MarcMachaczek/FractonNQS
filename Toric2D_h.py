@@ -19,6 +19,8 @@ from functools import partial
 
 save_results = True
 pre_init = False
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+# if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(421)  # this can be used to make results deterministic, but so far is not used
 
@@ -119,6 +121,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define fields for which to trian the NQS and get observables
 direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
+direction_index = 0  # 0 for x, 1 for y, 2 for z
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
                                                         [0.32, 0, 0],
@@ -133,8 +136,9 @@ hist_fields = np.array([[0.3, 0, 0],
 save_fields = hist_fields
 # make sure hist fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
-field_strengths = field_strengths[field_strengths[:, 0].argsort()]
-
+field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
+if swipe == "right_left":
+    field_strengths = field_strengths[::-1]
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
 # %%
@@ -157,11 +161,12 @@ if pre_init:
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
-    pretrained_parameters = gs_params
+    pre_init_parameters = gs_params
 
-    vqs.parameters = pretrained_parameters
+    vqs.parameters = pre_init_parameters
     print("init energy", vqs.expect(toric))
 
+last_trained_params = None
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
@@ -169,10 +174,17 @@ for h in tqdm(field_strengths, "external_field"):
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    if pre_init:
-        vqs.parameters = pretrained_parameters
+    if swipe != "independent":
+        if last_trained_params is not None:
+            vqs.parameters = last_trained_params
+        elif pre_init:
+            vqs.parameters = pre_init_parameters
+
+    if pre_init and swipe == "independent":
+        vqs.parameters = pre_init_parameters
 
     vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
+    last_trained_params = vqs.parameters
 
     # calculate observables, therefore set some params of vqs
     vqs.chunk_size = chunk_size
@@ -258,15 +270,15 @@ c = "red"
 fields, mags = observables.obs_to_array(["mag", "mag_var"])
 
 for field, mag in zip(fields, mags):
-    plot.errorbar(field[0], np.abs(mag[0]), yerr=mag[1], marker="o", markersize=2, color=c)
+    plot.errorbar(field[direction_index], np.abs(mag[0]), yerr=mag[1], marker="o", markersize=2, color=c)
 
-plot.plot(fields[:, 0], np.abs(mags[:, 0]), marker="o", markersize=2, color=c)
+plot.plot(fields[:, direction_index], np.abs(mags[:, 0]), marker="o", markersize=2, color=c)
 
 plot.set_xlabel("external magnetic field")
 plot.set_ylabel("magnetization")
 plot.set_title(f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
-plot.set_xlim(0, field_strengths[-1][2])
+plot.set_xlim(0, field_strengths[-1][direction_index])
 
 if save_results:
     fig.savefig(f"{RESULTS_PATH}/toric2d_h/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
