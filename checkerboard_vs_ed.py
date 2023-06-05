@@ -16,36 +16,42 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
+# %% training configuration
 save_results = True
+save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+# if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(12344567)  # this can be used to make results deterministic, but so far is not used
 
-# %%
+# define fields for which to trian the NQS and get observables
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction = np.array([0., 0., 0.7]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 8) * direction).T
+
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
+                                                        [0., 0., 0.44],
+                                                        [0., 0., 0.46]])))
+
+save_fields = np.array([[0.1, 0, 0.],
+                        [0.43, 0, 0.],
+                        [0.7, 0, 0.]])
+
+# %% operators on hilbert space
 shape = jnp.array([4, 2, 2])
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.product(shape).item())
 
 # define some observables
-magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsXMagnetization(hilbert)
-
-perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
-perms = nk.utils.HashableArray(perms.astype(int))
-
-# noinspection PyArgumentList
-correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, 2)),
-               HashableArray(geneqs.utils.indexing.get_bonds_cubical3d(shape)))
-# noinspection PyArgumentList
-correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
-                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
-# noinspection PyArgumentList
-loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
-         HashableArray(geneqs.utils.indexing.get_strings_cubical3d(1, shape)),
-         HashableArray(geneqs.utils.indexing.get_strings_cubical3d(2, shape)))
-# noinspection PyArgumentList
-loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape, 2)),
-                   HashableArray(geneqs.utils.indexing.get_ystring_perms3d(shape, 2)),
-                   HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
+if direction_index == 0:
+    abs_magnetization = geneqs.operators.observables.AbsXMagnetization(hilbert)
+    magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmax(hilbert, i) for i in range(hilbert.size)])
+elif direction_index == 1:
+    abs_magnetization = geneqs.operators.observables.AbsYMagnetization(hilbert)
+    magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmay(hilbert, i) for i in range(hilbert.size)])
+elif direction_index == 2:
+    abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
+    magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters
 n_iter = 2000
@@ -67,9 +73,34 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  diag_shift=diag_shift_schedule,
                                  holomorphic=True)
 
+# learning rate scheduling
+lr_init = 0.01
+lr_end = 0.01
+transition_begin = int(n_iter / 3)
+transition_steps = int(n_iter / 3)
+lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
+
 # define correlation enhanced RBM
 stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
+
+perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
+perms = nk.utils.HashableArray(perms.astype(int))
+
+# noinspection PyArgumentList
+correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, 2)),
+               HashableArray(geneqs.utils.indexing.get_bonds_cubical3d(shape)))
+# noinspection PyArgumentList
+correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
+                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
+# noinspection PyArgumentList
+loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
+         HashableArray(geneqs.utils.indexing.get_strings_cubical3d(1, shape)),
+         HashableArray(geneqs.utils.indexing.get_strings_cubical3d(2, shape)))
+# noinspection PyArgumentList
+loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape, 2)),
+                   HashableArray(geneqs.utils.indexing.get_ystring_perms3d(shape, 2)),
+                   HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
 
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
@@ -105,32 +136,15 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05
                                                            xstring_rule,
                                                            ystring_rule,
                                                            zstring_rule])
-# learning rate scheduling
-lr_init = 0.01
-lr_end = 0.01
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
-lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
-
-# define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.7]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 8) * direction).T
-
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
-                                                        [0., 0., 0.44],
-                                                        [0., 0., 0.46]])))
-
-save_fields = np.array([[0.1, 0, 0.],
-                        [0.43, 0, 0.],
-                        [0.7, 0, 0.]])
 
 field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
-field_strengths = field_strengths[field_strengths[:, 2].argsort()]
-
+field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
+if swipe == "right_left":
+    field_strengths = field_strengths[::-1]
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 exact_energies = []
 
-# %%
+# %% training
 if pre_init:
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
@@ -151,11 +165,12 @@ if pre_init:
     exact_weights = exact_weights.at[(jnp.arange(4) + 4).reshape(-1, 1), cube_idx].set(1j * jnp.pi / 4)
 
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
-    pretrained_parameters = gs_params
+    pre_init_parameters = gs_params
 
-    vqs.parameters = pretrained_parameters
+    vqs.parameters = pre_init_parameters
     print("init energy", vqs.expect(checkerboard))
 
+last_trained_params = None
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
@@ -166,11 +181,18 @@ for h in tqdm(field_strengths, "external_field"):
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
     vqs = nk.vqs.ExactState(hilbert, model, seed=random_key)
 
-    if pre_init:
-        vqs.parameters = pretrained_parameters
+    if swipe != "independent":
+        if last_trained_params is not None:
+            vqs.parameters = last_trained_params
+        elif pre_init:
+            vqs.parameters = pre_init_parameters
+
+    if pre_init and swipe == "independent":
+        vqs.parameters = pre_init_parameters
 
     # use driver gs if vqs is exact_state aka full_summation_state
     vqs, training_data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    last_trained_params = vqs.parameters
 
     # calculate observables, therefore set some params of vqs
     # vqs.n_samples = n_expect
@@ -192,9 +214,9 @@ for h in tqdm(field_strengths, "external_field"):
 
     if np.any((h == save_fields).all(axis=1)) and save_results:
         filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
-        with open(f"{RESULTS_PATH}/checkerboard/vqs_{filename}.mpack", 'wb') as file:
+        with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
             file.write(flax.serialization.to_bytes(vqs))
-        geneqs.utils.model_surgery.params_to_txt(vqs, f"{RESULTS_PATH}/checkerboard/params_{filename}.txt")
+        geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
 
     # plot and save training data, save observables
     fig = plt.figure(dpi=300, figsize=(12, 12))
@@ -220,33 +242,32 @@ for h in tqdm(field_strengths, "external_field"):
     plot.legend()
     if save_results:
         fig.savefig(
-            f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+            f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
-# %%
+# %% save results
 exact_energies = np.array(exact_energies).reshape(-1, 1)
 if save_results:
     save_array = np.concatenate((observables.obs_to_array(separate_keys=False), exact_energies), axis=1)
-    np.savetxt(f"{RESULTS_PATH}/checkerboard/L{shape}_{eval_model}_observables.txt", save_array,
+    np.savetxt(f"{save_path}/L{shape}_{eval_model}_observables.txt", save_array,
                header=", ".join(observables.key_names + observables.obs_names + ["exact_energy"]))
 
-# %%
-# create and save relative error plot
+# %% create and save relative error plot
 fig = plt.figure(dpi=300, figsize=(10, 10))
 plot = fig.add_subplot(111)
 
 fields, energies = observables.obs_to_array("energy", separate_keys=True)
 rel_errors = np.abs(exact_energies - energies) / np.abs(exact_energies)
 
-plot.plot(fields[:, 2], rel_errors, marker="o", markersize=2)
+plot.plot(fields[:, direction_index], rel_errors, marker="o", markersize=2)
 
 plot.set_yscale("log")
 plot.set_ylim(1e-7, 1e-1)
 plot.set_xlabel("external field")
 plot.set_ylabel("relative error")
 plot.set_title(f"Relative error of {eval_model} for the checkerboard model vs external field in {direction.flatten()} "
-               f"direction on a 3x3 lattice")
+               f"direction on a {shape} lattice")
 
 plt.show()
 
 if save_results:
-    fig.savefig(f"{RESULTS_PATH}/checkerboard/Relative_Error_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
+    fig.savefig(f"{save_path}/Relative_Error_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
