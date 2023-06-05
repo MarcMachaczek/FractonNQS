@@ -32,25 +32,85 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
+# %% training configuration
 save_results = True
+save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+# if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
-random_key = jax.random.PRNGKey(4214334)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(421456435)  # can be used to make results deterministic, so far only used for weightinit
 
-# %%
+# define fields for which to trian the NQS and get observables
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 9) * direction).T
+field_strengths = np.vstack((field_strengths, np.array([[0.35, 0, 0.35],
+                                                        [0.37, 0, 0.37],
+                                                        [0.39, 0, 0.39],
+                                                        [0.41, 0, 0.41],
+                                                        [0.43, 0, 0.43]])))
+# for which fields indices histograms are created
+hist_fields = np.array([[0.35, 0, 0.35],
+                        [0.39, 0, 0.39],
+                        [0.4, 0, 0.4],
+                        [0.42, 0, 0.42],
+                        [0.5, 0, 0.5]])
+save_fields = hist_fields  # field values for which vqs is serialized
+
+# %% operators on hilbert space
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 
 # define some observables
-magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
-abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
+if direction_index == 0:
+    abs_magnetization = geneqs.operators.observables.AbsXMagnetization(hilbert)
+    magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmax(hilbert, i) for i in range(hilbert.size)])
+elif direction_index == 1:
+    abs_magnetization = geneqs.operators.observables.AbsYMagnetization(hilbert)
+    magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmay(hilbert, i) for i in range(hilbert.size)])
+elif direction_index == 2:
+    abs_magnetization = geneqs.operators.observables.AbsZMagnetization(hilbert)
+    magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 wilsonob = geneqs.operators.observables.get_netket_wilsonob(hilbert, shape)
 
 positions = jnp.array([[i, j] for i in range(shape[0]) for j in range(shape[1])])
 A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert, p, shape) for p in positions]) - \
       1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
+
+# %%  setting hyper-parameters and model
+n_iter = 1000
+min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = int(n_chains * 64 / n_ranks)
+n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
+chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
+n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
+n_bins = 20  # number of bins for calculating histograms
+
+diag_shift_init = 1e-4
+diag_shift_end = 1e-5
+diag_shift_begin = int(n_iter / 3)
+diag_shift_steps = int(n_iter / 3)
+diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
+
+preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
+                                 solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6),
+                                 diag_shift=diag_shift_schedule,
+                                 holomorphic=True)
+
+# learning rate scheduling
+lr_init = 0.01
+lr_end = 0.001
+transition_begin = int(n_iter / 3)
+transition_steps = int(n_iter / 3)
+lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
+
+# define correlation enhanced RBM
+stddev = 0.008
+default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
 perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
@@ -74,31 +134,6 @@ loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  
 loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-# %%  setting hyper-parameters
-n_iter = 1000
-min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(n_chains * 64 / n_ranks)
-n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
-chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
-n_bins = 20  # number of bins for calculating histograms
-
-diag_shift_init = 1e-4
-diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
-diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
-
-preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
-                                 solver=partial(jax.scipy.sparse.linalg.cg, tol=1e-6),
-                                 diag_shift=diag_shift_schedule,
-                                 holomorphic=True)
-
-# define correlation enhanced RBM
-stddev = 0.008
-default_kernel_init = jax.nn.initializers.normal(stddev)
-
 alpha = 1
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
@@ -121,40 +156,14 @@ ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1),
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
-# learning rate scheduling
-lr_init = 0.01
-lr_end = 0.001
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
-lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
-
-# define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.35, 0, 0.35],
-                                                        [0.37, 0, 0.37],
-                                                        [0.39, 0, 0.39],
-                                                        [0.41, 0, 0.41],
-                                                        [0.43, 0, 0.43]])))
-# for which fields indices histograms are created
-hist_fields = np.array([[0.35, 0, 0.35],
-                        [0.39, 0, 0.39],
-                        [0.4, 0, 0.4],
-                        [0.42, 0, 0.42],
-                        [0.5, 0, 0.5]])
-save_fields = hist_fields
-# make sure hist fields are contained in field_strengths and sort final field array
+# make sure hist and save fields are contained in field_strengths and sort final field array
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
-field_strengths = field_strengths[field_strengths[:, 0].argsort()]
-
-# TODO: remove this after testing
-hist_fields = np.array([[0.4, 0, 0.4],
-                       [0.42, 0, 0.42]])
-field_strengths = hist_fields
-
+field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
+if swipe == "right_left":
+    field_strengths = field_strengths[::-1]
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names=("hx", "hy", "hz"))
 
-# %%
+# %% training
 if pre_init:
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
@@ -174,11 +183,12 @@ if pre_init:
     exact_weights = exact_weights.at[1, star_idxs].set(1j * jnp.pi / 2)
 
     gs_params = gs_params.copy({"symm_kernel": exact_weights})
-    pretrained_parameters = gs_params
+    pre_init_parameters = gs_params
 
-    vqs.parameters = pretrained_parameters
+    vqs.parameters = pre_init_parameters
     print("init energy", vqs.expect(toric))
 
+last_trained_params = None
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
@@ -186,10 +196,17 @@ for h in tqdm(field_strengths, "external_field"):
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
 
-    if pre_init:
-        vqs.parameters = pretrained_parameters
+    if swipe != "independent":
+        if last_trained_params is not None:
+            vqs.parameters = last_trained_params
+        elif pre_init:
+            vqs.parameters = pre_init_parameters
+
+    if pre_init and swipe == "independent":
+        vqs.parameters = pre_init_parameters
 
     vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
+    last_trained_params = vqs.parameters
 
     # calculate observables, therefore set some params of vqs
     vqs.chunk_size = chunk_size
@@ -208,11 +225,12 @@ for h in tqdm(field_strengths, "external_field"):
     wilsonob_nk = vqs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
-    if np.any((h == save_fields).all(axis=1)) and save_results:
-        filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
-        with open(f"{RESULTS_PATH}/toric2d_h/vqs_{filename}.mpack", 'wb') as file:
-            file.write(flax.serialization.to_bytes(vqs))
-        geneqs.utils.model_surgery.params_to_txt(vqs, f"{RESULTS_PATH}/toric2d_h/params_{filename}.txt")
+    if rank == 0:
+        if np.any((h == save_fields).all(axis=1)) and save_results:
+            filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
+            with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
+                file.write(flax.serialization.to_bytes(vqs))
+            geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
 
     # gather local estimators as each rank calculates them based on their own samples_per_rank
     if np.any((h == hist_fields).all(axis=1)):
@@ -252,7 +270,7 @@ for h in tqdm(field_strengths, "external_field"):
         plot.legend()
         if save_results:
             fig.savefig(
-                f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
+                f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
         # create histograms
         if np.any((h == hist_fields).all(axis=1)):
@@ -266,8 +284,8 @@ for h in tqdm(field_strengths, "external_field"):
         # save observables to file
         if save_results:
             save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
-            with open(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt", "ab") as f:
-                if os.path.getsize(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt") == 0:
+            with open(f"{save_path}/L{shape}_{eval_model}_observables.txt", "ab") as f:
+                if os.path.getsize(f"{save_path}/L{shape}_{eval_model}_observables.txt") == 0:
                     np.savetxt(f, save_array, header=", ".join(observables.key_names + observables.obs_names))
                 else:
                     np.savetxt(f, save_array)
@@ -275,29 +293,28 @@ for h in tqdm(field_strengths, "external_field"):
 # %% save histograms
 if rank == 0:
     for hist_name, _ in observables.histograms.items():
-        np.save(f"{RESULTS_PATH}/toric2d_h/hists_{hist_name}_L{shape}_{eval_model}.npy",
+        np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
                 observables.hist_to_array(hist_name))
 
-# %%
-# create and save magnetization plot
+# %% create and save magnetization plot
 if rank == 0:
-    obs_to_array = np.loadtxt(f"{RESULTS_PATH}/toric2d_h/L{shape}_{eval_model}_observables.txt")
+    obs_to_array = np.loadtxt(f"{save_path}/L{shape}_{eval_model}_observables.txt")
 
     fig = plt.figure(dpi=300, figsize=(10, 10))
     plot = fig.add_subplot(111)
 
     c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[2], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[direction_index], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, 2], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external magnetic field")
     plot.set_ylabel("magnetization")
     plot.set_title(
         f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
 
-    plot.set_xlim(0, field_strengths[-1][2])
+    plot.set_xlim(0, field_strengths[-1][direction_index])
 
     if save_results:
-        fig.savefig(f"{RESULTS_PATH}/toric2d_h/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
+        fig.savefig(f"{save_path}/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
