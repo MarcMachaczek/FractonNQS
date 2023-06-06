@@ -8,7 +8,7 @@ from global_variables import RESULTS_PATH
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
-L = 8
+L = 3
 hilbert_size = 2 * L ** 2
 eval_model = "ToricCRBM"
 save_dir = f"{RESULTS_PATH}/toric2d_h"

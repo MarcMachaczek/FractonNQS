@@ -194,7 +194,11 @@ for h in tqdm(field_strengths, "external_field"):
 
     if swipe != "independent":
         if last_trained_params is not None:
-            vqs.parameters = last_trained_params
+            random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
+            vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
+                                                    last_trained_params, real_noise, complex_noise)
         elif pre_init:
             vqs.parameters = pre_init_parameters
 

@@ -17,10 +17,10 @@ from tqdm import tqdm
 from functools import partial
 
 # %% training configuration
-save_results = False
+save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
@@ -28,14 +28,14 @@ random_key = jax.random.PRNGKey(144567)  # this can be used to make results dete
 # define fields for which to trian the NQS and get observables
 direction_index = 0  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.7]).reshape(-1, 1)
+direction = np.array([0.7, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 8) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.32],
-                                                        [0., 0., 0.35]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.32, 0., 0.],
+                                                        [0.35, 0., 0.]])))
 
 save_fields = np.array([[0.1, 0, 0.],
-                        [0.33, 0, 0.],
+                        [0.32, 0, 0.],
                         [0.7, 0, 0.]])
 
 # %% operators on hilbert space
@@ -116,9 +116,9 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
 alpha = 1
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
-                                   correlator_symmetries=correlators,
-                                   loops=(),
-                                   loop_symmetries=(),
+                                   correlator_symmetries=correlator_symmetries,
+                                   loops=loops,
+                                   loop_symmetries=loop_symmetries,
                                    alpha=alpha,
                                    kernel_init=default_kernel_init,
                                    bias_init=default_kernel_init,
@@ -131,8 +131,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = RBMSymm
-eval_model = "RBMSymm"
+model = cRBM
+eval_model = "cRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -161,8 +161,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
@@ -191,7 +191,11 @@ for h in tqdm(field_strengths, "external_field"):
 
     if swipe != "independent":
         if last_trained_params is not None:
-            vqs.parameters = last_trained_params
+            random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
+            vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
+                                                    last_trained_params, real_noise, complex_noise)
         elif pre_init:
             vqs.parameters = pre_init_parameters
 

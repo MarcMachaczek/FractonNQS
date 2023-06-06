@@ -160,8 +160,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
@@ -186,7 +186,11 @@ for h in tqdm(field_strengths, "external_field"):
 
     if swipe != "independent":
         if last_trained_params is not None:
-            vqs.parameters = last_trained_params
+            random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
+            vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
+                                                    last_trained_params, real_noise, complex_noise)
         elif pre_init:
             vqs.parameters = pre_init_parameters
 
@@ -223,16 +227,16 @@ for h in tqdm(field_strengths, "external_field"):
         vqs.n_samples = n_samples
         random_key, init_state_key = jax.random.split(random_key)
         # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
-        e_locs = np.asarray(get_locests_mixed(init_state_key, vqs, toric), dtype=np.float64)
+        e_locs = get_locests_mixed(init_state_key, vqs, toric)
         observables.add_hist("energy", h, np.histogram(e_locs / hilbert.size, n_bins, density=False))
 
-        mag_locs = np.asarray(get_locests_mixed(init_state_key, vqs, magnetization), dtype=np.float64)
+        mag_locs = get_locests_mixed(init_state_key, vqs, magnetization)
         observables.add_hist("mag", h, np.histogram(mag_locs, n_bins, density=False))
 
-        abs_mag_locs = np.asarray(get_locests_mixed(init_state_key, vqs, abs_magnetization), dtype=np.float64)
+        abs_mag_locs = get_locests_mixed(init_state_key, vqs, abs_magnetization)
         observables.add_hist("abs_mag", h, np.histogram(abs_mag_locs, n_bins, density=False))
 
-        A_B_locs = np.asarray(get_locests_mixed(init_state_key, vqs, A_B), dtype=np.float64)
+        A_B_locs = get_locests_mixed(init_state_key, vqs, A_B)
         observables.add_hist("A_B", h, np.histogram(A_B_locs, n_bins, density=False))
 
     # plot and save training data, save observables
