@@ -174,7 +174,7 @@ def locests_from_startstate(vqs: nk.vqs.MCState,
 def get_locests_mixed(rng_key,
                       vqs: nk.vqs.MCState,
                       operator: nk.operator.AbstractOperator,
-                      n_discard: int = 256) -> jax.Array:
+                      n_discard: int = 256) -> np.ndarray:
     """
     A convienience function that calculates local estimators from VQS for operator from three different initial
     configurations:
@@ -198,8 +198,8 @@ def get_locests_mixed(rng_key,
     cold_batch = -jnp.ones(shape=(n_chains, hilbert_size), dtype=jnp.int8)
     random_batch = 2 * jax.random.randint(rng_key, (n_chains, hilbert_size), 0, 1, dtype=jnp.int8) - 1
 
-    converged_locests = vqs.local_estimators(operator)
-    cold_locests = locests_from_startstate(vqs, operator, cold_batch, n_discard)
-    random_locests = locests_from_startstate(vqs, operator, random_batch, n_discard)
-    locests = jnp.concatenate((converged_locests, cold_locests, random_locests), axis=0).flatten()
+    converged_locests = np.asarray(vqs.local_estimators(operator), dtype=np.float64)
+    cold_locests = np.asarray(locests_from_startstate(vqs, operator, cold_batch, n_discard), dtype=np.float64)
+    random_locests = np.asarray(locests_from_startstate(vqs, operator, random_batch, n_discard), dtype=np.float64)
+    locests = np.concatenate((converged_locests, cold_locests, random_locests), axis=0).flatten()
     return locests.real

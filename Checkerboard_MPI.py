@@ -33,7 +33,7 @@ from tqdm import tqdm
 from functools import partial
 
 # %% training configuration
-save_results = False
+save_results = True
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
@@ -51,7 +51,7 @@ field_strengths = np.vstack((field_strengths, np.array([[0.42, 0, 0],
                                                         [0.45, 0, 0],
                                                         [0.46, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0, 0.],
+hist_fields = np.array([[0., 0, 0.],
                         [0.43, 0, 0.],
                         [0.44, 0, 0.],
                         [0.6, 0, 0.]])
@@ -75,7 +75,7 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 1000
+n_iter = 2
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 2 * 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(n_chains * 32 / n_ranks)
@@ -225,14 +225,12 @@ for h in tqdm(field_strengths, "external_field"):
         geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
 
     if np.any((h == hist_fields).all(axis=1)):
-        vqs.n_samples = n_samples
+        # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
+        vqs.n_samples = n_samples / 2
         random_key, init_state_key = jax.random.split(random_key)
-        energy_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, checkerboard), dtype=np.float64), root=0)
-        mag_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, magnetization), dtype=np.float64), root=0)
-        abs_mag_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, abs_magnetization), dtype=np.float64), root=0)
+        energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
+        mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
+        abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
 
     # plot and save training data, save observables
     if rank == 0:
@@ -263,8 +261,6 @@ for h in tqdm(field_strengths, "external_field"):
 
         # create histograms
         if np.any((h == hist_fields).all(axis=1)):
-            vqs.n_samples = n_samples
-            # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
             observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
             observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
             observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))

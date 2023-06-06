@@ -236,14 +236,10 @@ for h in tqdm(field_strengths, "external_field"):
     if np.any((h == hist_fields).all(axis=1)):
         vqs.n_samples = n_samples
         random_key, init_state_key = jax.random.split(random_key)
-        energy_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, toric), dtype=np.float64), root=0)
-        mag_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, magnetization), dtype=np.float64), root=0)
-        abs_mag_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, abs_magnetization), dtype=np.float64), root=0)
-        A_B_locests = comm.gather(
-            np.asarray(get_locests_mixed(init_state_key, vqs, A_B), dtype=np.float64), root=0)
+        energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, toric), root=0)
+        mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
+        abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
+        A_B_locests = comm.gather(get_locests_mixed(init_state_key, vqs, A_B), root=0)
     
     # plot and save training data, save observables
     if rank == 0:
@@ -274,8 +270,6 @@ for h in tqdm(field_strengths, "external_field"):
 
         # create histograms
         if np.any((h == hist_fields).all(axis=1)):
-            vqs.n_samples = n_samples
-            # calculate histograms, CAREFUL: if run with mpi, local_estimators produces rank-dependent output!
             observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
             observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
             observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
