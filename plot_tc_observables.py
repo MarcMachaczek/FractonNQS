@@ -10,7 +10,7 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
 L = 3
 hilbert_size = 2 * L ** 2
-eval_model = "ToricCRBM"
+eval_model = "ToricRBM"
 save_dir = f"{RESULTS_PATH}/toric2d_h"
 obs_list = []
 # append multiple data to compare them each within one plot
