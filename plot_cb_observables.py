@@ -9,6 +9,7 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
+field_direction = 0  # 0=x, 1=y, 2=z
 L = 4
 hilbert_size = L ** 3
 eval_model = "CheckerCRBM"
@@ -18,8 +19,11 @@ obs_list = []
 obs_list.append(
     np.loadtxt(f"{save_dir}/L[{L} {L} {L}]_{eval_model}_observables.txt"))
 
+# order by increasing field strength
+for i, obs in enumerate(obs_list):
+    obs_list[i] = obs[obs[:, field_direction].argsort()]
+    
 direction = obs_list[0][-1, :3]
-field_direction = 0  # 0=x, 1=y, 2=z
 
 # %% magnetizations comparison
 # obs columns: "hx, hy, hz, energy, energy_var, mag, mag_var, abs_mag, abs_mag_var, (exact_energy)"
