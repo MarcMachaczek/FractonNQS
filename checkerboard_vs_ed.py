@@ -19,7 +19,7 @@ from functools import partial
 # %% training configuration
 save_results = True
 save_path = f"{RESULTS_PATH}/checkerboard"
-pre_init = False
+pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
@@ -188,8 +188,6 @@ for h in tqdm(field_strengths, "external_field"):
             complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
                                                     last_trained_params, real_noise, complex_noise)
-        elif pre_init:
-            vqs.parameters = pre_init_parameters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
@@ -235,7 +233,7 @@ for h in tqdm(field_strengths, "external_field"):
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_init={pre_init}, stddev={stddev}")
+                 f" pre_init={pre_init}, stddev={stddev}, swipe={swipe}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")

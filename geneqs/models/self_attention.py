@@ -5,7 +5,7 @@ import flax
 from flax.linen.dtypes import promote_dtype
 
 import functools
-
+from typing import Any
 
 # %%
 # adapted from flax library
@@ -14,29 +14,29 @@ def dotproduct_attention(query: jax.Array,
                          value: jax.Array,
                          temperature: float = 1,
                          precision: Any = None) -> jax.Array:
-  """Computes dot-product attention given query, key, and value.
+    """Computes dot-product attention given query, key, and value.
 
-  This is the core function for applying attention based on
-  https://arxiv.org/abs/1706.03762. It calculates the attention weights given
-  query and key and combines the values using the attention weights.
+    This is the core function for applying attention based on
+    https://arxiv.org/abs/1706.03762. It calculates the attention weights given
+    query and key and combines the values using the attention weights.
 
-  Note: query, key, value needn't have any batch dimensions.
+    Note: query, key, value needn't have any batch dimensions.
 
-  Args:
+    Args:
     query: queries for calculating attention with shape of
       `[batch..., q_length, num_heads, qk_depth_per_head]`.
     key: keys for calculating attention with shape of
       `[batch..., kv_length, num_heads, qk_depth_per_head]`.
     value: values to be used in attention with shape of
       `[batch..., kv_length, num_heads, v_depth_per_head]`.
-    temperature: sharpens (T<1) or broadens (T>1) the probabilities 
+    temperature: sharpens (T<1) or broadens (T>1) the probabilities
         calculated from the softmax function.
     precision: numerical precision of the computation see `jax.lax.Precision`
       for details.
 
-  Returns:
+    Returns:
     Output of shape `[batch..., q_length, num_heads, v_depth_per_head]`.
-  """
+    """
     query, key, value = promote_dtype(query, key, value)
     dtype = query.dtype
     

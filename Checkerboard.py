@@ -20,7 +20,7 @@ from functools import partial
 # %% training configuration
 save_results = False
 save_path = f"{RESULTS_PATH}/checkerboard"
-pre_init = False
+pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
@@ -244,7 +244,7 @@ for h in tqdm(field_strengths, "external_field"):
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_init={pre_init}, stddev={stddev}")
+                 f" pre_init={pre_init}, stddev={stddev}, swipe={swipe}")
 
     plot.set_xlabel("iterations")
     plot.set_ylabel("energy")

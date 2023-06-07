@@ -35,7 +35,7 @@ from functools import partial
 # %% training configuration
 save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h"
-pre_init = False
+pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
@@ -172,8 +172,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 10)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 10)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
@@ -244,7 +244,7 @@ for h in tqdm(field_strengths, "external_field"):
         mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
         abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
         A_B_locests = comm.gather(get_locests_mixed(init_state_key, vqs, A_B), root=0)
-    
+
     # plot and save training data, save observables
     if rank == 0:
         fig = plt.figure(dpi=300, figsize=(12, 12))
@@ -259,7 +259,7 @@ for h in tqdm(field_strengths, "external_field"):
                      f" n_discard={n_discard_per_chain},"
                      f" n_chains={n_chains},"
                      f" n_samples={n_samples} \n"
-                     f" pre_init={pre_init}, stddev={stddev}")
+                     f" pre_init={pre_init}, stddev={stddev}, swipe={swipe}")
 
         plot.set_xlabel("iterations")
         plot.set_ylabel("energy")
