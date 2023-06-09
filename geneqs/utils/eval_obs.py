@@ -12,13 +12,13 @@ from dataclasses import dataclass, field
 # %%
 @dataclass
 class ObservableCollector:
-    key_names: Union[list[str, ...], tuple[str, ...]]
+    key_names: Union[list[str, ...], tuple[str, ...], str]
     observables: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
     histograms: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
     arrays: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
 
     def __post_init__(self):
-        self.key_names = list(self.key_names)
+        self.key_names = [self.key_names] if type(self.key_names) == str else list(self.key_names)
         self.observables = OrderedDict(self.observables)
         self.histograms = OrderedDict(self.histograms)
         self.arrays = OrderedDict(self.arrays)
