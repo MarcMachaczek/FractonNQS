@@ -35,7 +35,7 @@ E0_exact = nk.exact.lanczos_ed(toric, compute_eigenvectors=False)[0]
 E0_exact = - L**2 * 2
 
 # %%  setting hyper-parameters
-n_iter = 100
+n_iter = 200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 32
@@ -120,6 +120,9 @@ RBM = nk.models.RBM(alpha=alpha,
                     visible_bias_init=default_kernel_init,
                     param_dtype=complex)
 
+features = (4, 4)  # first number sets the invariant features
+SymmNN = geneqs.models.neural_networks.SymmetricNN(link_perms, features)
+
 models = {"ToricCRBM": cRBM,
           "RBMSymm": RBMSymm,
           "RBM": RBM}
@@ -165,7 +168,8 @@ fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},
              f" n_discard={n_discard_per_chain},"
              f" n_chains={n_chains},"
              f" n_samples={n_samples} \n"
-             f"using SR with diag_shift={diag_shift_init} down to {diag_shift_end}")
+             f" using SR with diag_shift={diag_shift_init} down to {diag_shift_end}"
+             f" and lr from {lr_init} to {lr_end}")
 
 plot.set_xlabel("iterations")
 plot.set_ylabel("energy")
