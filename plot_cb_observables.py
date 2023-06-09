@@ -9,15 +9,16 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
-field_direction = 0  # 0=x, 1=y, 2=z
-L = 4
-hilbert_size = L ** 3
+field_direction = 2  # 0=x, 1=y, 2=z
+L = 3
+shape = [4, 2, 2]
+hilbert_size = np.prod(shape)
 eval_model = "CheckerCRBM"
 save_dir = f"{RESULTS_PATH}/checkerboard"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    np.loadtxt(f"{save_dir}/L[{L} {L} {L}]_{eval_model}_observables.txt"))
+    np.loadtxt(f"{save_dir}/L[{shape[0]} {shape[1]} {shape[2]}]_{eval_model}_observables.txt"))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
@@ -118,9 +119,9 @@ fig.savefig(f"{save_dir}/obs_comparison_L[{L} {L} {L}]_cRBM.pdf")
 
 # %%%%%%%%%%%%%%% HISTOGRAMS %%%%%%%%%%%%%%% #
 # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
-energy_histograms = np.load(f"{save_dir}/hists_energy_L[{L} {L} {L}]_{eval_model}.npy", allow_pickle=True)
-mag_histograms = np.load(f"{save_dir}/hists_mag_L[{L} {L} {L}]_{eval_model}.npy", allow_pickle=True)
-abs_mag_histograms = np.load(f"{save_dir}/hists_abs_mag_L[{L} {L} {L}]_{eval_model}.npy", allow_pickle=True)
+energy_histograms = np.load(f"{save_dir}/hists_energy_L[{shape[0]} {shape[1]} {shape[2]}]_{eval_model}.npy", allow_pickle=True)
+mag_histograms = np.load(f"{save_dir}/hists_mag_L[{shape[0]} {shape[1]} {shape[2]}]_{eval_model}.npy", allow_pickle=True)
+abs_mag_histograms = np.load(f"{save_dir}/hists_abs_mag_L[{shape[0]} {shape[1]} {shape[2]}]_{eval_model}.npy", allow_pickle=True)
 
 fig = plt.figure(dpi=300, figsize=(13, 12))
 fig.suptitle("Probability (histogram) plots for different observables and external field for the Checkerboard model")

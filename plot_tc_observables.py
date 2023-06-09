@@ -9,10 +9,10 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
-field_direction = 2
+field_direction = 0
 L = 3
 hilbert_size = 2 * L ** 2
-eval_model = "ToricRBM"
+eval_model = "ToricCRBM"
 save_dir = f"{RESULTS_PATH}/toric2d_h"
 obs_list = []
 # append multiple data to compare them each within one plot

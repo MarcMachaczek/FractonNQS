@@ -81,7 +81,7 @@ n_chains = 2 * 256 * n_ranks  # total number of MCMC chains, when runnning on GP
 n_samples = int(n_chains * 32 / n_ranks)
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
 chunk_size = int(n_samples / 2)  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 32  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = chunk_size * 64  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4

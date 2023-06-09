@@ -34,9 +34,9 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
                                                         [0., 0., 0.44],
                                                         [0., 0., 0.46]])))
 
-save_fields = np.array([[0.1, 0, 0.],
-                        [0.43, 0, 0.],
-                        [0.7, 0, 0.]])
+save_fields = np.array([[0., 0, 0.1],
+                        [0., 0, 0.43],
+                        [0., 0, 0.7]])
 
 # %% operators on hilbert space
 shape = jnp.array([4, 2, 2])
@@ -54,7 +54,7 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters
-n_iter = 2000
+n_iter = 1500
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 40
@@ -104,10 +104,10 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
 
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=(correlators[0],),
-                                     correlator_symmetries=(correlator_symmetries[0],),
-                                     loops=(),
-                                     loop_symmetries=(),
+                                     correlators=(correlators),
+                                     correlator_symmetries=(correlator_symmetries),
+                                     loops=loops,
+                                     loop_symmetries=loop_symmetries,
                                      alpha=alpha,
                                      kernel_init=default_kernel_init,
                                      bias_init=default_kernel_init,
@@ -121,7 +121,7 @@ RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             param_dtype=complex)
 
 model = cRBM
-eval_model = "cRBM"
+eval_model = "CheckerCRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -151,7 +151,8 @@ if pre_init:
     sampler_exact = nk.sampler.ExactSampler(hilbert)
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
-    vqs = nk.vqs.ExactState(hilbert, model, seed=random_key)
+    vqs_full = nk.vqs.ExactState(hilbert, model, seed=random_key)
+    vqs = vqs_full
 
     # exact ground state parameters for the checkerboard model, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
@@ -179,7 +180,8 @@ for h in tqdm(field_strengths, "external_field"):
     sampler_exact = nk.sampler.ExactSampler(hilbert)
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
-    vqs = nk.vqs.ExactState(hilbert, model, seed=random_key)
+    vqs_full = nk.vqs.ExactState(hilbert, model, seed=random_key)
+    vqs = vqs_full
 
     if swipe != "independent":
         if last_trained_params is not None:
