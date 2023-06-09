@@ -138,9 +138,7 @@ def driver_gs(v_state: nk.vqs.VariationalState,
     cb = DriverCallback(min_delta=0.1, min_steps=min_steps, patience=20, monitor="mean")
     gs_driver.run(n_iter=n_iter, out=log, callback=cb)
 
-    data = log.data
-
-    return v_state, data
+    return v_state, log.data
 
 
 @dataclass

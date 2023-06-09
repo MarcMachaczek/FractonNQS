@@ -98,5 +98,6 @@ class SymmetricNN(nn.Module):
             x = lyr(x)
             if i != len(self.layers) - 1:
                 x = self.activation(x)
+        x = nknn.log_cosh(x)  # TODO: check if this is right
         x = jnp.sum(x, axis=-1)  # final sum layer
         return x

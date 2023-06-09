@@ -80,6 +80,19 @@ transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
+# create custom update rule
+single_rule = nk.sampler.rules.LocalRule()
+cube_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2))
+xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(0, shape))
+ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
+zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
+# noinspection PyArgumentList
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05, 0.05),
+                                                          [single_rule,
+                                                           cube_rule,
+                                                           xstring_rule,
+                                                           ystring_rule,
+                                                           zstring_rule])
 # define correlation enhanced RBM
 stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
@@ -123,20 +136,6 @@ RBMSymm = nk.models.RBMSymm(symmetries=perms,
 model = cRBM
 eval_model = "CheckerCRBM"
 
-# create custom update rule
-single_rule = nk.sampler.rules.LocalRule()
-cube_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2))
-xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(0, shape))
-ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
-zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
-# noinspection PyArgumentList
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05, 0.05),
-                                                          [single_rule,
-                                                           cube_rule,
-                                                           xstring_rule,
-                                                           ystring_rule,
-                                                           zstring_rule])
-
 field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":
@@ -151,7 +150,7 @@ if pre_init:
     sampler_exact = nk.sampler.ExactSampler(hilbert)
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
-    vqs_full = nk.vqs.ExactState(hilbert, model, seed=random_key)
+    vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
     vqs = vqs_full
 
     # exact ground state parameters for the checkerboard model, start with just noisy parameters
