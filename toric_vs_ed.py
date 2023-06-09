@@ -26,7 +26,7 @@ swipe = "right_left"  # viable options: "independent", "left_right", "right_left
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
 direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
