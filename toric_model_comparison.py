@@ -27,17 +27,14 @@ save_path = f"{RESULTS_PATH}/toric2d_h"
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
 
 # %% operators on hilbert space
-L = 3  # size should be at least 3, else there are problems with pbc and indexing
+L = 5  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 h = (0., 0., 0.)
 toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
 # exactly diagonalize hamiltonian, find exact E0 and save it
-try:
-    E0_exact = nk.exact.lanczos_ed(toric, compute_eigenvectors=False)[0]
-except:
-    E0_exact = - L**2 * 2
+E0_exact = - L**2 * 2
 
 # %%  setting hyper-parameters
 n_iter = 200
@@ -149,11 +146,12 @@ training_data = {}
 for eval_model, model in tqdm(models.items()):
     sampler_mc = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs_mc = nk.vqs.MCState(sampler_mc, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    sampler_exact = nk.sampler.ExactSampler(hilbert)
-    vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
-    vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
-    vqs = vqs_full
+    if L <= 3:
+        sampler_exact = nk.sampler.ExactSampler(hilbert)
+        vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+        random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
+        vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
+    vqs = vqs_mc
 
     # use driver gs if vqs is exact_state aka full_summation_state
     vqs, data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
