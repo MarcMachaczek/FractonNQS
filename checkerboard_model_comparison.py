@@ -20,24 +20,22 @@ from tqdm import tqdm
 from functools import partial
 
 # %% training configuration
-save_results = True
-save_path = f"{RESULTS_PATH}/toric2d_h"
+save_results = False
+save_path = f"{RESULTS_PATH}/checkerboard"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
 
 # %% operators on hilbert space
-L = 3  # size should be at least 3, else there are problems with pbc and indexing
-shape = jnp.array([L, L])
-square_graph = nk.graph.Square(length=L, pbc=True)
-hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
+shape = jnp.array([4, 2, 2])
+hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.product(shape).item())
 h = (0., 0., 0.)
-toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
+checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
 # exactly diagonalize hamiltonian, find exact E0 and save it
 try:
-    E0_exact = nk.exact.lanczos_ed(toric, compute_eigenvectors=False)[0]
+    E0_exact = nk.exact.lanczos_ed(checkerboard, compute_eigenvectors=False)[0]
 except:
-    E0_exact = - L**2 * 2
+    E0_exact = - jnp.prod(shape)
 
 # %%  setting hyper-parameters
 n_iter = 200
@@ -69,50 +67,52 @@ optimizer = optax.sgd(lr_schedule)
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
-vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
-xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
-ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
-                                                          [single_rule, vertex_rule, xstring_rule, ystring_rule])
+cube_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_cubes_cubical3d(shape, shift=2))
+xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(0, shape))
+ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
+zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
+# noinspection PyArgumentList
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05, 0.05),
+                                                          [single_rule,
+                                                           cube_rule,
+                                                           xstring_rule,
+                                                           ystring_rule,
+                                                           zstring_rule])
 
 # define correlation enhanced RBM
 stddev = 0.1
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
-# get (specific) symmetries of the model, in our case translations
-perms = geneqs.utils.indexing.get_translations_cubical2d(shape, shift=1)
-# noinspection PyArgumentList
-link_perms = HashableArray(geneqs.utils.indexing.get_linkperms_cubical2d(shape, shift=1))
-
-bl_bonds, lt_bonds, tr_bonds, rb_bonds = geneqs.utils.indexing.get_bonds_cubical2d(shape)
-bl_perms, lt_perms, tr_perms, rb_perms = geneqs.utils.indexing.get_bondperms_cubical2d(shape)
-# noinspection PyArgumentList
-correlators = (HashableArray(geneqs.utils.indexing.get_plaquettes_cubical2d(shape)),  # plaquette correlators,
-               HashableArray(bl_bonds), HashableArray(lt_bonds), HashableArray(tr_bonds), HashableArray(rb_bonds))
+perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
+perms = nk.utils.HashableArray(perms.astype(int))
 
 # noinspection PyArgumentList
-correlator_symmetries = (HashableArray(jnp.asarray(perms)),  # plaquettes permute like sites,
-                         HashableArray(bl_perms), HashableArray(lt_perms),
-                         HashableArray(tr_perms), HashableArray(rb_perms))
+correlators = (HashableArray(geneqs.utils.indexing.get_cubes_cubical3d(shape, 2)),
+               HashableArray(geneqs.utils.indexing.get_bonds_cubical3d(shape)))
 # noinspection PyArgumentList
-loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  # x-string correlators
-         HashableArray(geneqs.utils.indexing.get_strings_cubical2d(1, shape)))  # y-string correlators
+correlator_symmetries = (HashableArray(geneqs.utils.indexing.get_cubeperms_cubical3d(shape, 2)),
+                         HashableArray(geneqs.utils.indexing.get_bondperms_cubical3d(shape, 2)))
 # noinspection PyArgumentList
-loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
-                   HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
+loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical3d(0, shape)),
+         HashableArray(geneqs.utils.indexing.get_strings_cubical3d(1, shape)),
+         HashableArray(geneqs.utils.indexing.get_strings_cubical3d(2, shape)))
+# noinspection PyArgumentList
+loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape, 2)),
+                   HashableArray(geneqs.utils.indexing.get_ystring_perms3d(shape, 2)),
+                   HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
 
-alpha = 1
-cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
-                                   correlators=(correlators[0],),
-                                   correlator_symmetries=(correlator_symmetries[0],),
-                                   loops=(),
-                                   loop_symmetries=(),
-                                   alpha=alpha,
-                                   kernel_init=default_kernel_init,
-                                   bias_init=default_kernel_init,
-                                   param_dtype=complex)
+alpha = 1 / 4
+cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
+                                     correlators=(correlators[0],),
+                                     correlator_symmetries=(correlator_symmetries[0],),
+                                     loops=(),
+                                     loop_symmetries=(),
+                                     alpha=alpha,
+                                     kernel_init=default_kernel_init,
+                                     bias_init=default_kernel_init,
+                                     param_dtype=complex)
 
-RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
+RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             alpha=alpha,
                             kernel_init=default_kernel_init,
                             hidden_bias_init=default_kernel_init,
@@ -126,7 +126,7 @@ RBM = nk.models.RBM(alpha=alpha,
                     param_dtype=complex)
 
 features = (2, 4)  # first number sets the invariant features
-SymmNN = geneqs.models.neural_networks.SymmetricNN(symmetries=link_perms,
+SymmNN = geneqs.models.neural_networks.SymmetricNN(symmetries=perms,
                                                    features=features,
                                                    kernel_init=default_kernel_init,
                                                    bias_init=default_kernel_init,
@@ -156,14 +156,14 @@ for eval_model, model in tqdm(models.items()):
     vqs = vqs_full
 
     # use driver gs if vqs is exact_state aka full_summation_state
-    vqs, data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
+    vqs, data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
     training_data[f"{eval_model}"] = data
 
     # calculate observables, therefore set some params of vqs
     # vqs.n_samples = n_expect
     # vqs.chunk_size = chunk_size
 
-    energy_nk = vqs.expect(toric)
+    energy_nk = vqs.expect(checkerboard)
     observables.add_nk_obs("energy", (eval_model,), energy_nk)
 
 # %% plot and save training data, save observables
@@ -180,7 +180,7 @@ for eval_model, data in training_data.items():
                   label=f"{eval_model}, #p={n_params}, E={E0}+-{var}, delta= {rel_error}")
 
 
-fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
+fig.suptitle(f" Checkerboard h={tuple([round(hi, 3) for hi in h])}: size={shape},"
              f" n_discard={n_discard_per_chain},"
              f" n_chains={n_chains},"
              f" n_samples={n_samples} \n"
