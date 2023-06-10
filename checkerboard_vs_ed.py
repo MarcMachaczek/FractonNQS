@@ -20,10 +20,10 @@ from functools import partial
 save_results = True
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
-random_key = jax.random.PRNGKey(12344567)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
 direction_index = 0  # 0 for x, 1 for y, 2 for z;

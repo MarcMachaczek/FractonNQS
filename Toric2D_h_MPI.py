@@ -36,7 +36,7 @@ from functools import partial
 save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(421456435)  # can be used to make results deterministic, so far only used for weightinit
@@ -81,7 +81,7 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
       1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
 
 # %%  setting hyper-parameters and model
-n_iter = 1000
+n_iter = 300
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(n_chains * 64 / n_ranks)
@@ -90,7 +90,7 @@ chunk_size = n_samples  # doesn't work for gradient operations, need to check wh
 n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
-diag_shift_init = 1e-4
+diag_shift_init = 1e-3
 diag_shift_end = 1e-5
 diag_shift_begin = int(n_iter / 3)
 diag_shift_steps = int(n_iter / 3)
@@ -172,8 +172,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 10)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 10)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 100)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 100)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)

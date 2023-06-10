@@ -9,7 +9,7 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
-field_direction = 2  # 0=x, 1=y, 2=z
+field_direction = 0  # 0=x, 1=y, 2=z
 L = 3
 shape = [4, 2, 2]
 hilbert_size = np.prod(shape)

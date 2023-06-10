@@ -20,7 +20,7 @@ from functools import partial
 save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
@@ -61,7 +61,7 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
       1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
 
 # %%  setting hyper-parameters
-n_iter = 1600
+n_iter = 20
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 20
@@ -157,7 +157,7 @@ if pre_init:
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
     vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
-    vqs = vqs_full
+    vqs = vqs_exact_samp
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
@@ -188,7 +188,7 @@ for h in tqdm(field_strengths, "external_field"):
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
     vqs_full = nk.vqs.ExactState(hilbert, model, seed=random_key)
-    vqs = vqs_full
+    vqs = vqs_exact_samp
 
     if swipe != "independent":
         if last_trained_params is not None:
