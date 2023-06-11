@@ -12,12 +12,13 @@ from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
 import matplotlib
-matplotlib.rcParams.update({'font.size': 12})
 
 import numpy as np
 
 from tqdm import tqdm
 from functools import partial
+
+matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
@@ -45,8 +46,8 @@ n_discard_per_chain = 20  # should be small for using many chains, default is 10
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
 
-diag_shift_init = 1e-4
-diag_shift_end = 1e-5
+diag_shift_init = 1e-3
+diag_shift_end = 1e-3
 diag_shift_begin = int(n_iter / 3)
 diag_shift_steps = int(n_iter / 3)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
@@ -73,7 +74,7 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.1
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # define correlation enhanced RBM
-stddev = 0.1
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
