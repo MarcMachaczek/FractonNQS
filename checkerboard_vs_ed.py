@@ -117,8 +117,8 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
 
 alpha = 1 / 4
 cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=(correlators),
-                                     correlator_symmetries=(correlator_symmetries),
+                                     correlators=correlators,
+                                     correlator_symmetries=correlator_symmetries,
                                      loops=loops,
                                      loop_symmetries=loop_symmetries,
                                      alpha=alpha,

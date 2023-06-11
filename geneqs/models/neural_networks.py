@@ -23,23 +23,26 @@ class SimpleNN(nn.Module):
 
     # Initializer for the Dense layer matrix
     kernel_init: callable = lecun
+    bias_init: Callable = zeros
 
     def setup(self):
-        self.layers = [nn.Dense(feat,
+        self.layers = [nn.Dense(features=feat,
                                 use_bias=self.use_bias,
                                 kernel_init=self.kernel_init,
-                                bias_init=self.kernel_init,
-                                precision=self.precision,
-                                param_dtype=self.param_dtype)
+                                bias_init=self.bias_init,
+                                param_dtype=self.param_dtype,
+                                precision=self.precision)
                        for feat in self.features]
 
     def __call__(self, x_in):
         x = x_in
+        # jax.debug.print("{0}", self.layers)
         for i, lyr in enumerate(self.layers):
             x = lyr(x)
             if i != len(self.layers) - 1:
                 x = self.activation(x)
-        x = x.squeeze(-1)  # remove last axis
+        x = nknn.log_cosh(x)
+        x = jnp.sum(x, axis=-1)  # remove last axis
         return x
 
 
@@ -51,7 +54,7 @@ class SymmetricNN(nn.Module):
     # kernel mask (aka filter size for CNN)
     mask: Optional[HashableArray] = None
     # The nonlinear activation function
-    activation: Any = jax.nn.selu
+    activation: Any = jax.nn.gelu
     # bias for the all layers
     use_bias: bool = True
     # The dtype of the weights
@@ -76,7 +79,7 @@ class SymmetricNN(nn.Module):
                                          param_dtype=self.param_dtype,
                                          precision=self.precision)
 
-        self.layers = [nn.Dense(feat,
+        self.layers = [nn.Dense(features=feat,
                                 use_bias=self.use_bias,
                                 kernel_init=self.kernel_init,
                                 bias_init=self.bias_init,
@@ -98,6 +101,6 @@ class SymmetricNN(nn.Module):
             x = lyr(x)
             if i != len(self.layers) - 1:
                 x = self.activation(x)
-        x = nknn.log_cosh(x)  # TODO: check if this is right
+        x = nknn.log_cosh(x)
         x = jnp.sum(x, axis=-1)  # final sum layer
         return x
