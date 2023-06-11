@@ -26,17 +26,17 @@ swipe = "left_right"  # viable options: "independent", "left_right", "right_left
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0.7, 0., 0.]).reshape(-1, 1)
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction = np.array([0., 0., 0.7]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 8) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0.42, 0., 0.],
-                                                        [0.44, 0., 0.],
-                                                        [0.46, 0., 0.]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
+                                                        [0., 0., 0.44],
+                                                        [0., 0., 0.46]])))
 
-save_fields = np.array([[0.1, 0, 0.],
-                        [0.43, 0, 0.],
-                        [0.7, 0, 0.]])
+save_fields = np.array([[0., 0, 0.1],
+                        [0., 0, 0.43],
+                        [0., 0, 0.7]])
 
 # %% operators on hilbert space
 shape = jnp.array([4, 2, 2])

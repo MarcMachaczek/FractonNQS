@@ -23,20 +23,20 @@ pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
-random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(1494567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction_index = 1  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
+direction = np.array([0., 0.8, 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0.42, 0., 0.42],
-                                                        [0.45, 0., 0.45]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0.62, 0.],
+                                                        [0., 0.64, 0.]])))
 
-save_fields = np.array([[0.1, 0., 0.1],
-                        [0.4, 0., 0.4],
-                        [0.7, 0., 0.7]])
+save_fields = np.array([[0., 0.2, 0.],
+                        [0., 0.6, 0.],
+                        [0., 0.8, 0.]])
 
 # %% operators on hilbert space
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -61,7 +61,7 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
       1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
 
 # %%  setting hyper-parameters
-n_iter = 20
+n_iter = 2000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 20
@@ -120,7 +120,7 @@ loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  
 loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-alpha = 1
+alpha = 2
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
                                    correlator_symmetries=correlator_symmetries,
@@ -188,13 +188,13 @@ for h in tqdm(field_strengths, "external_field"):
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
     vqs_full = nk.vqs.ExactState(hilbert, model, seed=random_key)
-    vqs = vqs_exact_samp
+    vqs = vqs_full
 
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
-            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
                                                     last_trained_params, real_noise, complex_noise)
         elif pre_init:

@@ -34,28 +34,24 @@ from functools import partial
 
 # %% training configuration
 save_results = True
-save_path = f"{RESULTS_PATH}/toric2d_h"
+save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swip=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
-random_key = jax.random.PRNGKey(421456435)  # can be used to make results deterministic, so far only used for weightinit
+random_key = jax.random.PRNGKey(4214564359)  # can be used to make results deterministic, so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.35, 0, 0.35],
-                                                        [0.37, 0, 0.37],
-                                                        [0.39, 0, 0.39],
-                                                        [0.41, 0, 0.41],
-                                                        [0.43, 0, 0.43]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
+                                                        [0., 0, 0.33],
+                                                        [0., 0, 0.35]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.35, 0, 0.35],
-                        [0.39, 0, 0.39],
-                        [0.4, 0, 0.4],
-                        [0.42, 0, 0.42],
-                        [0.5, 0, 0.5]])
+hist_fields = np.array([[0., 0, 0.2],
+                        [0., 0, 0.33],
+                        [0., 0, 0.5]])
 save_fields = hist_fields  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -81,7 +77,7 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
       1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
 
 # %%  setting hyper-parameters and model
-n_iter = 300
+n_iter = 800
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(n_chains * 64 / n_ranks)
@@ -90,7 +86,7 @@ chunk_size = n_samples  # doesn't work for gradient operations, need to check wh
 n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
-diag_shift_init = 1e-3
+diag_shift_init = 1e-4
 diag_shift_end = 1e-5
 diag_shift_begin = int(n_iter / 3)
 diag_shift_steps = int(n_iter / 3)
@@ -103,13 +99,13 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.001
+lr_end = 0.01
 transition_begin = int(n_iter / 3)
 transition_steps = int(n_iter / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
-stddev = 0.008
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
@@ -172,8 +168,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 100)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 100)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 10)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 10)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
@@ -199,8 +195,8 @@ for h in tqdm(field_strengths, "external_field"):
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
-            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 10)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 10)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
                                                     last_trained_params, real_noise, complex_noise)
         elif pre_init:
