@@ -140,7 +140,7 @@ models = {f"FFNN_f{features}": FFNN,
           "RBM": RBM,
           "RBMSymm": RBMSymm,
           f"SymmNN_f{features}": SymmNN,
-          "ToricCRBM": cRBM}
+          "cRBM": cRBM}
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names="eval_model")
 

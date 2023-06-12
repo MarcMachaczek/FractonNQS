@@ -35,9 +35,10 @@ from functools import partial
 # %% training configuration
 save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
-pre_init = False  # True only has effect when swip=="independent"
+pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-# if pre_init==True and swipe!="independent", pre_init only applies to the first training run
+checkpoint = f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
+# options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # can be used to make results deterministic, so far only used for weightinit
 
@@ -48,11 +49,25 @@ field_strengths = (np.linspace(0, 1, 9) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
                                                         [0., 0, 0.33],
                                                         [0., 0, 0.35]])))
+
 # for which fields indices histograms are created
 hist_fields = np.array([[0., 0, 0.2],
                         [0., 0, 0.33],
                         [0., 0, 0.5]])
-save_fields = hist_fields  # field values for which vqs is serialized
+save_fields = np.array([[0., 0, 0.2],
+                        [0., 0, 0.31],
+                        [0., 0, 0.33],
+                        [0., 0, 0.5]])  # field values for which vqs is serialized
+
+# TODO: make this simpler when starting from checkpoints
+field_strengths = np.array([[0., 0, 0.35],
+                            [0., 0, 0.4],
+                            [0., 0, 0.5],
+                            [0., 0, 0.6],
+                            [0., 0, 0.7],
+                            [0., 0, 0.8]])
+hist_fields = field_strengths
+save_fields = field_strengths
 
 # %% operators on hilbert space
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
@@ -77,7 +92,7 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
       1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_plaq(hilbert, p, shape) for p in positions])
 
 # %%  setting hyper-parameters and model
-n_iter = 800
+n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(n_chains * 64 / n_ranks)
@@ -106,6 +121,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
+trans_dev = stddev / 100  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
@@ -149,7 +165,7 @@ single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.65, 0.25, 0.05, 0.05),
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # make sure hist and save fields are contained in field_strengths and sort final field array
@@ -168,8 +184,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 10)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 10)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, trans_dev)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
@@ -184,9 +200,18 @@ if pre_init:
     vqs.parameters = pre_init_parameters
     print("init energy", vqs.expect(toric))
 
-last_trained_params = None
+if checkpoint is not None:
+    checkpoint_sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
+    checkpoint_vqs = nk.vqs.MCState(checkpoint_sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    with open(checkpoint, 'rb') as file:
+        checkpoint_vqs = flax.serialization.from_bytes(checkpoint_vqs, file.read())
+    print(f"checkpoint {checkpoint} loaded.")
+last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
+last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
+
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
+    print(f"training for field={h}")
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
@@ -195,18 +220,19 @@ for h in tqdm(field_strengths, "external_field"):
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev / 10)
-            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev / 10)
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, trans_dev)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
                                                     last_trained_params, real_noise, complex_noise)
-        elif pre_init:
-            vqs.parameters = pre_init_parameters
+        if last_sampler_state is not None:
+            vqs.sampler_state = last_sampler_state
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
 
     vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
     last_trained_params = vqs.parameters
+    last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
     vqs.chunk_size = chunk_size
@@ -248,17 +274,17 @@ for h in tqdm(field_strengths, "external_field"):
 
         n_params = int(training_data["n_params"].value)
         plot.errorbar(training_data["Energy"].iters, training_data["Energy"].Mean, yerr=training_data["Energy"].Sigma,
-                      label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
+                      label=f"Energy")
 
-        fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
-                     f" {eval_model}, alpha={alpha},"
+        fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape} \n"
+                     f" {eval_model}, alpha={alpha}, #p={n_params}, lr from {lr_init} to {lr_end} \n"
                      f" n_discard={n_discard_per_chain},"
                      f" n_chains={n_chains},"
                      f" n_samples={n_samples} \n"
-                     f" pre_init={pre_init}, stddev={stddev}, swipe={swipe}")
+                     f" pre_init={pre_init}, stddev={stddev}, trans_dev={trans_dev}, swipe={swipe}")
 
-        plot.set_xlabel("iterations")
-        plot.set_ylabel("energy")
+        plot.set_xlabel("Training Iterations")
+        plot.set_ylabel("Observables")
 
         E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.item().real
         plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
