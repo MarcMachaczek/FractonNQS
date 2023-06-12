@@ -40,8 +40,7 @@ save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
-# options are either None or the path to an .mpack file containing a VQSs
+checkpoint = None # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
@@ -62,14 +61,6 @@ save_fields = np.array([[0., 0, 0.2],
                         [0., 0, 0.33],
                         [0., 0, 0.5]])  # field values for which vqs is serialized
 
-# TODO: make this simpler when starting from checkpoints
-field_strengths = np.array([[0., 0, 0.35],
-                            [0., 0, 0.4],
-                            [0., 0, 0.5],
-                            [0., 0, 0.6],
-                            [0., 0, 0.7],
-                            [0., 0, 0.8]])
-hist_fields = field_strengths
 save_fields = field_strengths
 
 # %% operators on hilbert space
@@ -106,8 +97,8 @@ n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
+diag_shift_begin = int(n_iter * 2 / 5)
+diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
@@ -117,14 +108,14 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.01
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
+lr_end = 0.001
+transition_begin = int(n_iter * 3 / 5)
+transition_steps = int(n_iter * 1 / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 100  # standard deviation for transfer learning noise
+trans_dev = stddev  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
@@ -168,7 +159,7 @@ single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.65, 0.25, 0.05, 0.05),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1),
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # make sure hist and save fields are contained in field_strengths and sort final field array
@@ -228,9 +219,9 @@ for h in tqdm(field_strengths, "external_field"):
             complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, rn, cn: ltp + rn + 1j * cn,
                                                     last_trained_params, real_noise, complex_noise)
-        if last_sampler_state is not None:
-            vqs.sampler_state = last_sampler_state
-        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
+        # if last_sampler_state is not None:
+        #     vqs.sampler_state = last_sampler_state
+        vqs.sample(chain_length=512)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters

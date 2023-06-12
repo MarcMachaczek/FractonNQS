@@ -214,8 +214,8 @@ for h in tqdm(field_strengths, "external_field"):
             complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, rn, cn: ltp + rn + 1j * cn,
                                                     last_trained_params, real_noise, complex_noise)
-        if last_sampler_state is not None:
-            vqs.sampler_state = last_sampler_state
+        # if last_sampler_state is not None:
+        #     vqs.sampler_state = last_sampler_state
         vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
