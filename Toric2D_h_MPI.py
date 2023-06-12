@@ -27,10 +27,13 @@ from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
+import matplotlib
 import numpy as np
 
 from tqdm import tqdm
 from functools import partial
+
+matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
@@ -40,7 +43,7 @@ swipe = "left_right"  # viable options: "independent", "left_right", "right_left
 checkpoint = f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
-random_key = jax.random.PRNGKey(4214564359)  # can be used to make results deterministic, so far only used for weightinit
+random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
 direction_index = 2  # 0 for x, 1 for y, 2 for z;
@@ -202,7 +205,8 @@ if pre_init:
 
 if checkpoint is not None:
     checkpoint_sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    checkpoint_vqs = nk.vqs.MCState(checkpoint_sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    checkpoint_vqs = nk.vqs.MCState(checkpoint_sampler, model, n_samples=n_samples,
+                                    n_discard_per_chain=n_discard_per_chain)
     with open(checkpoint, 'rb') as file:
         checkpoint_vqs = flax.serialization.from_bytes(checkpoint_vqs, file.read())
     print(f"checkpoint {checkpoint} loaded.")
@@ -222,10 +226,11 @@ for h in tqdm(field_strengths, "external_field"):
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
             real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, trans_dev)
             complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
-            vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
+            vqs.parameters = jax.tree_util.tree_map(lambda ltp, rn, cn: ltp + rn + 1j * cn,
                                                     last_trained_params, real_noise, complex_noise)
         if last_sampler_state is not None:
             vqs.sampler_state = last_sampler_state
+        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters

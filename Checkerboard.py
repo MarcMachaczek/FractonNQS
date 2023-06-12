@@ -12,10 +12,13 @@ from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
+import matplotlib
 import numpy as np
 
 from tqdm import tqdm
 from functools import partial
+
+matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = False

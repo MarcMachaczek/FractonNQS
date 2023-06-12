@@ -1,13 +1,12 @@
 import jax
 import jax.numpy as jnp
 import optax
-import flax
 
 import netket as nk
 from netket.utils import HashableArray
 
 import geneqs
-from geneqs.utils.training import loop_gs, driver_gs
+from geneqs.utils.training import driver_gs
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -149,7 +148,8 @@ for eval_model, model in tqdm(models.items()):
     vqs_mc = nk.vqs.MCState(sampler_mc, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     if L <= 3:
         sampler_exact = nk.sampler.ExactSampler(hilbert)
-        vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+        vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples,
+                                        n_discard_per_chain=n_discard_per_chain)
         random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
         vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
     vqs = vqs_mc

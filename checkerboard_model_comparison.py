@@ -1,23 +1,23 @@
 import jax
 import jax.numpy as jnp
 import optax
-import flax
 
 import netket as nk
 from netket.utils import HashableArray
 
 import geneqs
-from geneqs.utils.training import loop_gs, driver_gs
+from geneqs.utils.training import driver_gs
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
 import matplotlib
-matplotlib.rcParams.update({'font.size': 12})
 
 import numpy as np
 
 from tqdm import tqdm
 from functools import partial
+
+matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = False
@@ -32,10 +32,7 @@ hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.product(shape).item())
 h = (0., 0., 0.)
 checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
 # exactly diagonalize hamiltonian, find exact E0 and save it
-try:
-    E0_exact = nk.exact.lanczos_ed(checkerboard, compute_eigenvectors=False)[0]
-except:
-    E0_exact = - jnp.prod(shape)
+E0_exact = - jnp.prod(shape)
 
 # %%  setting hyper-parameters
 n_iter = 200
@@ -149,10 +146,12 @@ training_data = {}
 for eval_model, model in tqdm(models.items()):
     sampler_mc = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs_mc = nk.vqs.MCState(sampler_mc, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    sampler_exact = nk.sampler.ExactSampler(hilbert)
-    vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
-    vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
+    if L <= 3:
+        sampler_exact = nk.sampler.ExactSampler(hilbert)
+        vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples,
+                                        n_discard_per_chain=n_discard_per_chain)
+        random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
+        vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
     vqs = vqs_full
 
     # use driver gs if vqs is exact_state aka full_summation_state
