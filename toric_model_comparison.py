@@ -20,7 +20,7 @@ from functools import partial
 matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
-save_results = True
+save_results = False
 save_path = f"{RESULTS_PATH}/toric2d_h"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 

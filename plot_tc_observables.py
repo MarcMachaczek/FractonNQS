@@ -20,6 +20,10 @@ obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
     np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables.txt"))
+obs_list.append(
+    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables_lr.txt"))
+
+labels = ["independent", "left_right"]
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
@@ -35,8 +39,7 @@ for i, obs in enumerate(obs_list):
     for ob in obs:
         plot_mag.errorbar(ob[field_direction], ob[5], yerr=ob[6], marker="o", markersize=2, color=cmap(i))
 
-    plot_mag.plot(obs[:, field_direction], obs[:, 5], marker="o", markersize=2, color=cmap(i), label=f"h={obs[-1][:3]}")
-
+    plot_mag.plot(obs[:, field_direction], obs[:, 5], marker="o", markersize=2, color=cmap(i), label=labels[i])
 plot_mag.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_mag.set_ylabel("magnetization")
 plot_mag.set_title(
@@ -51,7 +54,7 @@ for i, obs in enumerate(obs_list):
         plot_abs_mag.errorbar(ob[field_direction], ob[7], yerr=ob[8], marker="o", markersize=2, color=cmap(i))
 
     plot_abs_mag.plot(obs[:, field_direction], obs[:, 7], marker="o", markersize=2, color=cmap(i),
-                      label=f"h={obs[-1][:3]}")
+                      label=labels[i])
 
 plot_abs_mag.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_abs_mag.set_ylabel("absolute magnetization")
@@ -65,7 +68,7 @@ plot_sus = fig.add_subplot(323)
 for i, obs in enumerate(obs_list):
     sus, sus_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs[:, 5], fields=obs[:, :3])
     plot_sus.plot(sus_fields[:, field_direction], sus, marker="o", markersize=2, color=cmap(i),
-                  label=f"h={obs[-1][:3]}")
+                  label=labels[i])
 
 plot_sus.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_sus.set_ylabel("susceptibility of magnetization")
@@ -81,7 +84,7 @@ for i, obs in enumerate(obs_list):
         plot_wilson.errorbar(ob[field_direction], ob[9], yerr=ob[10], marker="o", markersize=2, color=cmap(i))
 
     plot_wilson.plot(obs[:, field_direction], obs[:, 9], marker="o", markersize=2, color=cmap(i),
-                     label=f"h={obs[-1][:3]}")
+                     label=labels[i])
 
 plot_wilson.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_wilson.set_ylabel("wilson loop < prod A_s * prod B_p >")
@@ -95,7 +98,7 @@ plot_energy = fig.add_subplot(325)
 for i, obs in enumerate(obs_list):
     n_sites = L ** 2 * 2
     plot_energy.plot(obs[:, field_direction], obs[:, 3] / n_sites, marker="o", markersize=2, color=cmap(i),
-                     label=f"h={obs[-1][:3]}")
+                     label=labels[i])
 
 plot_energy.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_energy.set_ylabel("energy per site")
@@ -109,7 +112,7 @@ plot_spheat = fig.add_subplot(326)
 
 for i, obs in enumerate(obs_list):
     plot_spheat.plot(obs[:, field_direction], np.abs(obs[:, 4]), marker="o", markersize=2, color=cmap(i),
-                     label=f"h={obs[-1][:3]}")
+                     label=labels[i])
 
 plot_spheat.set_xlabel(f"external field h{f_dict[field_direction]}")
 plot_spheat.set_ylabel("specific heat")
@@ -118,7 +121,7 @@ plot_spheat.set_title(
 
 plot_spheat.legend()
 plt.show()
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/obs_comparison_L[{L} {L}]_cRBM.pdf")
+fig.savefig(f"{save_dir}/obs_comparison_L[{L} {L}]_cRBM.pdf")
 
 # %%%%%%%%%%%%%%% HISTOGRAMS %%%%%%%%%%%%%%% #
 # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
@@ -171,4 +174,4 @@ abs_mag_hist.legend()
 A_B_hist.legend()
 
 plt.show()
-fig.savefig(f"{RESULTS_PATH}/toric2d_h/hist_comparison_L[{L} {L}]_cRBM.pdf")
+fig.savefig(f"{save_dir}/hist_comparison_L[{L} {L}]_cRBM.pdf")
