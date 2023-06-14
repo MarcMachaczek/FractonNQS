@@ -40,7 +40,7 @@ save_results = True
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
-checkpoint = f"{RESULTS_PATH}/checkerbaord/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
+checkpoint = None  # f"{RESULTS_PATH}/checkerbaord/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
@@ -49,17 +49,25 @@ random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.42, 0, 0],
+field_strengths = np.vstack((field_strengths, np.array([[0.41, 0, 0],
+                                                        [0.42, 0, 0],
                                                         [0.43, 0, 0],
                                                         [0.44, 0, 0],
                                                         [0.45, 0, 0],
                                                         [0.46, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.],
-                        [0.43, 0, 0.],
+hist_fields = np.array([[0.2, 0, 0.],
+                        [0.42, 0, 0.],
                         [0.44, 0, 0.],
                         [0.6, 0, 0.]])
-save_fields = hist_fields  # field values for which vqs is serialized
+field_strengths = np.array([[0.36, 0, 0],
+                            [0.38, 0, 0],
+                            [0.5, 0, 0],
+                            [0.6, 0, 0],
+                            [0.7, 0, 0],
+                            [0.8, 0, 0]])
+hist_fields = field_strengths
+save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
 L = 6  # this translates to L+1 without PBC
@@ -79,19 +87,19 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 2
-min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+n_iter = 1200
+min_iter = 1000  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 2 * 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(n_chains * 32 / n_ranks)
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
-chunk_size = int(n_samples / 2)  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 64  # number of samples to estimate observables, must be dividable by chunk_size
+chunk_size = int(n_samples / n_ranks / 2)
+n_expect = chunk_size * 48 * n_ranks  # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
+diag_shift_begin = int(n_iter * 2 / 5)
+diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
@@ -101,9 +109,9 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.01
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
+lr_end = 0.001
+transition_begin = int(n_iter * 3 / 5)
+transition_steps = int(n_iter * 1 / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
@@ -205,7 +213,6 @@ for h in tqdm(field_strengths, "external_field"):
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    vqs.chunk_size = chunk_size
 
     if swipe != "independent":
         if last_trained_params is not None:
@@ -247,7 +254,7 @@ for h in tqdm(field_strengths, "external_field"):
 
     # gather local estimators as each rank calculates them based on their own samples_per_rank
     if np.any((h == hist_fields).all(axis=1)):
-        vqs.n_samples = n_samples / 2
+        vqs.n_samples = int(n_samples / 2)
         random_key, init_state_key = jax.random.split(random_key)
         energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
         mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)

@@ -40,7 +40,7 @@ save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = None # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
+checkpoint = f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
@@ -60,6 +60,14 @@ save_fields = np.array([[0., 0, 0.2],
                         [0., 0, 0.31],
                         [0., 0, 0.33],
                         [0., 0, 0.5]])  # field values for which vqs is serialized
+
+field_strengths = np.array([[0., 0, 0.35],
+                            [0., 0, 0.4],
+                            [0., 0, 0.5],
+                            [0., 0, 0.6],
+                            [0., 0, 0.7]])
+
+hist_fields = field_strengths
 
 save_fields = field_strengths
 
@@ -115,7 +123,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev  # standard deviation for transfer learning noise
+trans_dev = stddev / 10 # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
@@ -221,7 +229,7 @@ for h in tqdm(field_strengths, "external_field"):
                                                     last_trained_params, real_noise, complex_noise)
         # if last_sampler_state is not None:
         #     vqs.sampler_state = last_sampler_state
-        vqs.sample(chain_length=512)  # let mcmc chains adapt to noisy initial paramters
+        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
