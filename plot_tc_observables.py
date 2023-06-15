@@ -11,7 +11,7 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
-field_direction = [0, 1]
+field_direction = [0, 2]
 L = 8
 hilbert_size = 2 * L ** 2
 eval_model = "ToricCRBM"
@@ -51,9 +51,9 @@ plot_abs_mag = fig.add_subplot(322)
 
 for i, obs in enumerate(obs_list):
     for ob in obs:
-        plot_abs_mag.errorbar(ob[field_direction], ob[7], yerr=ob[8], marker="o", markersize=2, color=cmap(i))
+        plot_abs_mag.errorbar(ob[field_direction[i]], ob[7], yerr=ob[8], marker="o", markersize=2, color=cmap(i))
 
-    plot_abs_mag.plot(obs[:, field_direction], obs[:, 7], marker="o", markersize=2, color=cmap(i),
+    plot_abs_mag.plot(obs[:, field_direction[i]], obs[:, 7], marker="o", markersize=2, color=cmap(i),
                       label=labels[i])
 
 plot_abs_mag.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
@@ -67,7 +67,7 @@ plot_sus = fig.add_subplot(323)
 
 for i, obs in enumerate(obs_list):
     sus, sus_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs[:, 5], fields=obs[:, :3])
-    plot_sus.plot(sus_fields[:, field_direction], sus, marker="o", markersize=2, color=cmap(i),
+    plot_sus.plot(sus_fields[:, field_direction[i]], sus, marker="o", markersize=2, color=cmap(i),
                   label=labels[i])
 
 plot_sus.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
@@ -81,9 +81,9 @@ plot_wilson = fig.add_subplot(324)
 
 for i, obs in enumerate(obs_list):
     for ob in obs:
-        plot_wilson.errorbar(ob[field_direction], ob[9], yerr=ob[10], marker="o", markersize=2, color=cmap(i))
+        plot_wilson.errorbar(ob[field_direction[i]], ob[9], yerr=ob[10], marker="o", markersize=2, color=cmap(i))
 
-    plot_wilson.plot(obs[:, field_direction], obs[:, 9], marker="o", markersize=2, color=cmap(i),
+    plot_wilson.plot(obs[:, field_direction[i]], obs[:, 9], marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
 plot_wilson.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
@@ -97,7 +97,7 @@ plot_energy = fig.add_subplot(325)
 
 for i, obs in enumerate(obs_list):
     n_sites = L ** 2 * 2
-    plot_energy.plot(obs[:, field_direction], obs[:, 3] / n_sites, marker="o", markersize=2, color=cmap(i),
+    plot_energy.plot(obs[:, field_direction[i]], obs[:, 3] / n_sites, marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
 plot_energy.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
@@ -111,7 +111,7 @@ plot_energy.legend()
 plot_spheat = fig.add_subplot(326)
 
 for i, obs in enumerate(obs_list):
-    plot_spheat.plot(obs[:, field_direction], np.abs(obs[:, 4]), marker="o", markersize=2, color=cmap(i),
+    plot_spheat.plot(obs[:, field_direction[i]], np.abs(obs[:, 4]), marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
 plot_spheat.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
