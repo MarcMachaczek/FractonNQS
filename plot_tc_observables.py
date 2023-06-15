@@ -11,7 +11,7 @@ cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
-field_direction = 2
+field_direction = [0, 1]
 L = 8
 hilbert_size = 2 * L ** 2
 eval_model = "ToricCRBM"
@@ -21,13 +21,13 @@ obs_list = []
 obs_list.append(
     np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables.txt"))
 obs_list.append(
-    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables_lr.txt"))
+    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables_hz.txt"))
 
-labels = ["independent", "left_right"]
+labels = ["x-direction", "z-direction"]
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
-    obs_list[i] = obs[obs[:, field_direction].argsort()]
+    obs_list[i] = obs[obs[:, field_direction[i]].argsort()]
 direction = obs_list[0][-1, :3]
 
 # %% magnetizations comparison
@@ -37,10 +37,10 @@ plot_mag = fig.add_subplot(321)
 
 for i, obs in enumerate(obs_list):
     for ob in obs:
-        plot_mag.errorbar(ob[field_direction], ob[5], yerr=ob[6], marker="o", markersize=2, color=cmap(i))
+        plot_mag.errorbar(ob[field_direction[i]], ob[5], yerr=ob[6], marker="o", markersize=2, color=cmap(i))
 
-    plot_mag.plot(obs[:, field_direction], obs[:, 5], marker="o", markersize=2, color=cmap(i), label=labels[i])
-plot_mag.set_xlabel(f"external field h{f_dict[field_direction]}")
+    plot_mag.plot(obs[:, field_direction[i]], obs[:, 5], marker="o", markersize=2, color=cmap(i), label=labels[i])
+plot_mag.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_mag.set_ylabel("magnetization")
 plot_mag.set_title(
     f"magnetization vs external field in {direction}-direction for ToricCode2d of shape=[{L},{L}]")
@@ -56,7 +56,7 @@ for i, obs in enumerate(obs_list):
     plot_abs_mag.plot(obs[:, field_direction], obs[:, 7], marker="o", markersize=2, color=cmap(i),
                       label=labels[i])
 
-plot_abs_mag.set_xlabel(f"external field h{f_dict[field_direction]}")
+plot_abs_mag.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_abs_mag.set_ylabel("absolute magnetization")
 plot_abs_mag.set_title(
     f" absolute magnetization vs external field in {direction}-direction for ToricCode2d of shape=[{L},{L}]")
@@ -70,7 +70,7 @@ for i, obs in enumerate(obs_list):
     plot_sus.plot(sus_fields[:, field_direction], sus, marker="o", markersize=2, color=cmap(i),
                   label=labels[i])
 
-plot_sus.set_xlabel(f"external field h{f_dict[field_direction]}")
+plot_sus.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_sus.set_ylabel("susceptibility of magnetization")
 plot_sus.set_title(
     f"susceptibility vs external field in {direction}-direction for ToricCode2d of shape=[{L},{L}]")
@@ -86,7 +86,7 @@ for i, obs in enumerate(obs_list):
     plot_wilson.plot(obs[:, field_direction], obs[:, 9], marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
-plot_wilson.set_xlabel(f"external field h{f_dict[field_direction]}")
+plot_wilson.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_wilson.set_ylabel("wilson loop < prod A_s * prod B_p >")
 plot_wilson.set_title(
     f"wilson loop (see Valenti et al) vs external field in {direction}-direction for ToricCode2d of shape=[{L},{L}]")
@@ -100,7 +100,7 @@ for i, obs in enumerate(obs_list):
     plot_energy.plot(obs[:, field_direction], obs[:, 3] / n_sites, marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
-plot_energy.set_xlabel(f"external field h{f_dict[field_direction]}")
+plot_energy.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_energy.set_ylabel("energy per site")
 plot_energy.set_title(
     f"energy per site vs external field in {direction}-direction for ToricCode2d of shape=[{L},{L}]")
@@ -114,7 +114,7 @@ for i, obs in enumerate(obs_list):
     plot_spheat.plot(obs[:, field_direction], np.abs(obs[:, 4]), marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
-plot_spheat.set_xlabel(f"external field h{f_dict[field_direction]}")
+plot_spheat.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_spheat.set_ylabel("specific heat")
 plot_spheat.set_title(
     f"specific heat vs external field in {direction}-direction for ToricCode2d of shape=[{L},{L}]")
