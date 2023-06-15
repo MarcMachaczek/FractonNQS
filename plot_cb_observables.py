@@ -9,21 +9,19 @@ matplotlib.rcParams.update({'font.size': 12})
 
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
+save_dir = f"{RESULTS_PATH}/checkerboard"
 
 # %%
-field_direction = [0,]  # 0=x, 1=y, 2=z
-shape = [6, 6, 6]
-hilbert_size = np.prod(shape)
+field_direction = [0, 0]  # 0=x, 1=y, 2=z
+shape = [[4, 4, 4], [6, 6, 6]]
+labels = ["L=4", "L=6"]
 eval_model = "CheckerCRBM"
-save_dir = f"{RESULTS_PATH}/checkerboard"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
     np.loadtxt(f"{save_dir}/L[4 4 4]_{eval_model}_observables.txt"))
 obs_list.append(
-    np.loadtxt(f"{save_dir}/L[{shape[0]} {shape[1]} {shape[2]}]_{eval_model}_observables.txt"))
-
-labels = ["L=4", "L=6"]
+    np.loadtxt(f"{save_dir}/L[6 6 6]_{eval_model}_observables.txt"))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
@@ -43,7 +41,7 @@ for i, obs in enumerate(obs_list):
 plot_mag.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_mag.set_ylabel("magnetization")
 plot_mag.set_title(
-    f"magnetization vs external field in {direction}-direction for Checkerboard of shape={shape}")
+    f"magnetization vs external field in {direction}-direction for Checkerboard")
 plot_mag.legend()
 
 # %% absolute magnetization
@@ -59,7 +57,7 @@ for i, obs in enumerate(obs_list):
 plot_abs_mag.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_abs_mag.set_ylabel("absolute magnetization")
 plot_abs_mag.set_title(
-    f" absolute magnetization vs external field in {direction}-direction for Checkerboard of shape={shape}")
+    f" absolute magnetization vs external field in {direction}-direction for Checkerboard")
 plot_abs_mag.legend()
 
 # %% susceptibility
@@ -73,20 +71,21 @@ for i, obs in enumerate(obs_list):
 plot_sus.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_sus.set_ylabel("susceptibility of magnetization")
 plot_sus.set_title(
-    f"susceptibility vs external field in {direction}-direction for Checkerboard of shape={shape}")
+    f"susceptibility vs external field in {direction}-direction for Checkerboard")
 plot_sus.legend()
 
 # %% energy per site
 plot_energy = fig.add_subplot(234)
 
 for i, obs in enumerate(obs_list):
+    hilbert_size = np.prod(shape[i])
     plot_energy.plot(obs[:, field_direction[i]], obs[:, 3] / hilbert_size, marker="o", markersize=2, color=cmap(i),
                      label=labels[i])
 
 plot_energy.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_energy.set_ylabel("energy per site")
 plot_energy.set_title(
-    f"energy per site vs external field in {direction}-direction for Checkerboard of shape={shape}")
+    f"energy per site vs external field in {direction}-direction for Checkerboard")
 
 plot_energy.legend()
 
@@ -101,7 +100,7 @@ for i, obs in enumerate(obs_list):
 plot_dEdh.set_xlabel(f"external field h{f_dict[field_direction[i]]}")
 plot_dEdh.set_ylabel("dE / dh")
 plot_dEdh.set_title(
-    f"energy derivative vs external field in {direction}-direction for Checkerboard of shape={shape}")
+    f"energy derivative vs external field in {direction}-direction for Checkerboard")
 plot_dEdh.legend()
 
 # %% specific heat / variance of the energy
@@ -114,7 +113,7 @@ for i, obs in enumerate(obs_list):
 plot_spheat.set_xlabel(f"external field h{f_dict[field_direction[0]]}")
 plot_spheat.set_ylabel("specific heat")
 plot_spheat.set_title(
-    f"specific heat vs external field in {direction}-direction for Checkerboard of shape={shape}")
+    f"specific heat vs external field in {direction}-direction for Checkerboard")
 
 plot_spheat.legend()
 plt.show()

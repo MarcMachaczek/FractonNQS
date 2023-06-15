@@ -22,24 +22,24 @@ matplotlib.rcParams.update({'font.size': 12})
 # %% training configuration
 save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h"
-pre_init = False  # True only has effect when swip=="independent"
+pre_init = True  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
-random_key = jax.random.PRNGKey(1494567)  # this can be used to make results deterministic, but so far is not used
+random_key = jax.random.PRNGKey(14954567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 1  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0.8, 0.]).reshape(-1, 1)
+direction = np.array([0., 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0., 0.62, 0.],
-                                                        [0., 0.64, 0.]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.32],
+                                                        [0., 0., 0.34]])))
 
-save_fields = np.array([[0., 0.2, 0.],
-                        [0., 0.6, 0.],
-                        [0., 0.8, 0.]])
+save_fields = np.array([[0., 0., 0.1],
+                        [0., 0., 0.3],
+                        [0., 0., 0.6]])
 
 # %% operators on hilbert space
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -123,7 +123,7 @@ loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  
 loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-alpha = 2
+alpha = 1
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
                                    correlator_symmetries=correlator_symmetries,
@@ -160,12 +160,12 @@ if pre_init:
     vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
     random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
     vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
-    vqs = vqs_exact_samp
+    vqs = vqs_full
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/100)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/100)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)
