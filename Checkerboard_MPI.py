@@ -49,12 +49,12 @@ random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0.8, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0.41, 0, 0],
-                                                        [0.42, 0, 0],
-                                                        [0.43, 0, 0],
-                                                        [0.44, 0, 0],
-                                                        [0.45, 0, 0],
-                                                        [0.46, 0, 0]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
+                                                        [0.32, 0, 0],
+                                                        [0.33, 0, 0],
+                                                        [0.34, 0, 0],
+                                                        [0.35, 0, 0],
+                                                        [0.36, 0, 0]])))
 # for which fields indices histograms are created
 hist_fields = np.array([[0.2, 0, 0.],
                         [0.42, 0, 0.],
@@ -62,10 +62,10 @@ hist_fields = np.array([[0.2, 0, 0.],
                         [0.6, 0, 0.]])
 field_strengths = np.array([[0.36, 0, 0],
                             [0.38, 0, 0],
-                            [0.5, 0, 0],
-                            [0.6, 0, 0],
-                            [0.7, 0, 0],
-                            [0.8, 0, 0]])
+                            [0.39, 0, 0],
+                            [0.4, 0, 0],
+                            [0.41, 0, 0],
+                            [0.42, 0, 0]])
 hist_fields = field_strengths
 save_fields = field_strengths  # field values for which vqs is serialized
 
