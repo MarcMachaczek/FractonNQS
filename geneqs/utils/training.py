@@ -19,7 +19,8 @@ def loop_gs(v_state: nk.vqs.MCState,
             optimizer: Any,
             preconditioner: Any,
             n_iter: int,
-            min_steps: int = None):
+            min_steps: int = None,
+            out: int = None):
     """
     Training function with some additional functionality, like timing of each step, early stopping, logging etc.
     Args:

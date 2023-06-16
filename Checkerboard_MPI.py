@@ -37,6 +37,7 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
+save_stats = True  # whether or not to save run statistics like R_hat etc
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
