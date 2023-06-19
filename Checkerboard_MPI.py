@@ -37,7 +37,7 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
-save_stats = True  # whether or not to save run statistics like R_hat etc
+save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
@@ -224,7 +224,11 @@ for h in tqdm(field_strengths, "external_field"):
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
 
-    vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    if save_stats:
+        out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
+    else:
+        out_path = None
+    vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
 
     # calculate observables, therefore set some params of vqs

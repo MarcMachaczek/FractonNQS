@@ -20,7 +20,8 @@ def loop_gs(v_state: nk.vqs.MCState,
             preconditioner: Any,
             n_iter: int,
             min_steps: int = None,
-            out: int = None):
+            obs: dict = None,
+            out: str = None):
     """
     Training function with some additional functionality, like timing of each step, early stopping, logging etc.
     Args:
@@ -30,6 +31,8 @@ def loop_gs(v_state: nk.vqs.MCState,
         preconditioner: Gradient transformation like, for instance, stochastic reconfiguration.
         n_iter: Number of training iterations.
         min_steps: Minimum number of iterations before callback convergence criteria might cause early stopping.
+        obs: Observables to be tracked during training. Values are saved in log file. {obs_name: obs_operator, ...}
+        out: Where to save training_stats. None if no stats should be saved, else save_path.
 
     Returns:
         trained variational state, logger containing training information
@@ -92,6 +95,9 @@ def loop_gs(v_state: nk.vqs.MCState,
                                  "sr": sr_time,
                                  "p_update": p_update_time,
                                  "total": total_time}
+            if obs is not None:
+                for obs_name, obs_operator in obs.items():
+                    log_data[obs_name] = v_state.expect(obs_operator)
             callback_stop = not cb(epoch, log_data, v_state)
             log(epoch, log_data, v_state)
 
@@ -115,6 +121,8 @@ def loop_gs(v_state: nk.vqs.MCState,
 
             pbar.update(1)
 
+    if out is not None:
+        log.serialize(out)
     return v_state, log.data
 
 
@@ -130,15 +138,19 @@ def driver_gs(v_state: nk.vqs.VariationalState,
               optimizer: Any,
               preconditioner: Any,
               n_iter: int,
-              min_steps: int = None):
+              min_steps: int = None,
+              obs: dict = None,
+              out: str = None):
     if min_steps is None:
         min_steps = n_iter
     gs_driver = nk.driver.VMC(hamiltonian, optimizer, variational_state=v_state, preconditioner=preconditioner)
 
-    log = nk.logging.RuntimeLog()
     cb = DriverCallback(min_delta=0.1, min_steps=min_steps, patience=20, monitor="mean")
-    gs_driver.run(n_iter=n_iter, out=log, callback=cb)
+    log = nk.logging.RuntimeLog()
+    gs_driver.run(n_iter=n_iter, out=log, obs=obs, callback=cb)
 
+    if out is not None:
+        log.serialize(out)
     return v_state, log.data
 
 

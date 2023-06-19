@@ -235,6 +235,10 @@ for h in tqdm(field_strengths, "external_field"):
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
 
+    if save_stats:
+        out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
+    else:
+        out_path = None
     vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
     last_trained_params = vqs.parameters
     last_sampler_state = vqs.sampler_state

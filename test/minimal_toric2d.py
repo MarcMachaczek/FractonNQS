@@ -49,7 +49,7 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
 
 # %%
 # setting hyper-parameters
-n_iter = 120
+n_iter = 30
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 4
 n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
@@ -101,8 +101,7 @@ sigma1 = jnp.ones(hilbert.size)
 sigma2 = sigma1.at[0].set(-1)
 sigma = jnp.stack((sigma1, sigma2), axis=0)
 
-# print("test begins here")
-# y = cRBM.apply({"params": vqs.parameters}, sigma)
-
-vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter)
+vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter,
+                    obs={"star": geneqs.operators.toric_2d.get_netket_star(hilbert, jnp.array([0, 0]), shape),
+                         "plaq": geneqs.operators.toric_2d.get_netket_plaq(hilbert, jnp.array([0, 0]), shape)})
 
