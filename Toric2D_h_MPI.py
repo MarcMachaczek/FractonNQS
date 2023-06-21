@@ -37,40 +37,35 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
-save_stats = False  # whether or not to save run statistics like R_hat etc
+save_stats = True  # whether or not to save run statistics like R_hat etc
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
 direction_index = 2  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
+direction = np.array([0., 0., 0.7]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 8) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
                                                         [0., 0, 0.33],
                                                         [0., 0, 0.35]])))
 
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.2],
-                        [0., 0, 0.33],
-                        [0., 0, 0.5]])
-save_fields = np.array([[0., 0, 0.2],
-                        [0., 0, 0.31],
-                        [0., 0, 0.33],
-                        [0., 0, 0.5]])  # field values for which vqs is serialized
+hist_fields = np.array([[0., 0, 0.33]])
+save_fields = field_strengths  # field values for which vqs is serialized
 
-field_strengths = np.array([[0., 0, 0.35],
-                            [0., 0, 0.4],
-                            [0., 0, 0.5],
-                            [0., 0, 0.6],
-                            [0., 0, 0.7]])
+# field_strengths = np.array([[0., 0, 0.35],
+#                             [0., 0, 0.4],
+#                             [0., 0, 0.5],
+#                             [0., 0, 0.6],
+#                             [0., 0, 0.7]])
 
-hist_fields = field_strengths
+# hist_fields = field_strengths
 
-save_fields = field_strengths
+# save_fields = field_strengths
 
 # %% operators on hilbert space
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
@@ -239,7 +234,7 @@ for h in tqdm(field_strengths, "external_field"):
         out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
     else:
         out_path = None
-    vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
+    vqs, training_data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
     last_sampler_state = vqs.sampler_state
 

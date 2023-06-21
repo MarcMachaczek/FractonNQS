@@ -12,16 +12,14 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/toric2d_h"
 
 # %%
-field_direction = [0, 2]
+field_direction = [2,]
 L = 8
-labels = ["x-direction", "z-direction"]
+labels = ["z-direction",]
 eval_model = "ToricCRBM"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
     np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables.txt"))
-obs_list.append(
-    np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables_hz.txt"))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
