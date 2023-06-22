@@ -317,9 +317,9 @@ if rank == 0:
 
     c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[direction_index], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[direction_index], np.abs(obs[5]), yerr=obs[6], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 5]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external magnetic field")
     plot.set_ylabel("magnetization")

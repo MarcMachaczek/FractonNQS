@@ -40,7 +40,7 @@ save_results = True
 save_stats = True  # whether or not to save run statistics like R_hat etc
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
@@ -329,9 +329,9 @@ if rank == 0:
 
     c = "red"
     for obs in obs_to_array:
-        plot.errorbar(obs[direction_index], np.abs(obs[3]), yerr=obs[4], marker="o", markersize=2, color=c)
+        plot.errorbar(obs[direction_index], np.abs(obs[5]), yerr=obs[6], marker="o", markersize=2, color=c)
 
-    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 3]), marker="o", markersize=2, color=c)
+    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 5]), marker="o", markersize=2, color=c)
 
     plot.set_xlabel("external magnetic field")
     plot.set_ylabel("magnetization")
