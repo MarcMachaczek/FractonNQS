@@ -57,12 +57,7 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
                                                         [0.35, 0, 0],
                                                         [0.36, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.2, 0, 0.],
-                        [0.42, 0, 0.],
-                        [0.44, 0, 0.],
-                        [0.6, 0, 0.]])
-field_strengths = np.array([[0.37, 0, 0]])
-hist_fields = field_strengths
+hist_fields = np.array([[0.39, 0, 0.]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -112,7 +107,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 100  # standard deviation for transfer learning noise
+trans_dev = stddev / 10  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -230,6 +225,7 @@ for h in tqdm(field_strengths, "external_field"):
         out_path = None
     vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
+    last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
     vqs.chunk_size = chunk_size

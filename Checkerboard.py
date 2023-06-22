@@ -22,12 +22,13 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = False
+save_stats = False  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
-random_key = jax.random.PRNGKey(421)  # can be used to make results more deterministic, so far only used for weight init
+random_key = jax.random.PRNGKey(42659)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
 direction_index = 0  # 0 for x, 1 for y, 2 for z;
@@ -39,11 +40,8 @@ field_strengths = (np.linspace(0, 1, 20) * direction).T
 #                                                         [0.34, 0, 0],
 #                                                         [0.35, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0, 0.],
-                        [0.43, 0, 0.],
-                        [0.44, 0, 0.],
-                        [0.6, 0, 0.]])
-save_fields = hist_fields  # field values for which vqs is serialized
+hist_fields = np.array([[0.3, 0, 0.]])
+save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
 L = 4  # this translates to L+1 without PBC
@@ -80,8 +78,8 @@ n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
+diag_shift_begin = int(n_iter * 2 / 5)
+diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
@@ -92,12 +90,13 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 # learning rate scheduling
 lr_init = 0.01
 lr_end = 0.001
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
+transition_begin = int(n_iter * 3 / 5)
+transition_steps = int(n_iter * 1 / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
-stddev = 0.008
+stddev = 0.01
+trans_dev = stddev / 10  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -139,7 +138,7 @@ xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
 zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
 # noinspection PyArgumentList
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.08, 0.08, 0.09),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.51, 0.25, 0.08, 0.08, 0.08),
                                                           [single_rule,
                                                            cube_rule,
                                                            xstring_rule,
@@ -178,8 +177,10 @@ if pre_init:
     print("init energy", vqs.expect(checkerboard))
 
 last_trained_params = None
+last_sampler_state = None
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
+    print(f"training for field={h}")
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
@@ -188,18 +189,24 @@ for h in tqdm(field_strengths, "external_field"):
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
-            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
-            vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, trans_dev)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
+            vqs.parameters = jax.tree_util.tree_map(lambda ltp, rn, cn: ltp + rn + 1j * cn,
                                                     last_trained_params, real_noise, complex_noise)
-        elif pre_init:
-            vqs.parameters = pre_init_parameters
+        # if last_sampler_state is not None:
+        #     vqs.sampler_state = last_sampler_state
+        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
 
-    vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    if save_stats:
+        out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
+    else:
+        out_path = None
+    vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
+    last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
     vqs.chunk_size = chunk_size
@@ -240,17 +247,17 @@ for h in tqdm(field_strengths, "external_field"):
 
     n_params = int(training_data["n_params"].value)
     plot.errorbar(training_data["Energy"].iters, training_data["Energy"].Mean, yerr=training_data["Energy"].Sigma,
-                  label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
+                  label=f"Energy")
 
-    fig.suptitle(f" Checkerboard h={tuple([round(hi, 3) for hi in h])}: size={shape},"
-                 f" {eval_model}, alpha={alpha},"
+    fig.suptitle(f" Checkerboard h={tuple([round(hi, 3) for hi in h])}: size={shape} \n"
+                 f" {eval_model}, alpha={alpha}, #p={n_params}, lr from {lr_init} to {lr_end} \n"
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_init={pre_init}, stddev={stddev}, swipe={swipe}")
+                 f" pre_init={pre_init}, stddev={stddev}, trans_dev={trans_dev}, swipe={swipe}")
 
-    plot.set_xlabel("iterations")
-    plot.set_ylabel("energy")
+    plot.set_xlabel("Training Iterations")
+    plot.set_ylabel("Observables")
 
     E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.item().real
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"

@@ -42,6 +42,7 @@ save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
+# options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
@@ -119,7 +120,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 10 # standard deviation for transfer learning noise
+trans_dev = stddev / 10  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
