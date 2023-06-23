@@ -223,7 +223,10 @@ for h in tqdm(field_strengths, "external_field"):
         out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
     else:
         out_path = None
-    vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
+    if rank == 0:  # make sure stats are only saved by one node, otherwise json file gets corrupted
+        vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
+    else:
+        vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
     last_trained_params = vqs.parameters
     last_sampler_state = vqs.sampler_state
 

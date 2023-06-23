@@ -22,7 +22,7 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = False
-save_stats = False  # whether to save stats logged during training to drive
+save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
@@ -40,11 +40,12 @@ field_strengths = np.vstack((field_strengths, np.array([[0.31, 0, 0],
                                                         [0.34, 0, 0],
                                                         [0.35, 0, 0]])))
 # for which fields indices histograms are created
-hist_fields = np.array([[0.3, 0, 0.]])
+field_strengths = np.array([[0, 0, 0]])
+hist_fields = np.array([[0., 0, 0.]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
-L = 4  # size should be at least 3, else there are problems with pbc and indexing
+L = 3  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -72,7 +73,7 @@ square_graph.draw(ax)
 plt.show()
 
 # %%  setting hyper-parameters and model
-n_iter = 600
+n_iter = 6
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
