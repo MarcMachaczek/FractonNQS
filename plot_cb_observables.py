@@ -12,16 +12,14 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/checkerboard"
 
 # %%
-field_direction = [0, 0]  # 0=x, 1=y, 2=z
-shape = [[4, 4, 4], [6, 6, 6]]
-labels = ["L=4", "L=6"]
+field_direction = [2]  # 0=x, 1=y, 2=z
+shape = [[4, 2, 2]]
+labels = ["L=[4, 2, 2]"]
 eval_model = "CheckerCRBM"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    np.loadtxt(f"{save_dir}/L[4 4 4]_{eval_model}_observables.txt"))
-obs_list.append(
-    np.loadtxt(f"{save_dir}/L[6 6 6]_{eval_model}_observables.txt"))
+    np.loadtxt(f"{save_dir}/L[4 2 2]_{eval_model}_observables.txt"))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):

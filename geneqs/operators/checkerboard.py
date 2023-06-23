@@ -17,8 +17,8 @@ class Checkerboard(nk.operator.DiscreteOperator):
             self.h = (0., 0., 0.)
         else:
             self.h = h
-        if h[1] != 0:
-            print("Warning: hy field is currently disabled tor reduce memory cost")
+        # if h[1] != 0:
+        #     print("Warning: hy field is currently disabled to reduce memory cost")
 
         # get corresponding indices on which the operators act on
         positions = jnp.asarray([(x, y, z)
@@ -119,7 +119,7 @@ def checkerboard_conns_and_mels(sigma: jax.Array,
     # n_sites mels corresponding to flipped cubes
     cube_mels = -jnp.ones(n_cubes)
     # mel according to hx and hy
-    field_mels = -hx * jnp.ones(n_sites) # TODO: include hy again if needed! - hy * sigma * 1j
+    field_mels = -hx * jnp.ones(n_sites) - hy * sigma * 1j
     mels = jnp.hstack((diag_mel, cube_mels, field_mels))
     return eta, mels
 

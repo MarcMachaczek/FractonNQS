@@ -24,15 +24,15 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0., 0., 0.7]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 8) * direction).T
+direction_index = 1  # 0 for x, 1 for y, 2 for z;
+direction = np.array([0., 0., 0.9]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 10) * direction).T
 
 field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
                                                         [0., 0., 0.44],
@@ -207,7 +207,7 @@ for h in tqdm(field_strengths, "external_field"):
     else:
         out_path = None
     # use driver gs if vqs is exact_state aka full_summation_state
-    vqs, training_data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    vqs, training_data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
 
     # calculate observables, therefore set some params of vqs
