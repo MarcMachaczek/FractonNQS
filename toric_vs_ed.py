@@ -184,7 +184,6 @@ if pre_init:
     print("init energy", vqs.expect(toric))
 
 last_trained_params = None
-last_sampler_state = None
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     print(f"training for field={h}")
@@ -219,7 +218,6 @@ for h in tqdm(field_strengths, "external_field"):
     # use driver gs if vqs is exact_state aka full_summation_state
     vqs, training_data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
-    last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
     # vqs.n_samples = n_expect
