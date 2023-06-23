@@ -253,8 +253,10 @@ for h in tqdm(field_strengths, "external_field"):
     plot.set_ylabel("Observables")
 
     E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.real
+    psi = vqs.to_array()
+    full_probabilities = psi * jnp.conjugate(psi)
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
-                   f" down to {diag_shift_end}")
+                   f" down to {diag_shift_end}, max_prob = {jnp.max(full_probabilities)}")
     plot.legend()
     if save_results:
         fig.savefig(
