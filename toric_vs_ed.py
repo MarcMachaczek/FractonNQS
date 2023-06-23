@@ -21,8 +21,9 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
+save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h"
-pre_init = True  # True only has effect when swip=="independent"
+pre_init = False  # True only has effect when swipe=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
@@ -74,8 +75,8 @@ chunk_size = n_samples
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
+diag_shift_begin = int(n_iter * 2 / 5)
+diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
@@ -85,20 +86,14 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.01
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
+lr_end = 0.001
+transition_begin = int(n_iter * 3 / 5)
+transition_steps = int(n_iter * 1 / 3)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
-# create custom update rule
-single_rule = nk.sampler.rules.LocalRule()
-vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
-xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
-ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
-                                                          [single_rule, vertex_rule, xstring_rule, ystring_rule])
 # define correlation enhanced RBM
 stddev = 0.01
+trans_dev = stddev / 10  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations
@@ -144,6 +139,14 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
 model = cRBM
 eval_model = "ToricCRBM"
 
+# create custom update rule
+single_rule = nk.sampler.rules.LocalRule()
+vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
+xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
+ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
+                                                          [single_rule, vertex_rule, xstring_rule, ystring_rule])
+
 field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":
@@ -181,8 +184,10 @@ if pre_init:
     print("init energy", vqs.expect(toric))
 
 last_trained_params = None
+last_sampler_state = None
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
+    print(f"training for field={h}")
     toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
     toric_nk = geneqs.operators.toric_2d.get_netket_toric2dh(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
@@ -196,18 +201,25 @@ for h in tqdm(field_strengths, "external_field"):
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev/10)
-            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev/10)
-            vqs.parameters = jax.tree_util.tree_map(lambda ltp, r, c: ltp + r + 1j * c,
+            real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, trans_dev)
+            complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
+            vqs.parameters = jax.tree_util.tree_map(lambda ltp, rn, cn: ltp + rn + 1j * cn,
                                                     last_trained_params, real_noise, complex_noise)
-        elif pre_init:
-            vqs.parameters = pre_init_parameters
+        # if last_sampler_state is not None:
+        #     vqs.sampler_state = last_sampler_state
+        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
+
+    if save_stats:
+        out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
+    else:
+        out_path = None
     # use driver gs if vqs is exact_state aka full_summation_state
-    vqs, training_data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
+    vqs, training_data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     last_trained_params = vqs.parameters
+    last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
     # vqs.n_samples = n_expect
@@ -242,17 +254,17 @@ for h in tqdm(field_strengths, "external_field"):
 
     n_params = int(training_data["n_params"].value)
     plot.errorbar(training_data["Energy"].iters, training_data["Energy"].Mean, yerr=training_data["Energy"].Sigma,
-                  label=f"{eval_model}, lr_init={lr_init}, #p={n_params}")
+                  label=f"Energy")
 
     fig.suptitle(f" ToricCode2d h={tuple([round(hi, 3) for hi in h])}: size={shape},"
-                 f" {eval_model}, alpha={alpha},"
+                 f" {eval_model}, alpha={alpha}, #p={n_params}, lr from {lr_init} to {lr_end} \n"
                  f" n_discard={n_discard_per_chain},"
                  f" n_chains={n_chains},"
                  f" n_samples={n_samples} \n"
-                 f" pre_init={pre_init}, stddev={stddev}, swipe={swipe}")
+                 f" pre_init={pre_init}, stddev={stddev}, trans_dev={trans_dev}, swipe={swipe}")
 
-    plot.set_xlabel("iterations")
-    plot.set_ylabel("energy")
+    plot.set_xlabel("Training Iterations")
+    plot.set_ylabel("Observables")
 
     E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.real
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"

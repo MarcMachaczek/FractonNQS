@@ -39,7 +39,7 @@ matplotlib.rcParams.update({'font.size': 12})
 save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
-pre_init = False  # True only has effect when swip=="independent"
+pre_init = False  # True only has effect when swipe=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/checkerbaord/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs

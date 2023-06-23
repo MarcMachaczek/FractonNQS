@@ -37,7 +37,7 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
-save_stats = True  # whether or not to save run statistics like R_hat etc
+save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
@@ -57,16 +57,6 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
 # for which fields indices histograms are created
 hist_fields = np.array([[0., 0, 0.33]])
 save_fields = field_strengths  # field values for which vqs is serialized
-
-# field_strengths = np.array([[0., 0, 0.35],
-#                             [0., 0, 0.4],
-#                             [0., 0, 0.5],
-#                             [0., 0, 0.6],
-#                             [0., 0, 0.7]])
-
-# hist_fields = field_strengths
-
-# save_fields = field_strengths
 
 # %% operators on hilbert space
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
@@ -183,8 +173,8 @@ if pre_init:
 
     # exact ground state parameters for the 2d toric code, start with just noisy parameters
     random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
-    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, trans_dev)
-    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
+    real_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_real, vqs.parameters, stddev)
+    complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, stddev)
     gs_params = jax.tree_util.tree_map(lambda real, comp: real + 1j * comp, real_noise, complex_noise)
     # now set the exact parameters, this way noise is only added to all but the non-zero exact params
     plaq_idxs = toric.plaqs[0].reshape(1, -1)

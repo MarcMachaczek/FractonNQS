@@ -67,7 +67,7 @@ geneqs.utils.plotting.plot_checkerboard(ax, L)
 plt.show()
 
 # %%  setting hyper-parameters and model
-n_iter = 1000
+n_iter = 600
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
