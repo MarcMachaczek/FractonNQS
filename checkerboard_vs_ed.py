@@ -31,12 +31,12 @@ random_key = jax.random.PRNGKey(1234567)  # this can be used to make results det
 
 # define fields for which to trian the NQS and get observables
 direction_index = 1  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0., 0., 0.9]).reshape(-1, 1)
+direction = np.array([0., 0.9, 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.42],
-                                                        [0., 0., 0.44],
-                                                        [0., 0., 0.46]])))
+field_strengths = np.vstack((field_strengths, np.array([[0., 0.38, 0.],
+                                                        [0., 0.42, 0.],
+                                                        [0., 0.77, 0.]])))
 
 save_fields = field_strengths  # field values for which vqs is serialized
 
