@@ -105,7 +105,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 lr_init = 0.01
 lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
-transition_steps = int(n_iter * 1 / 3)
+transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
@@ -158,6 +158,8 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1)
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # make sure hist and save fields are contained in field_strengths and sort final field array
+hist_fields = np.round(hist_fields, 3)
+save_fields = np.round(save_fields, 3)
 field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":

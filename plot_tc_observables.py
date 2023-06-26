@@ -13,7 +13,7 @@ save_dir = f"{RESULTS_PATH}/toric2d_h"
 
 # %%
 field_direction = [2,]
-L = 8
+L = 3
 labels = ["z-direction",]
 eval_model = "ToricCRBM"
 obs_list = []

@@ -24,7 +24,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(14954567)  # this can be used to make results deterministic, but so far is not used
@@ -88,7 +88,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 lr_init = 0.01
 lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
-transition_steps = int(n_iter * 1 / 3)
+transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
@@ -147,6 +147,7 @@ ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
+save_fields = np.round(save_fields, 3)
 field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":
@@ -206,7 +207,7 @@ for h in tqdm(field_strengths, "external_field"):
                                                     last_trained_params, real_noise, complex_noise)
         # if last_sampler_state is not None:
         #     vqs.sampler_state = last_sampler_state
-        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
+        # vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters

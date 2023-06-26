@@ -24,7 +24,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
@@ -79,7 +79,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 lr_init = 0.01
 lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
-transition_steps = int(n_iter * 1 / 3)
+transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
@@ -141,6 +141,7 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.51, 0.25, 0.08, 0.0
                                                            zstring_rule])
 
 # make sure hist and save fields are contained in field_strengths and sort final field array
+save_fields = np.round(save_fields, 3)
 field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":
