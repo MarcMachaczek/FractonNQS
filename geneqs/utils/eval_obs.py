@@ -40,9 +40,11 @@ class ObservableCollector:
         # add name if not present
         if name not in self.observables.keys():
             self.observables[name] = OrderedDict()
+            self.observables[f"{name}_err"] = OrderedDict()
             self.observables[f"{name}_var"] = OrderedDict()
 
         self.observables[name][key] = nk_obs.Mean.item().real
+        self.observables[f"{name}_err"][key] = nk_obs.error_of_mean.item().real
         self.observables[f"{name}_var"][key] = nk_obs.Variance.item().real
 
     def add_hist(self, name: str, key, histogram: tuple[np.ndarray, np.ndarray]):
