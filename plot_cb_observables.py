@@ -20,7 +20,7 @@ eval_model = "CheckerCRBM"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    pd.read_csv(f"{save_dir}/L[4 4 4]_{eval_model}_observables.txt", sep=" ",header=0))
+    pd.read_csv(f"{save_dir}/L[4 4 4]_{eval_model}_observables.txt", sep=" ", header=0))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
@@ -33,10 +33,11 @@ fig = plt.figure(dpi=300, figsize=(34, 22))
 plot_mag = fig.add_subplot(231)
 
 for i, obs in enumerate(obs_list):
-    plot_mag.errorbar(obs.iloc[:, field_direction], obs["mag"], yerr=obs["mag_var"], marker="o", markersize=2, color=cmap(i))
+    plot_mag.errorbar(obs.iloc[:, field_direction], obs["mag"], yerr=obs["mag_err"], marker="o", markersize=2,
+                      color=cmap(i))
 
     plot_mag.plot(obs.iloc[:, field_direction], obs["mag"], marker="o", markersize=2, color=cmap(i),
-    label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
+                  label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
 
 plot_mag.set_xlabel(f"external field")
 plot_mag.set_ylabel("magnetization")
@@ -48,7 +49,8 @@ plot_mag.legend()
 plot_abs_mag = fig.add_subplot(232)
 
 for i, obs in enumerate(obs_list):
-    plot_abs_mag.errorbar(obs.iloc[:, field_direction], obs["abs_mag"], yerr=obs["abs_mag_var"], marker="o", markersize=2, color=cmap(i))
+    plot_abs_mag.errorbar(obs.iloc[:, field_direction], obs["abs_mag"], yerr=obs["abs_mag_err"], marker="o",
+                          markersize=2, color=cmap(i))
 
     plot_abs_mag.plot(obs.iloc[:, field_direction], obs["abs_mag"], marker="o", markersize=2, color=cmap(i),
                       label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
@@ -78,7 +80,11 @@ plot_energy = fig.add_subplot(234)
 
 for i, obs in enumerate(obs_list):
     hilbert_size = np.prod(shape[i])
-    plot_energy.plot(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size, marker="o", markersize=2, color=cmap(i),
+    plot_abs_mag.errorbar(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size,
+                          yerr=obs["energy_err"].values / hilbert_size, marker="o", markersize=2, color=cmap(i))
+
+    plot_energy.plot(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size, marker="o", markersize=2,
+                     color=cmap(i),
                      label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
 
 plot_energy.set_xlabel(f"external field")
@@ -92,7 +98,8 @@ plot_energy.legend()
 plot_dEdh = fig.add_subplot(235)
 
 for i, obs in enumerate(obs_list):
-    dEdh, fd_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs["energy"].values, fields=obs.iloc[:, :3].values)
+    dEdh, fd_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs["energy"].values,
+                                                          fields=obs.iloc[:, :3].values)
     plot_dEdh.plot(fd_fields[:, field_direction[i]], dEdh, marker="o", markersize=2, color=cmap(i),
                    label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
 
@@ -106,7 +113,8 @@ plot_dEdh.legend()
 plot_spheat = fig.add_subplot(236)
 
 for i, obs in enumerate(obs_list):
-    plot_spheat.plot(obs.iloc[:, field_direction], np.abs(obs["energy_var"].values), marker="o", markersize=2, color=cmap(i),
+    plot_spheat.plot(obs.iloc[:, field_direction], np.abs(obs["energy_var"].values), marker="o", markersize=2,
+                     color=cmap(i),
                      label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
 
 plot_spheat.set_xlabel(f"external field")
