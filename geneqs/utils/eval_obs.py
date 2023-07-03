@@ -44,7 +44,7 @@ class ObservableCollector:
             self.observables[f"{name}_var"] = OrderedDict()
 
         self.observables[name][key] = nk_obs.Mean.item().real
-        self.observables[f"{name}_err"][key] = nk_obs.error_of_mean.item().real
+        self.observables[f"{name}_err"][key] = nk_obs.error_of_mean.real
         self.observables[f"{name}_var"][key] = nk_obs.Variance.item().real
 
     def add_hist(self, name: str, key, histogram: tuple[np.ndarray, np.ndarray]):

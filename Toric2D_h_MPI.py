@@ -306,7 +306,7 @@ for h in tqdm(field_strengths, "external_field"):
             save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
             with open(f"{save_path}/L{shape}_{eval_model}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{save_path}/L{shape}_{eval_model}_observables.txt") == 0:
-                    np.savetxt(f, save_array, header=", ".join(observables.key_names + observables.obs_names))
+                    np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names), comments="")
                 else:
                     np.savetxt(f, save_array)
 

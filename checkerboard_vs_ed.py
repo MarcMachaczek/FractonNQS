@@ -269,7 +269,7 @@ exact_energies = np.array(exact_energies).reshape(-1, 1)
 if save_results:
     save_array = np.concatenate((observables.obs_to_array(separate_keys=False), exact_energies), axis=1)
     np.savetxt(f"{save_path}/L{shape}_{eval_model}_observables.txt", save_array,
-               header=", ".join(observables.key_names + observables.obs_names + ["exact_energy"]))
+               header=" ".join(observables.key_names + observables.obs_names + ["exact_energy"]), comments="")
 
 # %% create and save relative error plot
 fig = plt.figure(dpi=300, figsize=(10, 10))

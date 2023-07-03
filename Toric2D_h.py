@@ -284,7 +284,7 @@ for h in tqdm(field_strengths, "external_field"):
 if save_results:
     save_array = observables.obs_to_array(separate_keys=False)
     np.savetxt(f"{save_path}/L{shape}_{eval_model}_observables.txt", save_array,
-               header=", ".join(observables.key_names + observables.obs_names))
+               header=" ".join(observables.key_names + observables.obs_names), comments="")
 
     for hist_name, _ in observables.histograms.items():
         np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
