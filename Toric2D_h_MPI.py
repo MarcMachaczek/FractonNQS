@@ -315,26 +315,3 @@ if rank == 0:
     for hist_name, _ in observables.histograms.items():
         np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
                 observables.hist_to_array(hist_name))
-
-# %% create and save magnetization plot
-if rank == 0:
-    obs_to_array = np.loadtxt(f"{save_path}/L{shape}_{eval_model}_observables.txt")
-
-    fig = plt.figure(dpi=300, figsize=(10, 10))
-    plot = fig.add_subplot(111)
-
-    c = "red"
-    for obs in obs_to_array:
-        plot.errorbar(obs[direction_index], np.abs(obs[5]), yerr=obs[6], marker="o", markersize=2, color=c)
-
-    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 5]), marker="o", markersize=2, color=c)
-
-    plot.set_xlabel("external magnetic field")
-    plot.set_ylabel("magnetization")
-    plot.set_title(
-        f"Magnetization vs external field in {direction.flatten()}-direction for ToricCode2d of size={shape}")
-
-    plot.set_xlim(0, field_strengths[-1][direction_index])
-
-    if save_results:
-        fig.savefig(f"{save_path}/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")

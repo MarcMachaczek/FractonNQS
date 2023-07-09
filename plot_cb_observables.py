@@ -13,7 +13,7 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/checkerboard"
 
 # %%
-field_direction = [0]  # 0=x, 1=y, 2=z
+field_direction = [2]  # 0=x, 1=y, 2=z
 shape = [[4, 4, 4]]
 labels = ["L=[4, 4, 4]"]
 eval_model = "CheckerCRBM"
@@ -80,7 +80,7 @@ plot_energy = fig.add_subplot(234)
 
 for i, obs in enumerate(obs_list):
     hilbert_size = np.prod(shape[i])
-    plot_abs_mag.errorbar(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size,
+    plot_energy.errorbar(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size,
                           yerr=obs["energy_err"].values / hilbert_size, marker="o", markersize=2, color=cmap(i))
 
     plot_energy.plot(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size, marker="o", markersize=2,

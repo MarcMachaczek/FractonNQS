@@ -40,14 +40,14 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[4 4 4]_h(0.0, 0.0, 0.47).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 0., 0.7]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 8) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.33],
@@ -81,8 +81,8 @@ field_strengths = np.array([[0., 0., 0.8],
                             [0., 0., 0.2],
                             [0., 0., 0.1],
                             [0., 0., 0.]])
-field_strengths[:, [0, 2]] = field_strengths[:, [2,0]]
-hist_fields = np.array([[0.4, 0, 0.]])
+# field_strengths[:, [0, 2]] = field_strengths[:, [2,0]]
+hist_fields = np.array([[0., 0, 0.4]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -132,7 +132,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 10  # standard deviation for transfer learning noise
+trans_dev = 0 # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -241,7 +241,7 @@ for h in tqdm(field_strengths, "external_field"):
                                                     last_trained_params, real_noise, complex_noise)
         if last_sampler_state is not None:
             vqs.sampler_state = last_sampler_state
-            vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
+            # vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
@@ -334,26 +334,3 @@ if rank == 0:
     for hist_name, _ in observables.histograms.items():
         np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
                 observables.hist_to_array(hist_name))
-
-# %% create and save magnetization plot
-if rank == 0:
-    obs_to_array = np.loadtxt(f"{save_path}/L{shape}_{eval_model}_observables.txt")
-
-    fig = plt.figure(dpi=300, figsize=(10, 10))
-    plot = fig.add_subplot(111)
-
-    c = "red"
-    for obs in obs_to_array:
-        plot.errorbar(obs[direction_index], np.abs(obs[5]), yerr=obs[6], marker="o", markersize=2, color=c)
-
-    plot.plot(obs_to_array[:, direction_index], np.abs(obs_to_array[:, 5]), marker="o", markersize=2, color=c)
-
-    plot.set_xlabel("external magnetic field")
-    plot.set_ylabel("magnetization")
-    plot.set_title(
-        f"Magnetization vs external field in {direction.flatten()}-direction for Checkerboard of size={shape}")
-
-    plot.set_xlim(0, field_strengths[-1][direction_index])
-
-    if save_results:
-        fig.savefig(f"{save_path}/Magnetizations_L{shape}_{eval_model}_hdir{direction.flatten()}.pdf")
