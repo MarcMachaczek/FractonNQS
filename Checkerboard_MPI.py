@@ -40,14 +40,14 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[4 4 4]_h(0.0, 0.0, 0.47).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 0., 0.7]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 8) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.33],
@@ -81,8 +81,8 @@ field_strengths = np.array([[0., 0., 0.8],
                             [0., 0., 0.2],
                             [0., 0., 0.1],
                             [0., 0., 0.]])
-# field_strengths[:, [0, 2]] = field_strengths[:, [2,0]]
-hist_fields = np.array([[0., 0, 0.4]])
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+hist_fields = np.array([[0.41, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
