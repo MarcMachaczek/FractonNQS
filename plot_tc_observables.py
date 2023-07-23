@@ -14,13 +14,13 @@ save_dir = f"{RESULTS_PATH}/toric2d_h"
 
 # %%
 field_direction = [2,]
-shape = [[4, 4, 4]]
-labels = ["L=[8, 8]"]
+shape = [[3, 3]]
+labels = ["L=[3, 3]"]
 eval_model = "ToricCRBM"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    pd.read_csv(f"{save_dir}/L[8 8]_{eval_model}_observables.txt", sep=" ", header=0))
+    pd.read_csv(f"{save_dir}/L[3 3]_{eval_model}_observables.txt", sep=" ", header=0))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
@@ -96,8 +96,6 @@ plot_energy = fig.add_subplot(325)
 
 for i, obs in enumerate(obs_list):
     hilbert_size = np.prod(shape[i]) * 2
-    plot_abs_mag.errorbar(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size,
-                          yerr=obs["energy_err"].values / hilbert_size, marker="o", markersize=2, color=cmap(i))
 
     plot_energy.plot(obs.iloc[:, field_direction], obs["energy"].values / hilbert_size, marker="o", markersize=2,
                      color=cmap(i), label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")

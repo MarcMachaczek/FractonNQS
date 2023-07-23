@@ -13,7 +13,7 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/checkerboard"
 
 # %%
-field_direction = [0]  # 0=x, 1=y, 2=z
+field_direction = [1]  # 0=x, 1=y, 2=z
 shape = [[4, 4, 4]]
 labels = ["L=[4, 4, 4]"]
 eval_model = "CheckerCRBM"

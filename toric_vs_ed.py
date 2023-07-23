@@ -24,7 +24,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(14954567)  # this can be used to make results deterministic, but so far is not used
@@ -32,15 +32,13 @@ random_key = jax.random.PRNGKey(14954567)  # this can be used to make results de
 # define fields for which to trian the NQS and get observables
 direction_index = 2  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
-direction = np.array([0., 0., 0.8]).reshape(-1, 1)
+direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 9) * direction).T
 
-field_strengths = np.vstack((field_strengths, np.array([[0., 0., 0.32],
-                                                        [0., 0., 0.34]])))
+field_strengths = np.vstack((field_strengths, np.array([[0.42, 0., 0.42],
+                                                        [0.45, 0., 0.45]])))
 
-save_fields = np.array([[0., 0., 0.1],
-                        [0., 0., 0.3],
-                        [0., 0., 0.6]])
+save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
 L = 3  # size should be at least 3, else there are problems with pbc and indexing
@@ -93,7 +91,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 10  # standard deviation for transfer learning noise
+trans_dev = 0  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations

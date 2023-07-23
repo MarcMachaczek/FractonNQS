@@ -47,42 +47,52 @@ checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[4 4 4]_h(0.0
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0., 0., 0.7]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 8) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.33],
-                                                        [0., 0, 0.36],
-                                                        [0., 0, 0.37],
-                                                        [0., 0, 0.38],
-                                                        [0., 0, 0.39],
-                                                        [0., 0, 0.41],
-                                                        [0., 0, 0.42],
-                                                        [0., 0, 0.43],
-                                                        [0., 0, 0.44],
-                                                        [0., 0, 0.45]])))
+direction_index = 1  # 0 for x, 1 for y, 2 for z;
+direction = np.array([0., 1.0, 0]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 11) * direction).T
+field_strengths = np.vstack((field_strengths, np.array([[0., 0.55, 0.],
+                                                        [0., 0.65, 0.],
+                                                        [0., 0.67, 0.],
+                                                        [0., 0.72, 0.],
+                                                        [0., 0.74, 0.],
+                                                        [0., 0.76, 0.],
+                                                        [0., 0.78, 0.],
+                                                        [0., 0.82, 0.],
+                                                        [0., 0.84, 0.],
+                                                        [0., 0.86, 0.]])))
 # for which fields indices histograms are created
-field_strengths = np.array([[0., 0., 0.8],
-                            [0., 0., 0.7],
-                            [0., 0., 0.65],
-                            [0., 0., 0.6],
-                            [0., 0., 0.55],
-                            [0., 0., 0.53],
-                            [0., 0., 0.51],
-                            [0., 0., 0.49],
-                            [0., 0., 0.47],
-                            [0., 0., 0.45],
-                            [0., 0., 0.43],
-                            [0., 0., 0.41],
-                            [0., 0., 0.39],
-                            [0., 0., 0.37],
-                            [0., 0., 0.35],
-                            [0., 0., 0.33],
-                            [0., 0., 0.3],
-                            [0., 0., 0.2],
-                            [0., 0., 0.1],
-                            [0., 0., 0.]])
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
-hist_fields = np.array([[0.41, 0, 0]])
+# field_strengths = np.array([[0., 0., 0.8],
+#                             [0., 0., 0.7],
+#                             [0., 0., 0.65],
+#                             [0., 0., 0.6],
+#                             [0., 0., 0.55],
+#                             [0., 0., 0.53],
+#                             [0., 0., 0.51],
+#                             [0., 0., 0.49],
+#                             [0., 0., 0.47],
+#                             [0., 0., 0.45],
+#                             [0., 0., 0.43],
+#                             [0., 0., 0.41],
+#                             [0., 0., 0.39],
+#                             [0., 0., 0.37],
+#                             [0., 0., 0.35],
+#                             [0., 0., 0.33],
+#                             [0., 0., 0.3],
+#                             [0., 0., 0.2],
+#                             [0., 0., 0.1],
+#                             [0., 0., 0.]])
+# field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+field_strengths = np.array([[0., 0.86, 0.],
+                            [0., 0.90, 0.],
+                            [0., 0.94, 0.],
+                            [0., 0.98, 0.],
+                            [0., 1.02, 0.],
+                            [0., 1.06, 0.],
+                            [0., 1.10, 0.],
+                            [0., 1.14, 0.],
+                            [0., 1.18, 0.],
+                            [0., 1.22, 0.]])
+hist_fields = np.array([[0, 1.02, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -107,13 +117,13 @@ n_iter = 1200
 min_iter = 1000  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(32 * n_chains / n_ranks)
-n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 32  # should be small for using many chains, default is 10% of n_samples
 chunk_size = int(n_samples / n_ranks)  # for L=6: int(n_samples / n_ranks / 2)
 n_expect = n_ranks * chunk_size * 48   # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
-diag_shift_init = 1e-4
-diag_shift_end = 1e-5
+diag_shift_init = 1e-3
+diag_shift_end = 1e-4
 diag_shift_begin = int(n_iter * 2 / 5)
 diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
@@ -124,8 +134,8 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.01
-lr_end = 0.001
+lr_init = 0.001
+lr_end = 0.0001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
