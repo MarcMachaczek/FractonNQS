@@ -24,7 +24,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(14954567)  # this can be used to make results deterministic, but so far is not used
@@ -32,8 +32,8 @@ random_key = jax.random.PRNGKey(14954567)  # this can be used to make results de
 # define fields for which to trian the NQS and get observables
 direction_index = 2  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
-direction = np.array([0.8, 0., 0.8]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 9) * direction).T
+direction = np.array([0.9, 0., 0.9]).reshape(-1, 1)
+field_strengths = (np.linspace(0, 1, 10) * direction).T
 
 field_strengths = np.vstack((field_strengths, np.array([[0.42, 0., 0.42],
                                                         [0.45, 0., 0.45]])))

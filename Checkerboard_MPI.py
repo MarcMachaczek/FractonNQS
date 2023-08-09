@@ -41,13 +41,13 @@ save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[4 4 4]_h(0.0, 0.0, 0.47).mpack"
+checkpoint = f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
-random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
+random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 1  # 0 for x, 1 for y, 2 for z;
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 1.0, 0]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 11) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0.55, 0.],
@@ -60,43 +60,28 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0.55, 0.],
                                                         [0., 0.82, 0.],
                                                         [0., 0.84, 0.],
                                                         [0., 0.86, 0.]])))
-# for which fields indices histograms are created
-# field_strengths = np.array([[0., 0., 0.8],
-#                             [0., 0., 0.7],
-#                             [0., 0., 0.65],
-#                             [0., 0., 0.6],
-#                             [0., 0., 0.55],
-#                             [0., 0., 0.53],
-#                             [0., 0., 0.51],
-#                             [0., 0., 0.49],
-#                             [0., 0., 0.47],
-#                             [0., 0., 0.45],
-#                             [0., 0., 0.43],
-#                             [0., 0., 0.41],
-#                             [0., 0., 0.39],
-#                             [0., 0., 0.37],
-#                             [0., 0., 0.35],
-#                             [0., 0., 0.33],
-#                             [0., 0., 0.3],
-#                             [0., 0., 0.2],
-#                             [0., 0., 0.1],
-#                             [0., 0., 0.]])
-# field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
-field_strengths = np.array([[0., 0.86, 0.],
-                            [0., 0.90, 0.],
-                            [0., 0.94, 0.],
-                            [0., 0.98, 0.],
-                            [0., 1.02, 0.],
-                            [0., 1.06, 0.],
-                            [0., 1.10, 0.],
-                            [0., 1.14, 0.],
-                            [0., 1.18, 0.],
-                            [0., 1.22, 0.]])
-hist_fields = np.array([[0, 1.02, 0]])
+field_strengths = np.array([[0., 0., 0.90],
+                            [0., 0., 0.80],
+                            [0., 0., 0.70],
+                            [0., 0., 0.60],
+                            [0., 0., 0.50],
+                            [0., 0., 0.45],
+                            [0., 0., 0.44],
+                            [0., 0., 0.43],
+                            [0., 0., 0.42],
+                            [0., 0., 0.41],
+                            [0., 0., 0.40],
+                            [0., 0., 0.39],
+                            [0., 0., 0.38],
+                            [0., 0., 0.37],
+                            [0., 0., 0.36],
+                            [0., 0., 0.35],])
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+# hist_fields = np.array([[0, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
-L = 4  # this translates to L+1 without PBC
+L = 6  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
@@ -114,16 +99,16 @@ elif direction_index == 2:
 
 # %%  setting hyper-parameters and model
 n_iter = 1200
-min_iter = 1000  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+min_iter = 1200  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(32 * n_chains / n_ranks)
-n_discard_per_chain = 32  # should be small for using many chains, default is 10% of n_samples
-chunk_size = int(n_samples / n_ranks)  # for L=6: int(n_samples / n_ranks / 2)
-n_expect = n_ranks * chunk_size * 48   # number of samples to estimate observables, must be dividable by chunk_size
+n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
+chunk_size = int(n_samples / n_ranks)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
+n_expect = n_ranks * chunk_size * 24   # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
 
-diag_shift_init = 1e-3
-diag_shift_end = 1e-4
+diag_shift_init = 1e-4
+diag_shift_end = 1e-5
 diag_shift_begin = int(n_iter * 2 / 5)
 diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
@@ -134,15 +119,15 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.001
-lr_end = 0.0001
+lr_init = 0.01
+lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = 0 # standard deviation for transfer learning noise
+trans_dev = 1e-4 # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -192,9 +177,7 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.51, 0.25, 0.08, 0.0
                                                            zstring_rule])
 
 # make sure hist and save fields are contained in field_strengths and sort final field array
-hist_fields = np.round(hist_fields, 3)
-save_fields = np.round(save_fields, 3)
-field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
+field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":
     field_strengths = field_strengths[::-1]
@@ -240,7 +223,8 @@ for h in tqdm(field_strengths, "external_field"):
     checkerboard = geneqs.operators.checkerboard.Checkerboard(hilbert, shape, h)
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
-    vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
+    vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
+                         chunk_size=chunk_size)
 
     if swipe != "independent":
         if last_trained_params is not None:
@@ -269,7 +253,7 @@ for h in tqdm(field_strengths, "external_field"):
     last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
-    vqs.chunk_size = chunk_size
+    vqs.chunk_size = int(chunk_size / 4)
     vqs.n_samples = n_expect
 
     # calculate energy and specific heat / variance of energy
@@ -290,12 +274,12 @@ for h in tqdm(field_strengths, "external_field"):
             geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
 
     # gather local estimators as each rank calculates them based on their own samples_per_rank
-    if np.any((h == hist_fields).all(axis=1)):
-        vqs.n_samples = int(n_samples / 2)
-        random_key, init_state_key = jax.random.split(random_key)
-        energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
-        mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
-        abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
+    # if np.any((h == hist_fields).all(axis=1)):
+    #     vqs.n_samples = int(n_samples / 2)
+    #     random_key, init_state_key = jax.random.split(random_key)
+    #     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
+    #     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
+    #     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
 
     # plot and save training data, save observables
     if rank == 0:
@@ -325,10 +309,10 @@ for h in tqdm(field_strengths, "external_field"):
                 f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
         # create histograms
-        if np.any((h == hist_fields).all(axis=1)):
-            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
-            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
+        # if np.any((h == hist_fields).all(axis=1)):
+        #     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+        #     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+        #     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
 
         # save observables to file
         if save_results:

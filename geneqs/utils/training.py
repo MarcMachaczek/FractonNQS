@@ -185,7 +185,7 @@ class LoopCallback:
         Returns:
             A boolean. If True, training continues, else, it does not.
         """
-        if step == 1:
+        if step == 0:
             log_data["n_params"] = v_state.n_parameters
 
         is_mc = isinstance(v_state, nk.vqs.MCState) and (not v_state.sampler.is_exact)
