@@ -11,6 +11,8 @@ os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = f"{rank}"
 # force to use gpu
 os.environ["JAX_PLATFORM_NAME"] = "gpu"
+# make netket compute the exact autocorrelation time
+# os.environ["NETKET_EXPERIMENTAL_FFT_AUTOCORRELATION"] = "1"
 
 import jax
 # jax.distributed.initialize()

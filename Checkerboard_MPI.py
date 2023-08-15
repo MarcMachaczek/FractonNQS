@@ -11,6 +11,10 @@ os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"
 os.environ["CUDA_VISIBLE_DEVICES"] = f"{rank}"
 # force to use gpu
 os.environ["JAX_PLATFORM_NAME"] = "gpu"
+# make netket compute the exact autocorrelation time
+# os.environ["NETKET_EXPERIMENTAL_FFT_AUTOCORRELATION"] = "1"
+# make netket use the split-Rhat diagnostic, not just the plain one
+# os.environ["NETKET_USE_PLAIN_RHAT"] = "0"
 
 import jax
 # jax.distributed.initialize()
@@ -41,7 +45,7 @@ save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
+checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
@@ -75,7 +79,11 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.38],
                             [0., 0., 0.37],
                             [0., 0., 0.36],
-                            [0., 0., 0.35],])
+                            [0., 0., 0.35],
+                            [0., 0., 0.33],
+                            [0., 0., 0.30],
+                            [0., 0., 0.20],
+                            [0., 0., 0.10],])
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 # hist_fields = np.array([[0, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
@@ -100,9 +108,9 @@ elif direction_index == 2:
 # %%  setting hyper-parameters and model
 n_iter = 1200
 min_iter = 1200  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(32 * n_chains / n_ranks)
-n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
+n_chains = 512 * n_ranks / 2  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = int(32 * n_chains / n_ranks * 2)
+n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
 chunk_size = int(n_samples / n_ranks)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
 n_expect = n_ranks * chunk_size * 24   # number of samples to estimate observables, must be dividable by chunk_size
 n_bins = 20  # number of bins for calculating histograms
@@ -119,7 +127,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.01
+lr_init = 0.001
 lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
@@ -127,7 +135,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = 1e-4 # standard deviation for transfer learning noise
+trans_dev = 0 # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
