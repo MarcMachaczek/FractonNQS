@@ -29,12 +29,12 @@ def time_function(func: Callable, n_runs: int = 10, *args, **kwargs):
         **kwargs: kwargs for func
 
     Returns:
-        The results of the last execution, the average execution time of func over n_runs
+        The results of the last execution, the average execution time of func over n_runs in nanoseconds
 
     """
     result = None
-    t0 = time.perf_counter()
+    t0 = time.perf_counter_ns()
     for _ in tqdm(range(n_runs)):
         result = func(*args, **kwargs)
 
-    return result, round((time.perf_counter() - t0) / n_runs, 4)
+    return result, round((time.perf_counter_ns() - t0) / n_runs, 4)

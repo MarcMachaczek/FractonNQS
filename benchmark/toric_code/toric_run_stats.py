@@ -10,7 +10,6 @@ import geneqs
 from geneqs.utils.training import loop_gs
 
 from tqdm import tqdm
-from global_variables import BENCHMARK_PATH
 
 RUN_PATH = f"{BENCHMARK_PATH}/toric_code/"
 SAVE = True
