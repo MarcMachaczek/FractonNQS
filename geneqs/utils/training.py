@@ -31,7 +31,8 @@ def loop_gs(v_state: nk.vqs.MCState,
         preconditioner: Gradient transformation like, for instance, stochastic reconfiguration.
         n_iter: Number of training iterations.
         min_steps: Minimum number of iterations before callback convergence criteria might cause early stopping.
-        obs: Observables to be tracked during training. Values are saved in log file. {obs_name: obs_operator, ...}
+        obs: Observables to be tracked during training. Values are saved in log file. They are currently calculated
+        before the parameters update at the end of each training iteration. {obs_name: obs_operator, ...}
         out: Where to save training_stats. None if no stats should be saved, else save_path.
 
     Returns:
@@ -51,13 +52,19 @@ def loop_gs(v_state: nk.vqs.MCState,
     with tqdm(total=n_iter) as pbar:
         for epoch in range(n_iter):
             times = {}
+            log_data = {}
             v_state.reset()
 
             times["pre_sample"] = time.time()
             v_state.sample()
+            times["post_sample"] = time.time()
+
+            # calculate them before updating params to avoid sampling twice
+            if obs is not None:
+                for obs_name, obs_operator in obs.items():
+                    log_data[obs_name] = v_state.expect(obs_operator)
+
             times["pre_expectgrad"] = time.time()
-            
-            # the forces part of this crashes mpi when np > 2
             energy, gradients = v_state.expect_and_grad(hamiltonian)
             
             e_nan, e_inf = contains_naninf(energy.mean)
@@ -79,11 +86,12 @@ def loop_gs(v_state: nk.vqs.MCState,
                                                    opt_state,
                                                    sr_gradients,
                                                    v_state.parameters)
+
             v_state.parameters = new_params
             times["final"] = time.time()
 
             # logging data
-            sampling_time = times["pre_expectgrad"] - times["pre_sample"]
+            sampling_time = times["post_sample"] - times["pre_sample"]
             expect_grad_time = times["pre_sr"] - times["pre_expectgrad"]
             sr_time = times["post_sr"] - times["pre_sr"]
             p_update_time = times["final"] - times["post_sr"]
@@ -95,9 +103,7 @@ def loop_gs(v_state: nk.vqs.MCState,
                                  "sr": sr_time,
                                  "p_update": p_update_time,
                                  "total": total_time}
-            if obs is not None:
-                for obs_name, obs_operator in obs.items():
-                    log_data[obs_name] = v_state.expect(obs_operator)
+
             callback_stop = not cb(epoch, log_data, v_state)
             log(epoch, log_data, v_state)
 

@@ -56,7 +56,7 @@ n_iter = 200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 8
-n_discard_per_chain = 12 # should be small for using many chains, default is 10% of n_samples
+n_discard_per_chain = 12  # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
 
