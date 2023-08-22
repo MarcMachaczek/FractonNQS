@@ -97,7 +97,7 @@ def loop_gs(v_state: nk.vqs.MCState,
             p_update_time = times["final"] - times["post_sr"]
             total_time = times["final"] - times["pre_sample"]
 
-            log_data = {"Energy": energy}
+            log_data["Energy"] = energy
             log_data["times"] = {"sampling": sampling_time,
                                  "expect_grad": expect_grad_time,
                                  "sr": sr_time,

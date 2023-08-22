@@ -155,6 +155,8 @@ models = {f"FFNNf{features}": FFNN,
           f"SymmNNf{features}": SymmNN,
           "ToricCRBM": cRBM}
 
+models = {f"SymmNNf{features}": SymmNN}
+
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names="eval_model")
 
 # %% training
