@@ -155,8 +155,9 @@ for eval_model, model in tqdm(models.items()):
         vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
     vqs = vqs_full
 
+    out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
     # use driver gs if vqs is exact_state aka full_summation_state
-    vqs, data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter)
+    vqs, data = driver_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     training_data[f"{eval_model}"] = data
 
     # calculate observables, therefore set some params of vqs

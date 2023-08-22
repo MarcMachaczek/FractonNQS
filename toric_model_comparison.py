@@ -129,6 +129,7 @@ SymmNN = geneqs.models.neural_networks.SymmetricNN(symmetries=link_perms,
                                                    kernel_init=default_kernel_init,
                                                    bias_init=default_kernel_init,
                                                    param_dtype=complex)
+
 FFNN = geneqs.models.neural_networks.SimpleNN(features=features,
                                               kernel_init=default_kernel_init,
                                               bias_init=default_kernel_init,
