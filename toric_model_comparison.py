@@ -6,7 +6,7 @@ import netket as nk
 from netket.utils import HashableArray
 
 import geneqs
-from geneqs.utils.training import driver_gs
+from geneqs.utils.training import driver_gs, loop_gs
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -17,23 +17,37 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-matplotlib.rcParams['svg.fonttype'] = 'none'
-matplotlib.rcParams.update({'font.size': 24})
+matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
-save_results = False
+save_results = True
 save_path = f"{RESULTS_PATH}/toric2d_h"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
 
 # %% operators on hilbert space
-L = 3  # size should be at least 3, else there are problems with pbc and indexing
+L = 5  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 h = (0., 0., 0.)
 toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h)
+
+stars = nk.operator.LocalOperator(hilbert, dtype=complex)
+# adding the star terms
+for i in range(shape[0]):
+    for j in range(shape[1]):
+        stars -= geneqs.operators.toric_2d.get_netket_star(hilbert, jnp.array([i, j]), shape)
+
+plaquettes = nk.operator.LocalOperator(hilbert, dtype=complex)
+# adding the plaquette terms:
+for i in range(shape[0]):
+    for j in range(shape[1]):
+        plaquettes -= geneqs.operators.toric_2d.get_netket_plaq(hilbert, jnp.array([i, j]), shape)
+        
+track_obs = {"stars": stars, "plaqs": plaquettes}  # these observables are tracked during training
+
 # exactly diagonalize hamiltonian, find exact E0 and save it
 E0_exact = - L**2 * 2
 
@@ -41,15 +55,15 @@ E0_exact = - L**2 * 2
 n_iter = 200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 32
-n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples
+n_samples = n_chains * 8
+n_discard_per_chain = 12 # should be small for using many chains, default is 10% of n_samples
 n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
 
 diag_shift_init = 1e-3
-diag_shift_end = 1e-3
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
+diag_shift_end = 1e-4
+diag_shift_begin = int(n_iter * 2 / 5)
+diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
@@ -59,9 +73,9 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.01
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
+lr_end = 0.001
+transition_begin = int(n_iter * 3 / 5)
+transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 optimizer = optax.sgd(lr_schedule)
 
@@ -70,7 +84,7 @@ single_rule = nk.sampler.rules.LocalRule()
 vertex_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_stars_cubical2d(shape))
 xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(0, shape))
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical2d(1, shape))
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.5, 0.25, 0.125, 0.125),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1),
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # define correlation enhanced RBM
@@ -135,10 +149,10 @@ FFNN = geneqs.models.neural_networks.SimpleNN(features=features,
                                               bias_init=default_kernel_init,
                                               param_dtype=complex)
 
-models = {f"FFNN_f{features}": FFNN,
+models = {f"FFNNf{features}": FFNN,
           "RBM": RBM,
           "RBMSymm": RBMSymm,
-          f"SymmNN_f{features}": SymmNN,
+          f"SymmNNf{features}": SymmNN,
           "ToricCRBM": cRBM}
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names="eval_model")
@@ -154,11 +168,11 @@ for eval_model, model in tqdm(models.items()):
                                         n_discard_per_chain=n_discard_per_chain)
         random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
         vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
-    vqs = vqs_full
+    vqs = vqs_mc
 
     out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
     # use driver gs if vqs is exact_state aka full_summation_state
-    vqs, data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter, out=out_path)
+    vqs, data = loop_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter, obs=track_obs, out=out_path)
     training_data[f"{eval_model}"] = data
 
     # calculate observables, therefore set some params of vqs

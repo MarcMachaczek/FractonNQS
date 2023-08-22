@@ -269,7 +269,7 @@ class DriverCallback:
 
 def contains_naninf(pytree):
     """
-    Primite check if some elements in a pytree are NaNs or Infs.
+    Primitive check if some elements in a pytree are NaNs or Infs.
     Args:
         pytree:
 
