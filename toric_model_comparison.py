@@ -17,7 +17,8 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-matplotlib.rcParams.update({'font.size': 12})
+matplotlib.rcParams['svg.fonttype'] = 'none'
+matplotlib.rcParams.update({'font.size': 24})
 
 # %% training configuration
 save_results = False
@@ -27,7 +28,7 @@ save_path = f"{RESULTS_PATH}/toric2d_h"
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
 
 # %% operators on hilbert space
-L = 5  # size should be at least 3, else there are problems with pbc and indexing
+L = 3  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -152,10 +153,11 @@ for eval_model, model in tqdm(models.items()):
                                         n_discard_per_chain=n_discard_per_chain)
         random_key, init_key = jax.random.split(random_key)  # this makes everything deterministic
         vqs_full = nk.vqs.ExactState(hilbert, model, seed=init_key)
-    vqs = vqs_mc
+    vqs = vqs_full
 
+    out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
     # use driver gs if vqs is exact_state aka full_summation_state
-    vqs, data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter)
+    vqs, data = driver_gs(vqs, toric, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     training_data[f"{eval_model}"] = data
 
     # calculate observables, therefore set some params of vqs

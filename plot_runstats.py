@@ -6,9 +6,10 @@ import json
 
 from global_variables import RESULTS_PATH
 
-matplotlib.rcParams.update({'font.size': 12})
-
+matplotlib.rcParams['svg.fonttype'] = 'none'
+matplotlib.rcParams.update({'font.size': 24})
 cmap = matplotlib.colormaps["Set1"]
+
 save_dir = f"{RESULTS_PATH}/toric2d_h"
 
 # %%

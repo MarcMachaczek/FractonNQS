@@ -47,7 +47,7 @@ save_fields = field_strengths  # field values for which vqs is serialized
 L = 4  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
-hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
+hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
 
 # define some observables
 if direction_index == 0:

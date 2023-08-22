@@ -5,9 +5,10 @@ import numpy as np
 import geneqs.utils.eval_obs
 from global_variables import RESULTS_PATH
 
-matplotlib.rcParams.update({'font.size': 12})
-
+matplotlib.rcParams['svg.fonttype'] = 'none'
+matplotlib.rcParams.update({'font.size': 24})
 cmap = matplotlib.colormaps["Set1"]
+
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%

@@ -17,7 +17,8 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-matplotlib.rcParams.update({'font.size': 12})
+matplotlib.rcParams['svg.fonttype'] = 'none'
+matplotlib.rcParams.update({'font.size': 24})
 
 # %% training configuration
 save_results = False

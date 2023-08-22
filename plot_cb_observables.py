@@ -6,21 +6,22 @@ import pandas as pd
 import geneqs.utils.eval_obs
 from global_variables import RESULTS_PATH
 
-matplotlib.rcParams.update({'font.size': 12})
-
+matplotlib.rcParams['svg.fonttype'] = 'none'
+matplotlib.rcParams.update({'font.size': 24})
 cmap = matplotlib.colormaps["Set1"]
+
 f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/checkerboard"
 
 # %%
 field_direction = [0]  # 0=x, 1=y, 2=z
-shape = [[6, 6, 6]]
-labels = ["L=[6, 6, 6]"]
+shape = [[8, 8, 8]]
+labels = ["L=[8, 8, 8]"]
 eval_model = "CheckerCRBM"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    pd.read_csv(f"{save_dir}/L[6 6 6]_{eval_model}_observables.txt", sep=" ", header=0))
+    pd.read_csv(f"{save_dir}/L[8 8 8]_{eval_model}_observables.txt", sep=" ", header=0))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):
