@@ -1,7 +1,6 @@
 import matplotlib
 from matplotlib import pyplot as plt
 import numpy as np
-from jax import numpy as jnp
 import json
 
 from global_variables import RESULTS_PATH
@@ -13,10 +12,10 @@ cmap = matplotlib.colormaps["Set1"]
 save_dir = f"{RESULTS_PATH}/checkerboard/model_comparison"
 
 # %%
-shape = jnp.array([5, 5])
+shape = np.array([4, 2, 2])
 eval_models = ["FFNNf(2, 4)", "RBM", "RBMSymm", "SymmNNf(2, 4)", "CheckerCRBM"]
 h = (0., 0., 0.)
-E0 = -jnp.prod(shape)
+E0 = -np.prod(shape)
 
 # %% energy
 fig = plt.figure(dpi=300, figsize=(10, 14))

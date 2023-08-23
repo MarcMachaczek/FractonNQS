@@ -146,7 +146,7 @@ training_data = {}
 for eval_model, model in tqdm(models.items()):
     sampler_mc = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs_mc = nk.vqs.MCState(sampler_mc, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain)
-    if L <= 3:
+    if hilbert.size <= 18:
         sampler_exact = nk.sampler.ExactSampler(hilbert)
         vqs_exact_samp = nk.vqs.MCState(sampler_exact, model, n_samples=n_samples,
                                         n_discard_per_chain=n_discard_per_chain)

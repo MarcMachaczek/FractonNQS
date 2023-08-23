@@ -24,7 +24,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
@@ -57,7 +57,7 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters
-n_iter = 1500
+n_iter = 1300
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 40
