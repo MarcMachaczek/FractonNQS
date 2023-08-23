@@ -6,7 +6,7 @@ import netket as nk
 from netket.utils import HashableArray
 
 import geneqs
-from geneqs.utils.training import driver_gs
+from geneqs.utils.training import driver_gs, loop_gs
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -17,12 +17,11 @@ import numpy as np
 from tqdm import tqdm
 from functools import partial
 
-matplotlib.rcParams['svg.fonttype'] = 'none'
-matplotlib.rcParams.update({'font.size': 24})
+matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
-save_results = False
-save_path = f"{RESULTS_PATH}/checkerboard"
+save_results = True
+save_path = f"{RESULTS_PATH}/checkerboard/model_comparison"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
@@ -46,8 +45,8 @@ chunk_size = n_samples
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter / 3)
-diag_shift_steps = int(n_iter / 3)
+diag_shift_begin = int(n_iter * 2 / 5)
+diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
 preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
@@ -57,9 +56,9 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 
 # learning rate scheduling
 lr_init = 0.01
-lr_end = 0.01
-transition_begin = int(n_iter / 3)
-transition_steps = int(n_iter / 3)
+lr_end = 0.001
+transition_begin = int(n_iter * 3 / 5)
+transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 optimizer = optax.sgd(lr_schedule)
 
@@ -70,7 +69,7 @@ xstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_
 ystring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(1, shape))
 zstring_rule = geneqs.sampling.update_rules.MultiRule(geneqs.utils.indexing.get_strings_cubical3d(2, shape))
 # noinspection PyArgumentList
-weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05, 0.05),
+weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.51, 0.25, 0.08, 0.08, 0.08),
                                                           [single_rule,
                                                            cube_rule,
                                                            xstring_rule,
@@ -78,7 +77,7 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.7, 0.25, 0.05, 0.05
                                                            zstring_rule])
 
 # define correlation enhanced RBM
-stddev = 0.1
+stddev = 0.01
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -134,11 +133,11 @@ FFNN = geneqs.models.neural_networks.SimpleNN(features=features,
                                               bias_init=default_kernel_init,
                                               param_dtype=complex)
 
-models = {f"FFNN_f{features}": FFNN,
+models = {f"FFNNf{features}": FFNN,
           "RBM": RBM,
           "RBMSymm": RBMSymm,
-          f"SymmNN_f{features}": SymmNN,
-          "cRBM": cRBM}
+          f"SymmNNf{features}": SymmNN,
+          "CheckerCRBM": cRBM}
 
 observables = geneqs.utils.eval_obs.ObservableCollector(key_names="eval_model")
 

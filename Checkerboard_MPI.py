@@ -94,10 +94,7 @@ field_strengths = np.array([[0., 0., 0.41],
                             [0., 0., 0.36],
                             [0., 0., 0.35],
                             [0., 0., 0.33],
-                            [0., 0., 0.30],
-                            [0., 0., 0.20],
-                            [0., 0., 0.10],
-                            [0., 0., 0.00]])
+                            [0., 0., 0.30]])
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 # hist_fields = np.array([[0, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
@@ -120,8 +117,8 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 1200
-min_iter = 1200  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+n_iter = 1500
+min_iter = 1500  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(16 * n_chains / n_ranks)  # usually 16k samples
 n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples, we usually use 24

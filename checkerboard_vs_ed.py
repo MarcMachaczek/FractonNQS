@@ -85,7 +85,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 10  # standard deviation for transfer learning noise
+trans_dev = 0  # previously stddev / 10  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)

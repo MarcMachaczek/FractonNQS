@@ -21,7 +21,7 @@ matplotlib.rcParams.update({'font.size': 12})
 
 # %% training configuration
 save_results = True
-save_path = f"{RESULTS_PATH}/toric2d_h"
+save_path = f"{RESULTS_PATH}/toric2d_h/model_comparison"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(144567)  # this can be used to make results deterministic, but so far is not used
