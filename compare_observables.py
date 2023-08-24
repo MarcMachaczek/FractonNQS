@@ -6,17 +6,18 @@ import geneqs.utils.eval_obs
 from global_variables import RESULTS_PATH
 
 matplotlib.rcParams['svg.fonttype'] = 'none'
-matplotlib.rcParams.update({'font.size': 24})
+matplotlib.rcParams.update({'font.size': 12})
 cmap = matplotlib.colormaps["Set1"]
 
 f_dict = {0: "x", 1: "y", 2: "z"}
 
 # %%
-field_direction = [0, 2]
-L = 8
-hilbert_size = 2 * L ** 2
-eval_model = "ToricCRBM"
-save_dir = f"{RESULTS_PATH}/toric2d_h"
+field_directions = [0, 2]
+labels = ["hx", "hz"]
+shapee = np.array([[4, 4, 4], [4, 4, 4]])
+hilbert_size = np.prod(shape, axis=0)
+eval_model = "CheckerCRBM"
+save_dir = f"{RESULTS_PATH}/checkerboard/L=4_final"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
@@ -24,7 +25,6 @@ obs_list.append(
 obs_list.append(
     np.loadtxt(f"{save_dir}/L[{L} {L}]_{eval_model}_observables_hz.txt"))
 
-labels = ["hx", "hz"]
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):

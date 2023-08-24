@@ -38,6 +38,8 @@ field_strengths = (np.linspace(0, 1, 10) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0.32, 0., 0.],
                                                         [0.35, 0., 0.]])))
 
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -65,10 +67,10 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
 # %%  setting hyper-parameters
 n_iter = 1200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = n_chains * 20
-n_discard_per_chain = 48  # should be small for using many chains, default is 10% of n_samples
-n_expect = n_samples * 12  # number of samples to estimate observables, must be dividable by chunk_size
+n_chains = 256  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = n_chains * 64
+n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
+n_expect = n_samples * 48  # number of samples to estimate observables, must be dividable by chunk_size
 chunk_size = n_samples
 
 diag_shift_init = 1e-4
