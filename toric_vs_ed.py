@@ -24,7 +24,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(14954567)  # this can be used to make results deterministic, but so far is not used

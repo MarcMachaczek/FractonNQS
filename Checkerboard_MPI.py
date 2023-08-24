@@ -80,6 +80,7 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.37],
                             [0., 0., 0.36],
                             [0., 0., 0.35],
+                            [0., 0., 0.34],
                             [0., 0., 0.33],
                             [0., 0., 0.30],
                             [0., 0., 0.20],
@@ -92,9 +93,7 @@ field_strengths = np.array([[0., 0., 0.41],
                             [0., 0., 0.38],
                             [0., 0., 0.37],
                             [0., 0., 0.36],
-                            [0., 0., 0.35],
-                            [0., 0., 0.33],
-                            [0., 0., 0.30]])
+                            [0., 0., 0.34]])
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 # hist_fields = np.array([[0, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
