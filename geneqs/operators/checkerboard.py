@@ -113,7 +113,7 @@ def checkerboard_conns_and_mels(sigma: jax.Array,
     eta = eta.at[1+n_cubes:1+n_cubes+n_sites].set(
         flip(eta.at[1+n_cubes:1+n_cubes+n_sites].get(), jnp.arange(n_sites)))
 
-    # now calcualte matrix elements
+    # now calculate matrix elements
     # axis 0 of sigma.at[plaqs] corresponds to #n_cubes and axis 1 to the 8 sites in one cube
     diag_mel = -jnp.sum(jnp.product(sigma.at[cubes].get(), axis=1)) + hz * jnp.sum(sigma)
     # n_sites mels corresponding to flipped cubes

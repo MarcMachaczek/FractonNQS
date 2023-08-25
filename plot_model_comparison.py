@@ -6,20 +6,20 @@ import json
 from global_variables import RESULTS_PATH
 
 matplotlib.rcParams['svg.fonttype'] = 'none'
-matplotlib.rcParams.update({'font.size': 12})
+matplotlib.rcParams.update({'font.size': 24})
 cmap = matplotlib.colormaps["Set1"]
 
-save_dir = f"{RESULTS_PATH}/checkerboard/model_comparison"
+save_dir = f"{RESULTS_PATH}/toric2d_h/model_comparison"
 
 # %%
-shape = np.array([4, 2, 2])
-eval_models = ["FFNNf(2, 4)", "RBM", "RBMSymm", "SymmNNf(2, 4)", "CheckerCRBM"]
+shape = np.array([5, 5])
+eval_models = ["FFNNf(2, 4)", "RBM", "RBMSymm", "SymmNNf(2, 4)", "ToricCRBM"]
 h = (0., 0., 0.)
-E0 = -np.prod(shape)
+E0 = -2*np.prod(shape)
 
 # %% energy
-fig = plt.figure(dpi=300, figsize=(10, 14))
-plot_en = fig.add_subplot(311)
+fig = plt.figure(dpi=300, figsize=(20, 10))
+plot_en = fig.add_subplot(111)
 
 for i, eval_model in enumerate(eval_models):
     stats = json.load(open(f"{save_dir}/stats_L{shape}_{eval_model}_h{h}.json"))
@@ -37,20 +37,20 @@ plot_en.legend()
 fig.savefig(f"{save_dir}/comparison_plot_L{shape}_{eval_model}_h{h}.svg")
 
 # %% auxilliary
-# eval_models = ["FFNNf(2, 4)", "RBM", "RBMSymm", "SymmNNf(2, 4)", "ToricCRBM"]
-# fig = plt.figure(dpi=300, figsize=(10, 14))
-# plot_aux = fig.add_subplot(311)
+eval_models = ["FFNNf(2, 4)", "RBM", "RBMSymm", "SymmNNf(2, 4)", "ToricCRBM"]
+fig = plt.figure(dpi=300, figsize=(20, 10))
+plot_aux = fig.add_subplot(111)
 
-# for i, eval_model in enumerate(eval_models):
-#     stats = json.load(open(f"{save_dir}/stats_L{shape}_{eval_model}_h{h}.json"))
-#     plot_aux.errorbar(stats["stars"]["iters"],
-#                      np.asarray(stats["stars"]["Mean"]["real"]) - np.asarray(stats["plaqs"]["Mean"]["real"]),
-#                      yerr=np.asarray(stats["stars"]["Sigma"]) + np.asarray(stats["plaqs"]["Sigma"]),
-#                      label=eval_model)
+for i, eval_model in enumerate(eval_models):
+    stats = json.load(open(f"{save_dir}/stats_L{shape}_{eval_model}_h{h}.json"))
+    plot_aux.errorbar(stats["stars"]["iters"],
+                     -np.asarray(stats["stars"]["Mean"]["real"]) + np.asarray(stats["plaqs"]["Mean"]["real"]),
+                     yerr=np.asarray(stats["stars"]["Sigma"]),# + np.asarray(stats["plaqs"]["Sigma"]),
+                     label=eval_model)
 
-# plot_aux.set_ylim(top=0., bottom=E0/2-1)
-# plot_aux.set_xlim(left=0., right=stats["Energy"]["iters"][-1] + 1)
-# plot_aux.set_xlabel("Training Iterations")
-# plot_aux.set_ylabel("\$\sum_\mathcal{V} A_{\mathcal{V}} - \sum_\mathcal{F} B_{\mathcal{F}}\$")
-# plot_aux.legend()
-# fig.savefig(f"{save_dir}/comparison_aux_plot_L{shape}_{eval_model}_h{h}.svg")
+plot_aux.set_ylim(top=-E0/2+1, bottom=0)
+plot_aux.set_xlim(left=0., right=stats["Energy"]["iters"][-1] + 1)
+plot_aux.set_xlabel("Training Iterations")
+plot_aux.set_ylabel("\$\sum_\mathcal{V} A_{\mathcal{V}} - \sum_\mathcal{F} B_{\mathcal{F}}\$")
+plot_aux.legend(loc="right")
+fig.savefig(f"{save_dir}/comparison_aux_plot_L{shape}_{eval_model}_h{h}.svg")
