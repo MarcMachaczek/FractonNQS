@@ -310,15 +310,15 @@ def toric2d_xbasis_conns_and_mels(sigma: jax.Array,
     eta = jnp.tile(sigma, (1 + n_sites + 2*n_sites, 1))
     # connected states by plaq operators, leave the first eta as is (diagonal connected state)
     eta = eta.at[1:n_sites+1].set(flip(eta.at[1:n_sites+1].get(), plaqs))
-    # connected states through external field (sigma_x and sigma_y)
+    # connected states through external field (sigma_z and sigma_y)
     eta = eta.at[n_sites+1:3*n_sites+1].set(flip(eta.at[n_sites+1:3*n_sites+1].get(), jnp.arange(2*n_sites)))
 
     # calculate matrix elements
     # axis 0 of sigma.at[plaqs] corresponds to #N_plaqs and axis 1 to the 4 edges of one plaquette
     diag_mel = -jnp.sum(jnp.product(sigma.at[stars].get(), axis=1)) + hx * jnp.sum(sigma)
-    # n_sites mels corresponding to flipped stars
-    star_mels = -jnp.ones(n_sites)
-    # mels according to hx and hy, NOTE: chunking with non-zero hy might not work (netket internal stuff)
+    # n_sites mels corresponding to flipped plaqs
+    plaq_mels = -jnp.ones(n_sites)
+    # mels according to hz and hy, NOTE: chunking with non-zero hy might not work (netket internal stuff)
     field_mels = -hz * jnp.ones(2*n_sites) + hy * sigma * 1j
-    mels = jnp.hstack((diag_mel, star_mels, field_mels))
+    mels = jnp.hstack((diag_mel, plaq_mels, field_mels))
     return eta, mels
