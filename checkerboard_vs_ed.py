@@ -24,13 +24,13 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction_index = 1  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0.9, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
 

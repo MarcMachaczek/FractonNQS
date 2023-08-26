@@ -38,7 +38,7 @@ field_strengths = (np.linspace(0, 1, 10) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0.32, 0., 0.],
                                                         [0.35, 0., 0.]])))
 
-field_strengths[:, [0, 1]] = field_strengths[:, [1, 0]]
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 
 save_fields = field_strengths  # field values for which vqs is serialized
 
@@ -136,8 +136,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = cRBM
-eval_model = "ToricCRBM"
+model = RBMSymm
+eval_model = "RBMSymm"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()

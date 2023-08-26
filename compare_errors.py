@@ -12,16 +12,16 @@ cmap = matplotlib.colormaps["Set1"]
 line_styles = ["solid", "dashed", "dotted"]
 
 f_dict = {0: "x", 1: "y", 2: "z"}
-# save_dir = f"{RESULTS_PATH}/checkerboard/vsed_final"
-save_dir = f"{RESULTS_PATH}/toric2d_h/L=3_final"
+save_dir = f"{RESULTS_PATH}/checkerboard/vsed_final"
+# save_dir = f"{RESULTS_PATH}/toric2d_h/L=3_final"
 
 # %%
-field_directions = 3*[0]  # 0=x, 1=y, 2=z
-# shapes = 3*[[4, 2, 2]]
-shapes = 3*[[3, 3]]
+field_directions = 3*[1]  # 0=x, 1=y, 2=z
+shapes = 3*[[4, 2, 2]]
+# shapes = 3*[[3, 3]]
 labels = ["independent", "right_left", "left_right"]
-# eval_model = "CheckerCRBM"
-eval_model = "ToricCRBM"
+eval_model = "CheckerCRBM"
+# eval_model = "ToricCRBM"
 obs_list = []
 
 # append multiple data to compare them each within one plot
@@ -44,7 +44,7 @@ for i, obs in enumerate(obs_list):
     plot_mag.plot(obs.iloc[:, field_directions[i]], rel_errors, marker="o", markersize=2,
                   color=cmap(i), label=labels[i].replace("_","-"), linestyle=line_styles[i])
 
-plot_mag.set_xlabel("Field in \$ x \$-direction \$ h_x \$ ")
+plot_mag.set_xlabel("Field in \$ y \$-direction \$ h_y \$ ")
 plot_mag.set_ylabel("\$ |E_{\\boldsymbol{\\theta}}-E_\\mathrm{exact}| / |E_\\mathrm{exact}| \$ ")
 plot_mag.set_yscale("log")
 #plot_mag.set_ylim(1e-9, 1e-3)
