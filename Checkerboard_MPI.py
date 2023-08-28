@@ -118,7 +118,7 @@ n_samples = int(16 * n_chains / n_ranks)  # usually 16k samples
 n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples, we usually use 24
 chunk_size = int(n_samples / n_ranks / 4)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
 n_expect = n_ranks * chunk_size * 48   # number of samples to estimate observables, must be dividable by chunk_size
-n_bins = 20  # number of bins for calculating histograms
+# n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -337,7 +337,7 @@ for h in tqdm(field_strengths, "external_field"):
                     np.savetxt(f, save_array)
 
 # %% save histograms
-if rank == 0:
-    for hist_name, _ in observables.histograms.items():
-        np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
-                observables.hist_to_array(hist_name))
+# if rank == 0:
+#     for hist_name, _ in observables.histograms.items():
+#         np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
+#                 observables.hist_to_array(hist_name))

@@ -18,6 +18,7 @@ save_dir = f"{RESULTS_PATH}/checkerboard/L=4_final"
 field_directions = 3*[0]  # 0=x, 1=y, 2=z
 shapes = 3*[[4, 4, 4]]
 labels = ["independent", "right_left", "left_right"]
+legend_labels = labels  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
 eval_model = "CheckerCRBM"
 obs_list = []
 
@@ -38,12 +39,12 @@ plot_mag = fig.add_subplot(111)
 
 for i, obs in enumerate(obs_list):
     plot_mag.errorbar(obs.iloc[:, field_directions[i]], obs["mag"], yerr=obs["mag_err"], marker="o", markersize=2,
-                      color=cmap(i), label=labels[i], linestyle=line_styles[i])
+                      color=cmap(i), label=legend_labels[i], linestyle=line_styles[i])
 
 plot_mag.set_xlabel("Field strength in \$ x \$-direction \$ h_x \$ ")
 plot_mag.set_ylabel("Magnetization \$ m \$ ")
 plot_mag.legend()
-fig.savefig(f"{save_dir}/mag_comparison_L{shape}_cRBM.pdf")
+fig.savefig(f"{save_dir}/mag_comparison_L{shape}_cRBM.svg")
 
 # %% susceptibility
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -51,13 +52,13 @@ plot_sus = fig.add_subplot(111)
 
 for i, obs in enumerate(obs_list):
     sus, sus_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs["mag"].values, fields=obs.iloc[:, :3].values)
-    plot_sus.plot(sus_fields[:, field_directions[i]], sus, marker="o", markersize=2, color=cmap(i),
-                  label=labels[i], linestyle=line_styles[i])
+    plot_sus.plot(sus_fields[:, field_directions[i]], sus, marker="o", markersize=2,
+                  color=cmap(i), label=legend_labels[i], linestyle=line_styles[i])
 
 plot_sus.set_xlabel("Field strength in \$ x \$-direction \$ h_x \$ ")
 plot_sus.set_ylabel("Susceptibility \$ \\xi \$ ")
 plot_sus.legend()
-fig.savefig(f"{save_dir}/susc_comparison_L{shape}_cRBM.pdf")
+fig.savefig(f"{save_dir}/susc_comparison_L{shape}_cRBM.svg")
 
 # %% energy per site
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -67,25 +68,25 @@ for i, obs in enumerate(obs_list):
     hilbert_size = np.prod(shapes[i])
     plot_energy.errorbar(obs.iloc[:, field_directions[i]], obs["energy"].values / hilbert_size,
                          yerr=obs["energy_err"].values / hilbert_size, marker="o", markersize=2,
-                         color=cmap(i), label=labels[i], linestyle=line_styles[i])
+                         color=cmap(i), label=legend_labels[i], linestyle=line_styles[i])
 
 plot_energy.set_xlabel("Field strength in \$ x \$-direction \$ h_x \$ ")
 plot_energy.set_ylabel("Energy per spin")
 plot_energy.legend()
-fig.savefig(f"{save_dir}/epsite_comparison_L{shape}_cRBM.pdf")
+fig.savefig(f"{save_dir}/epsite_comparison_L{shape}_cRBM.svg")
 
-# %% specific heat / variance of the energy
+# %% variance of the energy
 fig = plt.figure(dpi=300, figsize=(10, 10))
-plot_spheat = fig.add_subplot(111)
+plot_evar = fig.add_subplot(111)
 
 for i, obs in enumerate(obs_list):
-    plot_spheat.plot(obs.iloc[:, field_directions[i]], np.abs(obs["energy_var"].values), marker="o", markersize=2,
-                     color=cmap(i), label=labels[i], linestyle=line_styles[i])
+    plot_evar.plot(obs.iloc[:, field_directions[i]], np.abs(obs["energy_var"].values), marker="o", markersize=2,
+                     color=cmap(i), label=legend_labels[i], linestyle=line_styles[i])
 
-plot_spheat.set_xlabel("Field strength in \$ x \$-direction \$ h_x \$ ")
-plot_spheat.set_ylabel("Var(\$ E \$)")
-plot_spheat.legend()
-fig.savefig(f"{save_dir}/evar_comparison_L{shape}_cRBM.pdf")
+plot_evar.set_xlabel("Field strength in \$ x \$-direction \$ h_x \$ ")
+plot_evar.set_ylabel("Var(\$ E \$)")
+plot_evar.legend()
+fig.savefig(f"{save_dir}/evar_comparison_L{shape}_cRBM.svg")
 
 # # %% energy derivative dE/dh
 # plot_dEdh = fig.add_subplot(235)

@@ -1,14 +1,33 @@
-import matplotlib
-from matplotlib import pyplot as plt
+import os
+from mpi4py import MPI
+
+comm = MPI.COMM_WORLD
+n_ranks = comm.Get_size()
+rank = MPI.COMM_WORLD.Get_rank()
+# supress warning about no cuda mpi version
+# we don't need that because jax handles that, we only want to run copies of a process with some communication
+os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"
+# set only one visible device
+os.environ["CUDA_VISIBLE_DEVICES"] = f"{rank}"
+# force to use gpu
+os.environ["JAX_PLATFORM_NAME"] = "gpu"
+# make netket compute the exact autocorrelation time
+# os.environ["NETKET_EXPERIMENTAL_FFT_AUTOCORRELATION"] = "1"
+# make netket use the split-Rhat diagnostic, not just the plain one
+# os.environ["NETKET_USE_PLAIN_RHAT"] = "0"
+
 import jax
 from jax import numpy as jnp
-import numpy as np
-import pandas as pd
-from tqdm import tqdm
 
 import netket as nk
 from netket.utils import HashableArray
 import flax
+
+import numpy as np
+import pandas as pd
+from tqdm import tqdm
+import matplotlib
+from matplotlib import pyplot as plt
 
 import geneqs
 from global_variables import RESULTS_PATH
@@ -130,7 +149,7 @@ for h in tqdm(field_strengths, "external_field"):
     vqs.chunk_size = chunk_size
     vqs.n_samples = n_samples
 
-    # calculate energy and specific heat / variance of energy
+    # calculate energy and variance of energy
     energy_nk = vqs.expect(toric)
     observables.add_nk_obs("energy", h, energy_nk)
     # calculate magnetization
@@ -143,6 +162,7 @@ for h in tqdm(field_strengths, "external_field"):
     wilsonob_nk = vqs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
 
-save_array = observables.obs_to_array(separate_keys=False)
-np.savetxt(f"{save_dir}/L{shape}_{eval_model}_eval_obs.txt", save_array,
-               header=" ".join(observables.key_names + observables.obs_names), comments="")
+if rank == 0:
+    save_array = observables.obs_to_array(separate_keys=False)
+    np.savetxt(f"{save_dir}/L{shape}_{eval_model}_eval_obs.txt", save_array,
+                   header=" ".join(observables.key_names + observables.obs_names), comments="")

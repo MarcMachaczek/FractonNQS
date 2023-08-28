@@ -108,18 +108,18 @@ plot_energy.set_title(
 
 plot_energy.legend()
 
-# %% specific heat / variance of the energy
-plot_spheat = fig.add_subplot(326)
+# %% variance of the energy
+plot_evar = fig.add_subplot(326)
 
 for i, obs in enumerate(obs_list):
-    plot_spheat.plot(obs.iloc[:, field_direction[i]], np.abs(obs["energy_var"].values), marker="o",
+    plot_evar.plot(obs.iloc[:, field_direction[i]], np.abs(obs["energy_var"].values), marker="o",
                      markersize=2, color=cmap(i), label=f"hdir={f_dict[field_direction[i]]}_{labels[i]}")
 
-plot_spheat.set_xlabel(f"external field")
-plot_spheat.set_ylabel("specific heat")
-plot_spheat.set_title(
+plot_evar.set_xlabel(f"external field")
+plot_evar.set_ylabel("specific heat")
+plot_evar.set_title(
     f"specific heat vs external field for ToricCode2d")
 
-plot_spheat.legend()
+plot_evar.legend()
 plt.show()
 fig.savefig(f"{save_dir}/obs_comparison_L[{shape}_cRBM.pdf")

@@ -42,7 +42,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
@@ -52,12 +52,15 @@ random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 direction_index = 2  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 0., 0.7]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 8) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.31],
+field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
+                                                        [0., 0, 0.31],
                                                         [0., 0, 0.33],
-                                                        [0., 0, 0.35]])))
+                                                        [0., 0, 0.34],
+                                                        [0., 0, 0.35],
+                                                        [0., 0, 0.37]])))
 
 # for which fields indices histograms are created
-hist_fields = np.array([[0., 0, 0.33]])
+# hist_fields = np.array([[0., 0, 0.33]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -86,11 +89,11 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
 n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(64 * n_chains / n_ranks)
+n_samples = int(32 * n_chains / n_ranks)
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
 n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
-n_bins = 20  # number of bins for calculating histograms
+# n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
@@ -160,9 +163,9 @@ weighted_rule = geneqs.sampling.update_rules.WeightedRule((0.55, 0.25, 0.1, 0.1)
                                                           [single_rule, vertex_rule, xstring_rule, ystring_rule])
 
 # make sure hist and save fields are contained in field_strengths and sort final field array
-hist_fields = np.round(hist_fields, 3)
+# hist_fields = np.round(hist_fields, 3)
 save_fields = np.round(save_fields, 3)
-field_strengths = np.unique(np.round(np.vstack((field_strengths, hist_fields, save_fields)), 3), axis=0)
+field_strengths = np.unique(np.round(np.vstack((field_strengths, save_fields)), 3), axis=0)
 field_strengths = field_strengths[field_strengths[:, direction_index].argsort()]
 if swipe == "right_left":
     field_strengths = field_strengths[::-1]
@@ -218,9 +221,9 @@ for h in tqdm(field_strengths, "external_field"):
             complex_noise = geneqs.utils.jax_utils.tree_random_normal_like(noise_key_complex, vqs.parameters, trans_dev)
             vqs.parameters = jax.tree_util.tree_map(lambda ltp, rn, cn: ltp + rn + 1j * cn,
                                                     last_trained_params, real_noise, complex_noise)
-        # if last_sampler_state is not None:
-        #     vqs.sampler_state = last_sampler_state
-        vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
+        if last_sampler_state is not None:
+            vqs.sampler_state = last_sampler_state
+            # vqs.sample(chain_length=256)  # let mcmc chains adapt to noisy initial paramters
 
     if pre_init and swipe == "independent":
         vqs.parameters = pre_init_parameters
@@ -261,13 +264,13 @@ for h in tqdm(field_strengths, "external_field"):
             geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
 
     # gather local estimators as each rank calculates them based on their own samples_per_rank
-    if np.any((h == hist_fields).all(axis=1)):
-        vqs.n_samples = n_samples
-        random_key, init_state_key = jax.random.split(random_key)
-        energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, toric), root=0)
-        mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
-        abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
-        A_B_locests = comm.gather(get_locests_mixed(init_state_key, vqs, A_B), root=0)
+    # if np.any((h == hist_fields).all(axis=1)):
+    #     vqs.n_samples = n_samples
+    #     random_key, init_state_key = jax.random.split(random_key)
+    #     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, toric), root=0)
+    #     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
+    #     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
+    #     A_B_locests = comm.gather(get_locests_mixed(init_state_key, vqs, A_B), root=0)
 
     # plot and save training data, save observables
     if rank == 0:
@@ -297,11 +300,11 @@ for h in tqdm(field_strengths, "external_field"):
                 f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
         # create histograms
-        if np.any((h == hist_fields).all(axis=1)):
-            observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-            observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
-            observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
-            observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
+        # if np.any((h == hist_fields).all(axis=1)):
+        #     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+        #     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+        #     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
+        #     observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
 
         # save observables to file
         if save_results:
@@ -313,7 +316,7 @@ for h in tqdm(field_strengths, "external_field"):
                     np.savetxt(f, save_array)
 
 # %% save histograms
-if rank == 0:
-    for hist_name, _ in observables.histograms.items():
-        np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
-                observables.hist_to_array(hist_name))
+# if rank == 0:
+#     for hist_name, _ in observables.histograms.items():
+#         np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
+#                 observables.hist_to_array(hist_name))
