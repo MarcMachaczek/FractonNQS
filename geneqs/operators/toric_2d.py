@@ -248,10 +248,10 @@ class ToricCode2d_xbasis(nk.operator.DiscreteOperator):
             connected states or "kets" eta, corresponding matrix elements mels
 
         """
-        return toric2d_conns_and_mels(sigma, self.plaqs, self.stars, self.h)
+        return toric2d_xbasis_conns_and_mels(sigma, self.plaqs, self.stars, self.h)
 
     def get_conn_flattened(self, x, sections):
-        eta, mels = toric2d_conns_and_mels(x, self.plaqs, self.stars, self.h)
+        eta, mels = toric2d_xbasis_conns_and_mels(x, self.plaqs, self.stars, self.h)
 
         n_primes = eta.shape[1]  # number of connected states, same for all possible configurations x
         n_visible = x.shape[1]

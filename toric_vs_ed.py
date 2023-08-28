@@ -118,7 +118,7 @@ loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  
 loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-alpha = 1
+alpha = 2
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
                                    correlator_symmetries=correlator_symmetries,
@@ -136,8 +136,8 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             visible_bias_init=default_kernel_init,
                             param_dtype=complex)
 
-model = RBMSymm
-eval_model = "RBMSymm"
+model = cRBM
+eval_model = "ToricCRBM"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -157,7 +157,7 @@ exact_energies = []
 
 # %% training
 if pre_init:
-    toric = geneqs.operators.toric_2d.ToricCode2d(hilbert, shape, h=(0., 0., 0.))
+    toric = geneqs.operators.toric_2d.ToricCode2d_xbasis(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)
@@ -267,7 +267,7 @@ for h in tqdm(field_strengths, "external_field"):
 
     E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.real
     psi = vqs.to_array()
-    full_probabilities = psi * jnp.conjugate(psi)
+    full_probabilities = psi * jnp.conjugate(psi) / jnp.sum(psi * jnp.conjugate(psi))
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                    f" down to {diag_shift_end}, max_prob = {jnp.max(full_probabilities)}")
     plot.legend()

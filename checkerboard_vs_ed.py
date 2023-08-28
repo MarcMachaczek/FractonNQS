@@ -24,13 +24,13 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swip=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 1  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0.9, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
 
@@ -39,7 +39,7 @@ field_strengths = np.vstack((field_strengths, np.array([[0.15, 0., 0.],
                                                         [0.35, 0., 0.],
                                                         [0.45, 0., 0.]])))
 
-field_strengths[:, [0, 1]] = field_strengths[:, [1, 0]]
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 
 save_fields = field_strengths  # field values for which vqs is serialized
 
@@ -258,7 +258,7 @@ for h in tqdm(field_strengths, "external_field"):
 
     E0, err = energy_nk.Mean.item().real, energy_nk.Sigma.real
     psi = vqs.to_array()
-    full_probabilities = psi * jnp.conjugate(psi)
+    full_probabilities = psi * jnp.conjugate(psi) / jnp.sum(psi * jnp.conjugate(psi))
     plot.set_title(f"E0 = {round(E0, 5)} +- {round(err, 5)} using SR with diag_shift={diag_shift_init}"
                    f" down to {diag_shift_end}, max_prob = {jnp.max(full_probabilities)}")
     plot.legend()
