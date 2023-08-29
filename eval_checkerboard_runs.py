@@ -15,7 +15,7 @@ os.environ["JAX_PLATFORM_NAME"] = "gpu"
 # os.environ["NETKET_EXPERIMENTAL_FFT_AUTOCORRELATION"] = "1"
 # make netket use the split-Rhat diagnostic, not just the plain one
 # os.environ["NETKET_USE_PLAIN_RHAT"] = "0"
-################################################################### NOT YET COMPATIBLE WITH MULTIPLE RANKS #########################################################################
+
 import jax
 from jax import numpy as jnp
 
@@ -43,7 +43,7 @@ shape = jnp.array([4, 4, 4])
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
 eval_model = "CheckerCRBM"
 # get fields
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 obs = pd.read_csv(f"{save_dir}/L{shape}_{eval_model}_observables.txt", sep=" ", header=0)
 field_strengths = obs.iloc[:, :3].values
 
@@ -69,15 +69,12 @@ field_strengths = obs.iloc[:, :3].values
 #                             [0., 0., 0.20],
 #                             [0., 0., 0.10],
 #                             [0., 0., 0.00]])
+# field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 
-field_strengths = np.array([[0., 0., 0.41],
-                            [0., 0., 0.40]])
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
-
-n_chains = 1024  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-chunk_size = 1024 * 4
-n_samples = chunk_size * 4 * 16
-n_discard_per_chain = 64
+n_chains = 256 * 2 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+chunk_size = 1024 * 16
+n_samples = chunk_size * 24
+n_discard_per_chain = 20
 
 # %% create observables
 # define some observables
@@ -161,7 +158,9 @@ for h in tqdm(field_strengths, "external_field"):
 
     with open(f"{save_dir}/vqs_{eval_model}_L{shape}_h{h}.mpack", 'rb') as file:
         vqs = flax.serialization.from_bytes(vqs, file.read())
-        # vqs.n_chains_per_rank = vqs.sampler_state.σ.shape[0]
+        # rank_sigmas = vqs.sampler_state.σ.reshape(n_ranks, -1, σ.shape[-1])
+        # vqs.sampler_state.σ = rank_sigmas[rank]
+        # vqs.n_chains = vqs.sampler_state.σ.shape[0]
         # print(vqs.n_samples, vqs.n_samples_per_rank, vqs.sampler.n_chains, vqs.sampler.n_chains_per_rank, vqs.sampler_state.σ.shape)
     vqs.chunk_size = chunk_size
     vqs.n_samples = n_samples
@@ -184,4 +183,4 @@ for h in tqdm(field_strengths, "external_field"):
 if rank == 0:
     save_array = observables.obs_to_array(separate_keys=False)
     np.savetxt(f"{save_dir}/L{shape}_{eval_model}_eval_obs.txt", save_array,
-                   header=" ".join(observables.key_names + observables.obs_names), comments="")
+               header=" ".join(observables.key_names + observables.obs_names), comments="")

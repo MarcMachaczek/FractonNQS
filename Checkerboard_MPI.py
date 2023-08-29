@@ -44,14 +44,14 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 1  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 1.0, 0]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 11) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0.55, 0.],
@@ -87,10 +87,14 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.10],
                             [0., 0., 0.00]])
 
-field_strengths = np.array([[0., 0., 0.41],
-                            [0., 0., 0.40]])
+field_strengths = np.array([[0., 0., 1.20],
+                            [0., 0., 1.10],
+                            [0., 0., 1.00],
+                            [0., 0., 0.95],
+                            [0., 0., 0.90],
+                            [0., 0., 0.86]])
 
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+field_strengths[:, [1, 2]] = field_strengths[:, [2, 1]]
 # hist_fields = np.array([[0, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
@@ -112,13 +116,13 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 5  # 1500
-min_iter = 1500  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+n_iter = 1200  # 1500 for L=8
+min_iter = 1200  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(16 * n_chains / n_ranks)  # usually 16k samples
-n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples, we usually use 24
-chunk_size = int(n_samples / n_ranks / 4)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
-n_expect = n_ranks * chunk_size * 48   # number of samples to estimate observables, must be dividable by chunk_size
+n_samples = int(4 * 16 * n_chains / n_ranks)  # usually 16k samples
+n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples, we usually use 24
+chunk_size = int(n_samples / n_ranks)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
+n_expect = n_ranks * chunk_size * 16   # number of samples to estimate observables, must be dividable by chunk_size
 # n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -133,8 +137,8 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.003
-lr_end = 0.001
+lr_init = 0.001
+lr_end = 0.0001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -267,7 +271,7 @@ for h in tqdm(field_strengths, "external_field"):
     last_sampler_state = vqs.sampler_state
 
     # calculate observables, therefore set some params of vqs
-    vqs.chunk_size = int(chunk_size / 4)
+    vqs.chunk_size = int(chunk_size)
     vqs.n_samples = n_expect
 
     # calculate energy and specific heat / variance of energy

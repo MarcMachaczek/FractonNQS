@@ -50,8 +50,8 @@ random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
 direction_index = 2  # 0 for x, 1 for y, 2 for z;
-direction = np.array([0., 0., 0.7]).reshape(-1, 1)
-field_strengths = (np.linspace(0, 1, 8) * direction).T
+direction = np.array([0., 0., 1]).reshape(-1, 1)
+field_strengths = ((np.linspace(0, 0.6, 7) + 0.1) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
                                                         [0., 0, 0.31],
                                                         [0., 0, 0.33],
@@ -59,10 +59,8 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
                                                         [0., 0, 0.35],
                                                         [0., 0, 0.37]])))
 
-# for which fields indices histograms are created
-# hist_fields = np.array([[0., 0, 0.33]])
+field_strengths[:, 0] = 0.3
 save_fields = field_strengths  # field values for which vqs is serialized
-
 # %% operators on hilbert space
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
