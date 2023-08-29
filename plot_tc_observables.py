@@ -15,13 +15,13 @@ save_dir = f"{RESULTS_PATH}/toric2d_h"
 
 # %%
 field_direction = [2,]
-shape = [[3, 3]]
-labels = ["L=[3, 3]"]
+shape = [[8, 8]]
+labels = ["L=[8, 8]"]
 eval_model = "ToricCRBM"
 obs_list = []
 # append multiple data to compare them each within one plot
 obs_list.append(
-    pd.read_csv(f"{save_dir}/L[3 3]_{eval_model}_observables.txt", sep=" ", header=0))
+    pd.read_csv(f"{save_dir}/L[8 8]_{eval_model}_observables.txt", sep=" ", header=0))
 
 # order by increasing field strength
 for i, obs in enumerate(obs_list):

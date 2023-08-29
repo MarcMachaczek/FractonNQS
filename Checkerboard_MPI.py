@@ -89,12 +89,13 @@ field_strengths = np.array([[0., 0., 0.90],
 
 field_strengths = np.array([[0., 0., 0.41],
                             [0., 0., 0.40]])
+
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 # hist_fields = np.array([[0, 0, 0]])
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
-L = 8  # this translates to L+1 without PBC
+L = 4  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
@@ -111,7 +112,7 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 1500
+n_iter = 5  # 1500
 min_iter = 1500  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = int(16 * n_chains / n_ranks)  # usually 16k samples
@@ -278,21 +279,8 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate absolute magnetization
     abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
-
-    if rank == 0:
-        if np.any((h == save_fields).all(axis=1)) and save_results:
-            filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
-            with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
-                file.write(flax.serialization.to_bytes(vqs))
-            geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
-
-    # gather local estimators as each rank calculates them based on their own samples_per_rank
-    # if np.any((h == hist_fields).all(axis=1)):
-    #     vqs.n_samples = int(n_samples / 2)
-    #     random_key, init_state_key = jax.random.split(random_key)
-    #     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
-    #     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
-    #     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
+    
+    vqs.n_samples = n_samples
 
     # plot and save training data, save observables
     if rank == 0:
@@ -321,12 +309,6 @@ for h in tqdm(field_strengths, "external_field"):
             fig.savefig(
                 f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
 
-        # create histograms
-        # if np.any((h == hist_fields).all(axis=1)):
-        #     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-        #     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
-        #     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
-
         # save observables to file
         if save_results:
             save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
@@ -335,6 +317,36 @@ for h in tqdm(field_strengths, "external_field"):
                     np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names), comments="")
                 else:
                     np.savetxt(f, save_array)
+                    
+    # serialize the vqs including params and sampler state for later use
+    # collect all chains over all ranks into one vqs (sampler_state)
+    sampler_sigmas = comm.gather(vqs.sampler_state.σ, root=0)
+    if rank == 0:
+        if np.any((h == save_fields).all(axis=1)) and save_results:
+            all_sigmas = jnp.concatenate(sampler_sigmas, axis=0)
+            full_sampler_state = vqs.sampler_state.replace(σ=all_sigmas)
+            # previous state is serialized, not the current one!
+            vqs._sampler_state_previous = full_sampler_state
+            filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
+            with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
+                file.write(flax.serialization.to_bytes(vqs))
+        
+            geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
+            
+            
+# gather local estimators as each rank calculates them based on their own samples_per_rank
+# if np.any((h == hist_fields).all(axis=1)):
+#     vqs.n_samples = int(n_samples / 2)
+#     random_key, init_state_key = jax.random.split(random_key)
+#     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
+#     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
+#     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
+
+# create histograms
+# if np.any((h == hist_fields).all(axis=1)):
+#     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+#     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+#     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
 
 # %% save histograms
 # if rank == 0:

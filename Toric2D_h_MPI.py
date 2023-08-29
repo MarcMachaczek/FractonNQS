@@ -42,7 +42,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
@@ -255,22 +255,8 @@ for h in tqdm(field_strengths, "external_field"):
     # calcualte wilson loop operator
     wilsonob_nk = vqs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
-
-    if rank == 0:
-        if np.any((h == save_fields).all(axis=1)) and save_results:
-            filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
-            with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
-                file.write(flax.serialization.to_bytes(vqs))
-            geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
-
-    # gather local estimators as each rank calculates them based on their own samples_per_rank
-    # if np.any((h == hist_fields).all(axis=1)):
-    #     vqs.n_samples = n_samples
-    #     random_key, init_state_key = jax.random.split(random_key)
-    #     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, toric), root=0)
-    #     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
-    #     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
-    #     A_B_locests = comm.gather(get_locests_mixed(init_state_key, vqs, A_B), root=0)
+    
+    vqs.n_samples = n_samples
 
     # plot and save training data, save observables
     if rank == 0:
@@ -298,14 +284,7 @@ for h in tqdm(field_strengths, "external_field"):
         if save_results:
             fig.savefig(
                 f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
-
-        # create histograms
-        # if np.any((h == hist_fields).all(axis=1)):
-        #     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-        #     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
-        #     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
-        #     observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
-
+            
         # save observables to file
         if save_results:
             save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
@@ -314,7 +293,39 @@ for h in tqdm(field_strengths, "external_field"):
                     np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names), comments="")
                 else:
                     np.savetxt(f, save_array)
+                    
+    # serialize the vqs including params and sampler state for later use
+    # collect all chains over all ranks into one vqs (sampler_state)
+    sampler_sigmas = comm.gather(vqs.sampler_state.σ, root=0)
+    if rank == 0:
+        if np.any((h == save_fields).all(axis=1)) and save_results:
+            all_sigmas = jnp.concatenate(sampler_sigmas, axis=0)
+            full_sampler_state = vqs.sampler_state.replace(σ=all_sigmas)
+            # previous state is serialized, not the current one!
+            vqs._sampler_state_previous = full_sampler_state
+            filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
+            with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
+                file.write(flax.serialization.to_bytes(vqs))
+        
+            geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
+                    
+                    
+# gather local estimators as each rank calculates them based on their own samples_per_rank
+# if np.any((h == hist_fields).all(axis=1)):
+#     vqs.n_samples = n_samples
+#     random_key, init_state_key = jax.random.split(random_key)
+#     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, toric), root=0)
+#     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
+#     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
+#     A_B_locests = comm.gather(get_locests_mixed(init_state_key, vqs, A_B), root=0)
 
+# create histograms
+# if np.any((h == hist_fields).all(axis=1)):
+#     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+#     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+#     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
+#     observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
+        
 # %% save histograms
 # if rank == 0:
 #     for hist_name, _ in observables.histograms.items():
