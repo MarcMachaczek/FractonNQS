@@ -42,14 +42,14 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction_index = 0 # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 0., 1]).reshape(-1, 1)
 field_strengths = ((np.linspace(0, 0.6, 7) + 0.1) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
@@ -59,7 +59,17 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
                                                         [0., 0, 0.35],
                                                         [0., 0, 0.37]])))
 
-field_strengths[:, 0] = 0.3
+direction = np.array([0., 0., 0.7]).reshape(-1, 1)
+field_strengths = ((np.linspace(0, 1, 8)) * direction).T
+field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
+                                                        [0., 0, 0.31],
+                                                        [0., 0, 0.33],
+                                                        [0., 0, 0.34],
+                                                        [0., 0, 0.35],
+                                                        [0., 0, 0.37]])))
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+# field_strengths[:, 0] = 0.3
+
 save_fields = field_strengths  # field values for which vqs is serialized
 # %% operators on hilbert space
 L = 8  # size should be at least 3, else there are problems with pbc and indexing
@@ -105,7 +115,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.01
+lr_init = 0.003
 lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
@@ -204,6 +214,9 @@ if checkpoint is not None:
 last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
 last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
 
+if rank==0:
+    print("field_strengths: ", field_strengths)
+    
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     print(f"training for field={h}")

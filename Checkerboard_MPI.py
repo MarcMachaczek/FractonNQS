@@ -27,7 +27,6 @@ from netket.utils import HashableArray
 
 import geneqs
 from geneqs.utils.training import loop_gs
-from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -51,7 +50,7 @@ checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.3
 random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 1  # 0 for x, 1 for y, 2 for z;
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 1.0, 0]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 11) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0.55, 0.],
@@ -87,19 +86,11 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.10],
                             [0., 0., 0.00]])
 
-field_strengths = np.array([[0., 0., 1.20],
-                            [0., 0., 1.10],
-                            [0., 0., 1.00],
-                            [0., 0., 0.95],
-                            [0., 0., 0.90],
-                            [0., 0., 0.86]])
-
-field_strengths[:, [1, 2]] = field_strengths[:, [2, 1]]
-# hist_fields = np.array([[0, 0, 0]])
+field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
-L = 4  # this translates to L+1 without PBC
+L = 8  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
@@ -116,13 +107,13 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 1200  # 1500 for L=8
-min_iter = 1200  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+n_iter = 1500  # 1500 for L=8
+min_iter = 1500  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(4 * 16 * n_chains / n_ranks)  # usually 16k samples
-n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples, we usually use 24
+n_samples = int(4 * 4 * n_chains / n_ranks)  # usually 16k samples
+n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples, we usually use 24
 chunk_size = int(n_samples / n_ranks)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
-n_expect = n_ranks * chunk_size * 16   # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = n_ranks * chunk_size * 20   # number of samples to estimate observables, must be dividable by chunk_size
 # n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -137,8 +128,8 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.001
-lr_end = 0.0001
+lr_init = 0.003
+lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
@@ -336,24 +327,3 @@ for h in tqdm(field_strengths, "external_field"):
                 file.write(flax.serialization.to_bytes(vqs))
         
             geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
-            
-            
-# gather local estimators as each rank calculates them based on their own samples_per_rank
-# if np.any((h == hist_fields).all(axis=1)):
-#     vqs.n_samples = int(n_samples / 2)
-#     random_key, init_state_key = jax.random.split(random_key)
-#     energy_locests = comm.gather(get_locests_mixed(init_state_key, vqs, checkerboard), root=0)
-#     mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, magnetization), root=0)
-#     abs_mag_locests = comm.gather(get_locests_mixed(init_state_key, vqs, abs_magnetization), root=0)
-
-# create histograms
-# if np.any((h == hist_fields).all(axis=1)):
-#     observables.add_hist("energy", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-#     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
-#     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
-
-# %% save histograms
-# if rank == 0:
-#     for hist_name, _ in observables.histograms.items():
-#         np.save(f"{save_path}/hists_{hist_name}_L{shape}_{eval_model}.npy",
-#                 observables.hist_to_array(hist_name))

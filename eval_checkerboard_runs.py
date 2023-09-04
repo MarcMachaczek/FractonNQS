@@ -71,10 +71,13 @@ field_strengths = obs.iloc[:, :3].values
 #                             [0., 0., 0.00]])
 # field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 
+hist_fields = np.array([[0, 0, 0]])
+
 n_chains = 256 * 2 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 chunk_size = 1024 * 16
 n_samples = chunk_size * 24
 n_discard_per_chain = 20
+n_bins = 20
 
 # %% create observables
 # define some observables
@@ -158,9 +161,10 @@ for h in tqdm(field_strengths, "external_field"):
 
     with open(f"{save_dir}/vqs_{eval_model}_L{shape}_h{h}.mpack", 'rb') as file:
         vqs = flax.serialization.from_bytes(vqs, file.read())
-        # rank_sigmas = vqs.sampler_state.σ.reshape(n_ranks, -1, σ.shape[-1])
-        # vqs.sampler_state.σ = rank_sigmas[rank]
-        # vqs.n_chains = vqs.sampler_state.σ.shape[0]
+        rank_sigmas = vqs.sampler_state.σ.reshape(n_ranks, -1, vqs.sampler_state.σ.shape[-1])
+        rank_sampler_state = vqs.sampler_state.replace(σ=rank_sigmas[rank])
+        vqs.sampler_state = rank_sampler_state
+        vqs.n_chains_per_rank = vqs.sampler_state.σ.shape[0]
         # print(vqs.n_samples, vqs.n_samples_per_rank, vqs.sampler.n_chains, vqs.sampler.n_chains_per_rank, vqs.sampler_state.σ.shape)
     vqs.chunk_size = chunk_size
     vqs.n_samples = n_samples
@@ -179,6 +183,21 @@ for h in tqdm(field_strengths, "external_field"):
     zcubes_nk = vqs.expect(zcubes)
     observables.add_nk_obs("xcubes", h, xcubes_nk)
     observables.add_nk_obs("zcubes", h, zcubes_nk)
+    
+    # gather local estimators as each rank calculates them based on their own samples_per_rank
+    if np.any((h == hist_fields).all(axis=1)):
+        random_key, init_state_key = jax.random.split(random_key)
+        energy_locests = comm.gather(vqs.local_estimators(checkerboard), root=0)
+        mag_locests = comm.gather(vqs.local_estimators(magnetization), root=0)
+
+        observables.add_hist("epsite", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+        observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+
+    # %% save histograms
+    if rank == 0:
+        for hist_name, _ in observables.histograms.items():
+            np.save(f"{save_dir}/hist_{hist_name}_L{shape}_{eval_model}.npy",
+                    observables.hist_to_array(hist_name))
 
 if rank == 0:
     save_array = observables.obs_to_array(separate_keys=False)

@@ -36,11 +36,11 @@ matplotlib.rcParams.update({'font.size': 12})
 
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
-save_dir = f"{RESULTS_PATH}/toric_h"
+save_dir = f"{RESULTS_PATH}/toric2d_h/L=8_final/L=8_mc_hx_right_left_chaintrans_nonoise"
 
 # %%
 shape = jnp.array([8, 8])
-square_graph = nk.graph.Square(length=shape[0], pbc=True)
+square_graph = nk.graph.Square(length=shape[0].item(), pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 eval_model = "ToricCRBM"
 # get fields
@@ -48,30 +48,30 @@ direction_index = 0  # 0 for x, 1 for y, 2 for z;
 obs = pd.read_csv(f"{save_dir}/L{shape}_{eval_model}_observables.txt", sep=" ", header=0)
 field_strengths = obs.iloc[:, :3].values
 
-field_strengths = np.array([[0., 0., 0.8],
-                            [0., 0., 0.7],
-                            [0., 0., 0.65],
-                            [0., 0., 0.6],
-                            [0., 0., 0.55],
-                            [0., 0., 0.53],
-                            [0., 0., 0.51],
-                            [0., 0., 0.49],
-                            [0., 0., 0.47],
-                            [0., 0., 0.45],
-                            [0., 0., 0.43],
-                            [0., 0., 0.41],
-                            [0., 0., 0.39],
-                            [0., 0., 0.37],
-                            [0., 0., 0.35],
-                            [0., 0., 0.33],
-                            [0., 0., 0.3],
-                            [0., 0., 0.2],
-                            [0., 0., 0.1],
-                            [0., 0., 0.]])
+# field_strengths = np.array([[0., 0., 0.8],
+#                             [0., 0., 0.7],
+#                             [0., 0., 0.65],
+#                             [0., 0., 0.6],
+#                             [0., 0., 0.55],
+#                             [0., 0., 0.53],
+#                             [0., 0., 0.51],
+#                             [0., 0., 0.49],
+#                             [0., 0., 0.47],
+#                             [0., 0., 0.45],
+#                             [0., 0., 0.43],
+#                             [0., 0., 0.41],
+#                             [0., 0., 0.39],
+#                             [0., 0., 0.37],
+#                             [0., 0., 0.35],
+#                             [0., 0., 0.33],
+#                             [0., 0., 0.3],
+#                             [0., 0., 0.2],
+#                             [0., 0., 0.1],
+#                             [0., 0., 0.]])
 
-n_chains = 512 * 1  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 chunk_size = 1024 * 8
-n_samples = chunk_size * 50
+n_samples = chunk_size * 48
 n_discard_per_chain = 0
 
 # %% create observables
@@ -146,6 +146,11 @@ for h in tqdm(field_strengths, "external_field"):
 
     with open(f"{save_dir}/vqs_{eval_model}_L{shape}_h{h}.mpack", 'rb') as file:
         vqs = flax.serialization.from_bytes(vqs, file.read())
+        rank_sigmas = vqs.sampler_state.σ.reshape(n_ranks, -1, vqs.sampler_state.σ.shape[-1])
+        rank_sampler_state = vqs.sampler_state.replace(σ=rank_sigmas[rank])
+        vqs.sampler_state = rank_sampler_state
+        vqs.n_chains_per_rank = vqs.sampler_state.σ.shape[0]
+        # print(vqs.n_samples, vqs.n_samples_per_rank, vqs.sampler.n_chains, vqs.sampler.n_chains_per_rank, vqs.sampler_state.σ.shape)
     vqs.chunk_size = chunk_size
     vqs.n_samples = n_samples
 
