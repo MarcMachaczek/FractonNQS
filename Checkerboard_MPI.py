@@ -43,7 +43,7 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
@@ -109,11 +109,11 @@ elif direction_index == 2:
 # %%  setting hyper-parameters and model
 n_iter = 1500  # 1500 for L=8
 min_iter = 1500  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(4 * 4 * n_chains / n_ranks)  # usually 16k samples
+n_chains = 4 * 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = int(4 * n_chains / n_ranks)  # usually 16k samples
 n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples, we usually use 24
 chunk_size = int(n_samples / n_ranks)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
-n_expect = n_ranks * chunk_size * 20   # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = n_ranks * chunk_size * 10   # number of samples to estimate observables, must be dividable by chunk_size
 # n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -226,6 +226,9 @@ if checkpoint is not None:
 last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
 last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
 
+if rank==0:
+    print("field_strengths: ", field_strengths)
+    
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     print(f"training for field={h}")

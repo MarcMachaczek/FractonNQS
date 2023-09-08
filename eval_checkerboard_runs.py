@@ -32,18 +32,16 @@ from matplotlib import pyplot as plt
 import geneqs
 from global_variables import RESULTS_PATH
 
-matplotlib.rcParams.update({'font.size': 12})
-
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
-save_dir = f"{RESULTS_PATH}/checkerboard"
+save_dir = f"{RESULTS_PATH}/checkerboard/L=8_final/L=8_mc_crbm_hx_right_left_chaintrans_nonoise"
 
 # %%
-shape = jnp.array([4, 4, 4])
+shape = jnp.array([8, 8, 8])
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
 eval_model = "CheckerCRBM"
 # get fields
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 obs = pd.read_csv(f"{save_dir}/L{shape}_{eval_model}_observables.txt", sep=" ", header=0)
 field_strengths = obs.iloc[:, :3].values
 
@@ -73,9 +71,9 @@ field_strengths = obs.iloc[:, :3].values
 
 hist_fields = np.array([[0, 0, 0]])
 
-n_chains = 256 * 2 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-chunk_size = 1024 * 16
-n_samples = chunk_size * 24
+n_chains = 256 * 4 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+chunk_size = 1024
+n_samples = chunk_size * 30 * 4
 n_discard_per_chain = 20
 n_bins = 20
 
@@ -165,7 +163,7 @@ for h in tqdm(field_strengths, "external_field"):
         rank_sampler_state = vqs.sampler_state.replace(σ=rank_sigmas[rank])
         vqs.sampler_state = rank_sampler_state
         vqs.n_chains_per_rank = vqs.sampler_state.σ.shape[0]
-        # print(vqs.n_samples, vqs.n_samples_per_rank, vqs.sampler.n_chains, vqs.sampler.n_chains_per_rank, vqs.sampler_state.σ.shape)
+        print(vqs.n_samples, vqs.n_samples_per_rank, vqs.sampler.n_chains, vqs.sampler.n_chains_per_rank, vqs.sampler_state.σ.shape)
     vqs.chunk_size = chunk_size
     vqs.n_samples = n_samples
 
@@ -176,8 +174,8 @@ for h in tqdm(field_strengths, "external_field"):
     magnetization_nk = vqs.expect(magnetization)
     observables.add_nk_obs("mag", h, magnetization_nk)
     # calculate absolute magnetization
-    abs_magnetization_nk = vqs.expect(abs_magnetization)
-    observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
+    # abs_magnetization_nk = vqs.expect(abs_magnetization)
+    # observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
     # calculate cube parts of the hamiltonian
     xcubes_nk = vqs.expect(xcubes)
     zcubes_nk = vqs.expect(zcubes)
@@ -185,19 +183,19 @@ for h in tqdm(field_strengths, "external_field"):
     observables.add_nk_obs("zcubes", h, zcubes_nk)
     
     # gather local estimators as each rank calculates them based on their own samples_per_rank
-    if np.any((h == hist_fields).all(axis=1)):
-        random_key, init_state_key = jax.random.split(random_key)
-        energy_locests = comm.gather(vqs.local_estimators(checkerboard), root=0)
-        mag_locests = comm.gather(vqs.local_estimators(magnetization), root=0)
+#     if np.any((h == hist_fields).all(axis=1)):
+#         random_key, init_state_key = jax.random.split(random_key)
+#         energy_locests = comm.gather(vqs.local_estimators(checkerboard), root=0)
+#         mag_locests = comm.gather(vqs.local_estimators(magnetization), root=0)
 
-        observables.add_hist("epsite", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-        observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+#         observables.add_hist("epsite", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+#         observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
 
-    # %% save histograms
-    if rank == 0:
-        for hist_name, _ in observables.histograms.items():
-            np.save(f"{save_dir}/hist_{hist_name}_L{shape}_{eval_model}.npy",
-                    observables.hist_to_array(hist_name))
+#     # %% save histograms
+#     if rank == 0:
+#         for hist_name, _ in observables.histograms.items():
+#             np.save(f"{save_dir}/hist_{hist_name}_L{shape}_{eval_model}.npy",
+#                     observables.hist_to_array(hist_name))
 
 if rank == 0:
     save_array = observables.obs_to_array(separate_keys=False)

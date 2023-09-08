@@ -12,12 +12,12 @@ cmap = matplotlib.colormaps["Set1"]
 line_styles = ["solid", "dashed", "dotted"]
 
 f_dict = {0: "x", 1: "y", 2: "z"}
-save_dir = f"{RESULTS_PATH}/checkerboard/L=4_final"
+save_dir = f"{RESULTS_PATH}/checkerboard/L=8_final"
 
 # %%
-field_directions = 1*[2]  # 0=x, 1=y, 2=z
-shapes = 1*[[4, 4, 4]]
-labels = ["right_left"]  # , "right_left", "left_right"]
+field_directions = 2*[0]  # 0=x, 1=y, 2=z
+shapes = 2*[[8, 8, 8]]
+labels = ["independent", "right_left"]  # , "right_left", "left_right"]
 legend_labels = labels  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
 eval_model = "CheckerCRBM"
 obs_list = []
