@@ -44,7 +44,7 @@ save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
+checkpoint = f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[8 8 8]_h(0.35, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
@@ -85,6 +85,22 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.20],
                             [0., 0., 0.10],
                             [0., 0., 0.00]])
+
+field_strengths = np.array([[0., 0., 0.90],
+                            [0., 0., 0.80],
+                            [0., 0., 0.70],
+                            [0., 0., 0.60],
+                            [0., 0., 0.50],
+                            [0., 0., 0.45],
+                            [0., 0., 0.44],
+                            [0., 0., 0.43],
+                            [0., 0., 0.42],
+                            [0., 0., 0.41],
+                            [0., 0., 0.40],
+                            [0., 0., 0.39],
+                            [0., 0., 0.38],
+                            [0., 0., 0.37],
+                            [0., 0., 0.36]])
 
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 save_fields = field_strengths  # field values for which vqs is serialized
