@@ -40,7 +40,7 @@ matplotlib.rcParams.update({'font.size': 12})
 # %% training configuration
 save_results = True
 save_stats = True  # whether to save stats logged during training to drive
-save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
+save_path = f"{RESULTS_PATH}/toric2d_h"
 pre_init = False  # True only has effect when swipe=="independent"
 swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
