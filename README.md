@@ -1,4 +1,6 @@
-# Gauge-equivariant Neural Quantum States
+# Neural Network Quantum States (NQS) for Fracton Models
+
+This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
 
 
