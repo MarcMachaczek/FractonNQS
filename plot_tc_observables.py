@@ -15,10 +15,10 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/toric2d_h/L=8_final"
 
 # %%
-field_directions = 2*[0,]
+field_directions = 2*[2,]
 shapes = 2*[[8, 8]]
 labels = ["independent", "right_left", "left_right"]
-legend_labels = labels  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
+legend_labels = ["independent", "right_left", "left_right"]  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
 eval_model = "ToricCRBM"
 obs_list = []
 
@@ -65,7 +65,7 @@ fig = plt.figure(dpi=300, figsize=(10, 10))
 plot_energy = fig.add_subplot(111)
 
 for i, obs in enumerate(obs_list):
-    hilbert_size = np.prod(shapes[i])
+    hilbert_size = 2 * np.prod(shapes[i])
     plot_energy.errorbar(obs.iloc[:, field_directions[i]], obs["energy"].values / hilbert_size,
                          yerr=obs["energy_err"].values / hilbert_size, marker="o", markersize=3,
                          color=cmap(i), label=legend_labels[i].replace("_","-"), linestyle=line_styles[i])
@@ -81,7 +81,7 @@ fig = plt.figure(dpi=300, figsize=(10, 10))
 plot_vscore = fig.add_subplot(111)
 
 for i, obs in enumerate(obs_list):
-    hilbert_size = np.prod(shapes[i])
+    hilbert_size = 2 * np.prod(shapes[i])
     vscore = hilbert_size * np.abs(obs["energy_var"].values / obs["energy"].values**2)
     plot_vscore.plot(obs.iloc[:, field_directions[i]], vscore, marker="o", markersize=3,
                    color=cmap(i), label=legend_labels[i].replace("_","-"), linestyle=line_styles[i])

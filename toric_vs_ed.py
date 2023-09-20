@@ -118,7 +118,7 @@ loops = (HashableArray(geneqs.utils.indexing.get_strings_cubical2d(0, shape)),  
 loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape)),
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
-alpha = 2
+alpha = 1
 cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
                                    correlators=correlators,
                                    correlator_symmetries=correlator_symmetries,

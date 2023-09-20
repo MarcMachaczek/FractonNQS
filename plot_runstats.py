@@ -18,10 +18,11 @@ f_dict = {0: "x", 1: "y", 2: "z"}
 # %%
 L = 8
 shapes = 2*[[L, L]]
-field_directions = 2*[0,]
-labels = ["independent",
-          "right_left_chaintrans_nonoise"]
-legend_labels = ["independent", "right_left"]  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
+field_directions = 2*[2,]
+labels = ["hx03_independent",
+          "hx03_right_left_chaintrans_nonoise",
+          "left_right_chaintrans_nonoise"]
+legend_labels = ["hx03_independent", "hx03_right_left", "left_right"]  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
 eval_model = "ToricCRBM"
 save_dir = f"{RESULTS_PATH}/toric2d_h/L={L}_final"
 
@@ -73,6 +74,6 @@ rhat_plot.legend()
 tau_plot.legend()
 arate_plot.legend()
 
-rhat_fig.savefig(f"{save_dir}/rhats_L[{shape_string}]_{eval_model}_h{f_dict[field_directions[0]]}.svg")
-tau_fig.savefig(f"{save_dir}/taus_L[{shape_string}]_{eval_model}_h{f_dict[field_directions[0]]}.svg")
-arate_fig.savefig(f"{save_dir}/arates_L[{shape_string}]_{eval_model}_h{f_dict[field_directions[0]]}.svg")
+rhat_fig.savefig(f"{save_dir}/rhats_L[{shape_string}]_{eval_model}_h{f_dict[field_directions[0]]}_hx03.svg")
+tau_fig.savefig(f"{save_dir}/taus_L[{shape_string}]_{eval_model}_h{f_dict[field_directions[0]]}_hx03.svg")
+arate_fig.savefig(f"{save_dir}/arates_L[{shape_string}]_{eval_model}_h{f_dict[field_directions[0]]}_hx03.svg")

@@ -43,8 +43,8 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/checkerboard"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[8 8 8]_h(0.35, 0.0, 0.0).mpack"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+checkpoint = None  # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[8 8 8]_h(0.45, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
@@ -83,24 +83,7 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.33],
                             [0., 0., 0.30],
                             [0., 0., 0.20],
-                            [0., 0., 0.10],
-                            [0., 0., 0.00]])
-
-field_strengths = np.array([[0., 0., 0.90],
-                            [0., 0., 0.80],
-                            [0., 0., 0.70],
-                            [0., 0., 0.60],
-                            [0., 0., 0.50],
-                            [0., 0., 0.45],
-                            [0., 0., 0.44],
-                            [0., 0., 0.43],
-                            [0., 0., 0.42],
-                            [0., 0., 0.41],
-                            [0., 0., 0.40],
-                            [0., 0., 0.39],
-                            [0., 0., 0.38],
-                            [0., 0., 0.37],
-                            [0., 0., 0.36]])
+                            [0., 0., 0.10]])
 
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 save_fields = field_strengths  # field values for which vqs is serialized
@@ -253,7 +236,7 @@ for h in tqdm(field_strengths, "external_field"):
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
                          chunk_size=chunk_size)
-
+    
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
