@@ -4,7 +4,15 @@ This is the code repository for the Master project titled "Neural Network Quantu
 
 ## Set-up
 
-A python $\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to Jax restrcitions). After cloning the repository, a new virtual environment "venv" can be created with the command:
+A python $\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to Jax restrcitions).
+After cloning the repository, a new virtual environment 'venv' can be created with the command:
+
+'python -m venv <directory>'
+
+Typically, it is easiest to choose '<directory>'='venv', which creates the 'venv' virtual environment into a newly created 'venv' folder in the current working directory.
+Then, activate the virtual environment using
+
+'source myvenv/bin/activate'
 
 ## Getting started
 
