@@ -11,14 +11,15 @@ After cloning the repository, a new virtual environment `venv` can be created wi
 python -m venv <directory>
 ```
 
+Please do not use conda for this, as described in the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html).
 Typically, it is easiest to choose `<directory>`=`venv`, which creates the `venv` virtual environment into a newly created `venv` folder of the current working directory (which we assume is the root of the cloned repository).
 Then, activate the virtual environment with
 
 ```
-source myvenv/bin/activate
+source venv/bin/activate
 ```
 
-This codebase currently uses the CUDA 11 compatible JAX version. This can be installed into the currently activate environment using the commands
+This codebase currently uses the CUDA 11.8 compatible JAX version. It can be installed into the currently activate environment using the commands
 
 ```
 pip install --upgrade pip
@@ -31,6 +32,8 @@ Of course, this requires an NVIDIA GPU with up-to-date drivers. For CPU-only sup
 pip install --upgrade pip
 pip install --upgrade "jax[cpu]"
 ```
+
+For more details refer to the [JAX installation guide](https://github.com/google/jax#installation).
 
 
 ## Add your files
