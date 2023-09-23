@@ -11,7 +11,7 @@ After cloning the repository, a new virtual environment `venv` can be created wi
 python -m venv <directory>
 ```
 
-Please do not use conda for this, as described in the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html).
+Anaconda is **not** recommened for this, as described in the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html). 
 Typically, it is easiest to choose `<directory>`=`venv`, which creates the `venv` virtual environment into a newly created `venv` folder of the current working directory (which we assume is the root of the cloned repository).
 Then, activate the virtual environment with
 
