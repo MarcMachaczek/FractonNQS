@@ -2,7 +2,9 @@
 
 This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
+## Set-up
 
+A python $\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to Jax restrcitions). After cloning the repository, a new virtual environment ~venv~ can be created with the command:
 
 ## Getting started
 
