@@ -2,6 +2,8 @@
 
 This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
+Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model in the presence of external magnetic fields. In particular, this package takes handles translational symmetries of qubits and correlators constructed from them to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Performant operator and neural network implementations with GPU support allow for simulations up to 512 qubits ($L=8$) on the Checkerboard model on a single NVIDIA A100 GPU. By calculating the magnetization from the trained NQS for different magnetic fields, for instance, indications of a strong-first order phase transition are found.
+
 ## Setup
 
 A Python$\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to JAX constraints).
