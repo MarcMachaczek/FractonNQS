@@ -41,7 +41,15 @@ The `requirements.txt` contains all other required packages together with their 
 pip install -r requirements.txt
 ```
 
+This essentially completes the setup process.
 
+However, it is possible to use MPI in order to run NQS optimizations on multiple hosts / GPUs. Assuming a working MPI installation, simply execute 
+
+```
+pip install --upgrade "netket[mpi]"
+```
+
+to install all required MPI dependencies. For more details on this, refer to the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html).
 
 
 ## Collaborate with your team
