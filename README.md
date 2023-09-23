@@ -57,13 +57,13 @@ to install all required MPI dependencies. For more details on this, refer to the
 
 The core implementations are located within the `geneqs` directory. Therein, four sub-folders can be found: `models`, `operators`, `sampling`, and `utils`.
 
-- `models` contains all variational wave function implementations. In particular, `rbm.py` containing all RBM-type architectures and `neural_networks.py` containing FFNN-like architectures.
+- `models` contains all variational wave function implementations. In particular, `rbm.py` contains all RBM-type architectures and `neural_networks.py` contains FFNN-like architectures.
 
-- `operators` folder contains all operator implementations for calculating connected (matrix) elements and some more functionality in a NetKet compatible syntax. This includes `checkerboard.py` and `toric_2d.py`.
+- `operators` contains all operator implementations for calculating connected (matrix) elements and some more functionality in a NetKet compatible syntax. This includes `checkerboard.py` and `toric_2d.py`.
 
-- `sampling` folder only contains the implementation of the weighted update rule for MCMC sampling in `update_rules.py`.
+- `sampling` so far implements only the implementation of the weighted update rule for MCMC sampling in `update_rules.py`.
 
-- `utils` directory contains many different functionalities that are required for NQS training or implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains our custom training loop, enabling tracking of observables during optimization, progress bars that show the relative time requirement of different steps during NQS optimization and more.
+- `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, progress bars that show the relative time requirement of different steps during NQS optimization and more.
 
 ## How to use
 
@@ -75,4 +75,4 @@ So far, this project lacks many quality-of-life features that should be mandator
 2. clean production scripts with proper argument parsing for easy repoduction of core results
 3. documentation
 4. benchmarks and tests
-5. and more
+5. ...
