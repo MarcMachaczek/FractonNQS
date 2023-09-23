@@ -2,7 +2,7 @@
 
 This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
-## Set-up
+## Setup
 
 A Python$\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to JAX constraints).
 After cloning the repository, a new virtual environment `venv` can be created with the command:
@@ -35,22 +35,14 @@ pip install --upgrade "jax[cpu]"
 
 For more details refer to the [JAX installation guide](https://github.com/google/jax#installation).
 
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+The `requirements.txt` contains all other required packages together with their versions. They can be installed simply by using the command
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/MarcMa/geneqs.git
-git branch -M main
-git push -uf origin main
+pip install -r requirements.txt
 ```
 
-## Integrate with your tools
 
-- [ ] [Set up project integrations](https://gitlab.com/MarcMa/geneqs/-/settings/integrations)
+
 
 ## Collaborate with your team
 
