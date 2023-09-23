@@ -4,25 +4,34 @@ This is the code repository for the Master project titled "Neural Network Quantu
 
 ## Set-up
 
-A python $\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to Jax restrcitions).
-After cloning the repository, a new virtual environment 'venv' can be created with the command:
+A Python$\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to JAX constraints).
+After cloning the repository, a new virtual environment `venv` can be created with the command:
 
 ```
 python -m venv <directory>
 ```
 
-Typically, it is easiest to choose `<directory>`=`venv`, which creates the `venv` virtual environment into a newly created `venv` folder in the current working directory.
-Then, activate the virtual environment using
+Typically, it is easiest to choose `<directory>`=`venv`, which creates the `venv` virtual environment into a newly created `venv` folder of the current working directory (which we assume is the root of the cloned repository).
+Then, activate the virtual environment with
 
 ```
 source myvenv/bin/activate
 ```
 
-## Getting started
+This codebase currently uses the CUDA 11 compatible JAX version. This can be installed into the currently activate environment using the commands
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+```
+pip install --upgrade pip
+pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+Of course, this requires an NVIDIA GPU with up-to-date drivers. For CPU-only support, install JAX with
+
+```
+pip install --upgrade pip
+pip install --upgrade "jax[cpu]"
+```
+
 
 ## Add your files
 
