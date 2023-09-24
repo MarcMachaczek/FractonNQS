@@ -2,7 +2,7 @@
 
 This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
-Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model in the presence of external magnetic fields. In particular, this package takes handles translational symmetries of qubits and correlators constructed from them to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Performant operator and neural network implementations with GPU support allow for simulations up to 512 qubits ($L=8$) on the Checkerboard model on a single NVIDIA A100 GPU. By calculating the magnetization from the trained NQS for different magnetic fields, for instance, indications of a strong-first order phase transition are found.
+Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model in the presence of external magnetic fields. In particular, this package handles translational symmetries for qubits and correlators constructed from them to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Performant operator and neural network implementations with GPU support allow for simulations up to 512 qubits ($L=8$) on the Checkerboard model on a single NVIDIA A100 GPU. Calculating the magnetization from the trained NQS for different magnetic fields, for instance, indicates a strong-first order phase transition.
 
 ## Setup
 
@@ -86,7 +86,17 @@ For NQS training distributed over multiple hosts, run the command:
 mpiexec -np <number_of_hosts> python <system>_MPI.py
 ```
 
-The `<number_of_hosts>` must not exceed the number of available GPUs. 
+The `<number_of_hosts>` must not exceed the number of available GPUs.
+
+By default, all these scripts produce 4 files for each field configuration into the `save_path` (by default, the `checkerboard` or `toric2d_h` folder in the results directory):
+
+- a .pdf file that contains most hyperparameter settings and shows the energy vs training iterations
+- a .txt file with prefix `params_` that contains all optimized parameters in a “human-readable” form
+- a .json file with the prefix `stats_` that contains all training stats like energy variances, split-$\hat{R}$ values, auto-correlation times etc.
+- an .mpack file with the prefix `vqs_` that serializes the final trained model, including all parameters and the states of the Markov chains, which can be used to reconstruct the trained model for evaluation purposes
+
+Moreover, an `*_observables.txt` file is created that contains the energy, magnetization and absolute magnetization together with errors and variances for all field_strengths. This allows for a quick evaluation of results.
+
 
 ## Project status
 
