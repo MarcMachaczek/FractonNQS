@@ -25,7 +25,6 @@ from netket.utils import HashableArray
 
 import geneqs
 from geneqs.utils.training import loop_gs
-from geneqs.utils.eval_obs import get_locests_mixed
 from global_variables import RESULTS_PATH
 
 from matplotlib import pyplot as plt
@@ -49,7 +48,7 @@ checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0,
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0 # 0 for x, 1 for y, 2 for z;
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 0., 1]).reshape(-1, 1)
 field_strengths = ((np.linspace(0, 0.6, 7) + 0.1) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
@@ -214,9 +213,9 @@ if checkpoint is not None:
 last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
 last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
 
-if rank==0:
+if rank == 0:
     print("field_strengths: ", field_strengths)
-    
+
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     print(f"training for field={h}")
@@ -266,7 +265,7 @@ for h in tqdm(field_strengths, "external_field"):
     # calcualte wilson loop operator
     wilsonob_nk = vqs.expect(wilsonob)
     observables.add_nk_obs("wilson", h, wilsonob_nk)
-    
+
     vqs.n_samples = n_samples
 
     # plot and save training data, save observables
@@ -295,16 +294,17 @@ for h in tqdm(field_strengths, "external_field"):
         if save_results:
             fig.savefig(
                 f"{save_path}/L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.pdf")
-            
+
         # save observables to file
         if save_results:
             save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
             with open(f"{save_path}/L{shape}_{eval_model}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{save_path}/L{shape}_{eval_model}_observables.txt") == 0:
-                    np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names), comments="")
+                    np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names),
+                               comments="")
                 else:
                     np.savetxt(f, save_array)
-                    
+
     # serialize the vqs including params and sampler state for later use
     # collect all chains over all ranks into one vqs (sampler_state)
     sampler_sigmas = comm.gather(vqs.sampler_state.σ, root=0)
@@ -317,10 +317,9 @@ for h in tqdm(field_strengths, "external_field"):
             filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
             with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
                 file.write(flax.serialization.to_bytes(vqs))
-        
+
             geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")
-                    
-                    
+
 # gather local estimators as each rank calculates them based on their own samples_per_rank
 # if np.any((h == hist_fields).all(axis=1)):
 #     vqs.n_samples = n_samples
@@ -336,7 +335,7 @@ for h in tqdm(field_strengths, "external_field"):
 #     observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
 #     observables.add_hist("abs_mag", h, np.histogram(np.asarray(abs_mag_locests), n_bins))
 #     observables.add_hist("A_B", h, np.histogram(np.asarray(A_B_locests), n_bins))
-        
+
 # %% save histograms
 # if rank == 0:
 #     for hist_name, _ in observables.histograms.items():

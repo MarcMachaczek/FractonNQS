@@ -214,7 +214,8 @@ def get_netket_plaq(hilbert, position: jax.Array, shape: jax.Array):
             nk.operator.spin.sigmaz(hilbert, plaq_indices[3].item())
     return plaq
 
-class ToricCode2d_xbasis(nk.operator.DiscreteOperator):
+
+class ToricCode2dXbasis(nk.operator.DiscreteOperator):
     def __init__(self, hilbert: nk.hilbert.DiscreteHilbert, shape: jax.Array, h: Tuple[float, float, float] = None):
         super().__init__(hilbert)
         self.shape = shape
@@ -266,12 +267,12 @@ class ToricCode2d_xbasis(nk.operator.DiscreteOperator):
 
 
 @nk.vqs.get_local_kernel.dispatch
-def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2d_xbasis):
+def get_local_kernel(vstate: nk.vqs.MCState, op: ToricCode2dXbasis):
     return e_loc
 
 
 @nk.vqs.get_local_kernel_arguments.dispatch
-def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2d_xbasis):
+def get_local_kernel_arguments(vstate: nk.vqs.MCState, op: ToricCode2dXbasis):
     sigma = vstate.samples
     extra_args = toric2d_xbasis_conns_and_mels(sigma.reshape(-1, vstate.hilbert.size), op.plaqs, op.stars, op.h)
     return sigma, extra_args

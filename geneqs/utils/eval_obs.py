@@ -12,6 +12,10 @@ from dataclasses import dataclass, field
 # %%
 @dataclass
 class ObservableCollector:
+    """
+    A dataclass that simplifies tracking of observables, histograms or arrays. This is essentially a glorified
+    ordered dictionary with some i/o functionality.
+    """
     key_names: Union[list[str, ...], tuple[str, ...], str]
     observables: Union[dict, OrderedDict] = field(default_factory=OrderedDict)
     histograms: Union[dict, OrderedDict] = field(default_factory=OrderedDict)

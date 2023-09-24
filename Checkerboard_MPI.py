@@ -84,8 +84,8 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.30],
                             [0., 0., 0.20],
                             [0., 0., 0.10]])
-
 field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
@@ -112,7 +112,7 @@ n_chains = 4 * 256 * n_ranks  # total number of MCMC chains, when runnning on GP
 n_samples = int(4 * n_chains / n_ranks)  # usually 16k samples
 n_discard_per_chain = 20  # should be small for using many chains, default is 10% of n_samples, we usually use 24
 chunk_size = int(n_samples / n_ranks)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
-n_expect = n_ranks * chunk_size * 10   # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = n_ranks * chunk_size * 10  # number of samples to estimate observables, must be dividable by chunk_size
 # n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -135,7 +135,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = 0 # standard deviation for transfer learning noise
+trans_dev = 0  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 perms = geneqs.utils.indexing.get_translations_cubical3d(shape, shift=2)
@@ -225,9 +225,9 @@ if checkpoint is not None:
 last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
 last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
 
-if rank==0:
+if rank == 0:
     print("field_strengths: ", field_strengths)
-    
+
 for h in tqdm(field_strengths, "external_field"):
     h = tuple(h)
     print(f"training for field={h}")
@@ -236,7 +236,7 @@ for h in tqdm(field_strengths, "external_field"):
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     vqs = nk.vqs.MCState(sampler, model, n_samples=n_samples, n_discard_per_chain=n_discard_per_chain,
                          chunk_size=chunk_size)
-    
+
     if swipe != "independent":
         if last_trained_params is not None:
             random_key, noise_key_real, noise_key_complex = jax.random.split(random_key, 3)
@@ -255,7 +255,7 @@ for h in tqdm(field_strengths, "external_field"):
         out_path = f"{save_path}/stats_L{shape}_{eval_model}_h{tuple([round(hi, 3) for hi in h])}.json"
     else:
         out_path = None
-        
+
     if rank == 0:  # make sure stats are only saved by one node, otherwise json file gets corrupted
         vqs, training_data = loop_gs(vqs, checkerboard, optimizer, preconditioner, n_iter, min_iter, out=out_path)
     else:
@@ -276,7 +276,7 @@ for h in tqdm(field_strengths, "external_field"):
     # calculate absolute magnetization
     abs_magnetization_nk = vqs.expect(abs_magnetization)
     observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
-    
+
     vqs.n_samples = n_samples
 
     # plot and save training data, save observables
@@ -311,10 +311,11 @@ for h in tqdm(field_strengths, "external_field"):
             save_array = observables.obs_to_array(separate_keys=False)[-1].reshape(1, -1)
             with open(f"{save_path}/L{shape}_{eval_model}_observables.txt", "ab") as f:
                 if os.path.getsize(f"{save_path}/L{shape}_{eval_model}_observables.txt") == 0:
-                    np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names), comments="")
+                    np.savetxt(f, save_array, header=" ".join(observables.key_names + observables.obs_names),
+                               comments="")
                 else:
                     np.savetxt(f, save_array)
-                    
+
     # serialize the vqs including params and sampler state for later use
     # collect all chains over all ranks into one vqs (sampler_state)
     sampler_sigmas = comm.gather(vqs.sampler_state.σ, root=0)
@@ -327,5 +328,5 @@ for h in tqdm(field_strengths, "external_field"):
             filename = f"{eval_model}_L{shape}_h{tuple([round(hi, 3) for hi in h])}"
             with open(f"{save_path}/vqs_{filename}.mpack", 'wb') as file:
                 file.write(flax.serialization.to_bytes(vqs))
-        
+
             geneqs.utils.model_surgery.params_to_txt(vqs, f"{save_path}/params_{filename}.txt")

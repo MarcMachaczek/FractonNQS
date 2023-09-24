@@ -242,6 +242,9 @@ class ToricLoopCRBM(nn.Module):
 
 # %%
 class CorrelationRBM(nn.Module):
+    """
+    Symmetric RBM architecture that additionally includes correlator features.
+    """
     # permutations of lattice sites corresponding to symmetries
     symmetries: HashableArray
     # correlators that serve as additional input for the cRBM
@@ -394,7 +397,7 @@ class ExplicitCorrelationRBM(nn.Module):
 # %%
 class RBMModPhaseSymm(nn.Module):
     """
-    Essentially the same as the RBMModPhase model in the netket library, however, it additionally utilizes equivariant
+    Essentially the same as the RBMModPhase model in the NetKet library, however, it additionally utilizes equivariant
     layers, aka GCNNs, for translational symmetry.
     """
     # Array of permutation indices corresponding to symmetry opeartions incl identity.

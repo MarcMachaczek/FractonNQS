@@ -14,11 +14,10 @@ markers = ["o", "<", ">"]
 
 f_dict = {0: "x", 1: "y", 2: "z"}
 
-
 # %%
 L = 8
-shapes = 2*[[L, L]]
-field_directions = 2*[2,]
+shapes = 2 * [[L, L]]
+field_directions = 2 * [2, ]
 labels = ["hx03_independent",
           "hx03_right_left_chaintrans_nonoise",
           "left_right_chaintrans_nonoise"]
@@ -41,9 +40,9 @@ for i, (fdir, label) in enumerate(zip(field_directions, labels)):
                       sep=" ", header=0)
     obs = obs.sort_values(by=[f"h{f_dict[field_directions[i]]}"])
     fields = obs.iloc[:, :3].values
-    
+
     rhats, taus, arates = [], [], []
-    
+
     for field in fields:
         stats = json.load(open(f"{fname}/stats_L[{shape_string}]_{eval_model}_h{tuple(field)}.json"))
         rhats.append(np.mean(stats["Energy"]["R_hat"][-200:]))
@@ -53,15 +52,18 @@ for i, (fdir, label) in enumerate(zip(field_directions, labels)):
     iters = fields[:, field_directions[i]]
 
     rhat_plot.plot(iters, np.asarray(rhats), marker=markers[i], markersize=7,
-                 color=cmap(i), label=legend_labels[i].replace("_","-"), linestyle=line_styles[i])
+                   color=cmap(i), label=legend_labels[i].replace("_", "-"), linestyle=line_styles[i])
     tau_plot.plot(iters, np.asarray(taus), marker=markers[i], markersize=7,
-                color=cmap(i), label=legend_labels[i].replace("_","-"), linestyle=line_styles[i])
+                  color=cmap(i), label=legend_labels[i].replace("_", "-"), linestyle=line_styles[i])
     arate_plot.plot(iters, np.asarray(arates), marker=markers[i], markersize=7,
-                  color=cmap(i), label=legend_labels[i].replace("_","-"), linestyle=line_styles[i])   
+                    color=cmap(i), label=legend_labels[i].replace("_", "-"), linestyle=line_styles[i])
 
-rhat_plot.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
-tau_plot.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
-arate_plot.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
+rhat_plot.set_xlabel(
+    f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
+tau_plot.set_xlabel(
+    f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
+arate_plot.set_xlabel(
+    f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
 
 rhat_plot.set_ylabel("Split \$\\hat{R} \$")
 tau_plot.set_ylabel("Auto-correlation time \$\\tau \$")

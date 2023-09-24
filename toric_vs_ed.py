@@ -157,7 +157,7 @@ exact_energies = []
 
 # %% training
 if pre_init:
-    toric = geneqs.operators.toric_2d.ToricCode2d_xbasis(hilbert, shape, h=(0., 0., 0.))
+    toric = geneqs.operators.toric_2d.ToricCode2dXbasis(hilbert, shape, h=(0., 0., 0.))
     optimizer = optax.sgd(lr_schedule)
     sampler = nk.sampler.MetropolisSampler(hilbert, rule=weighted_rule, n_chains=n_chains, dtype=jnp.int8)
     sampler_exact = nk.sampler.ExactSampler(hilbert)

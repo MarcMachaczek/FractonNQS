@@ -102,7 +102,7 @@ Moreover, an `*_observables.txt` file is created that contains the energy, magne
 The important **settings for production scripts**, which can be set at the beginning of the corresponding .py file, are the following:
 
 - `swipe` determines the transfer learning protocol. Viable options are `independent`, `left-right`, and `right-left`.
-- `field_strengths` is a two dimensional array that contains all field configurations $(h_x, h_y, h_z)$. 
+- `field_strengths` is a two-dimensional array that contains all field configurations $(h_x, h_y, h_z)$. 
 - `direction_index` is either equal to $0=x$, $1=y$ or $2=z$, and determines along which field compenents the transfer learning order is fixed. For instance, `swipe`=`right-left` and `direction_index`=`1` sorts `field_strengths` in decreasing order of the $y$-field components and transfer learning is then applied starting from the first element of the ordered `field_strengths`.
 - `pre_init` determines whether the model is initialized in the exact ground state represenation of the pure system
 - `checkpoint` can point towards a serialized NQS (.mpack file) to load that parametrization and chains in order to continure transfer learning / optimization from with this state.
