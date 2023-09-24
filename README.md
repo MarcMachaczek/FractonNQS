@@ -63,9 +63,24 @@ The core implementations are located within the `geneqs` directory. Therein, fou
 
 - `sampling` so far implements only the implementation of the weighted update rule for MCMC sampling in `update_rules.py`.
 
-- `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, progress bars that show the relative time requirement of different steps during NQS optimization and more.
+- `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, a progress bar that shows the relative time requirement of different steps during NQS optimization and more.
 
-## How to use
+## Usage
+
+To run an NQS optimization, simply use the command
+
+```
+python <script_name>.py
+```
+
+from within the activated `venv` environment. 
+For NQS training distributed over multiple hosts, run the command:
+
+```
+mpiexec -np <number_of_hosts> python <system>_MPI.py
+```
+
+The `number_of_hosts` must not exceed the number of available GPUs. 
 
 ## Project status
 
