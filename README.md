@@ -71,7 +71,7 @@ The `<system>_model_comparison.py` scripts implement different neural network ar
 
 Scripts with the `eval_` prefix can be used to load serialized NQS and calculate observables with them (or other things), possibly with more samples etc.
 
-All scripts with the `plot_` prefix only contain plotting functionality to visualize results from the production scripts. For instance, `plot_model_comparison.py` loads the .json containing training statistics to compare, for instance, the energy of different network architectures during training. The `plot_runstats.py` script creates comparison plots containing the acceptance rates, auto-correlation times and split-$\hat{R}$ values over different field configurations. `plot_tc_observables.py` and `plot_cb_observables.py` create plots containing the energy per spin, magnetization, susceptibility (by finite differences), and V-score from an `*_observables.txt` file, see [Usage](user-content-usage) for more details.
+All scripts with the `plot_` prefix only contain plotting functionality to visualize results from the production scripts. For instance, `plot_model_comparison.py` loads the .json containing training statistics to compare, for instance, the energy of different network architectures during training. The `plot_runstats.py` script creates comparison plots containing the acceptance rates, auto-correlation times and split-$\hat{R}$ values over different field configurations. `plot_tc_observables.py` and `plot_cb_observables.py` create plots containing the energy per spin, magnetization, susceptibility (by finite differences), and V-score from an `*_observables.txt` file, see the **Usage** section for more details.
 
 ## Usage
 
