@@ -71,7 +71,7 @@ The `<system>_model_comparison.py` scripts implement different neural network ar
 
 Scripts with the `eval_` prefix can be used to load serialized NQS and calculate observables with them (or other things), possibly with more samples etc.
 
-All scripts with the `plot_` prefix only contain plotting functionality to visualize results from the production scripts. For instance, `plot_model_comparison.py` loads the .json containing training statistics to compare, for instance, the energy of different network architectures during training. The `plot_runstats.py` script creates comparison plots containing the acceptance rates, auto-correlation times and split-$\hat{R}$ values over different field configurations. `plot_tc_observables.py` and `plot_cb_observables.py` create plots containing the energy per spin, magnetization, susceptibility (by finite differences), and V-score from an `*_observables.txt` file, see **Usage** for more details.
+All scripts with the `plot_` prefix only contain plotting functionality to visualize results from the production scripts. For instance, `plot_model_comparison.py` loads the .json containing training statistics to compare, for instance, the energy of different network architectures during training. The `plot_runstats.py` script creates comparison plots containing the acceptance rates, auto-correlation times and split-$\hat{R}$ values over different field configurations. `plot_tc_observables.py` and `plot_cb_observables.py` create plots containing the energy per spin, magnetization, susceptibility (by finite differences), and V-score from an `*_observables.txt` file, see [Usage](user-content-usage) for more details.
 
 ## Usage
 
@@ -98,6 +98,14 @@ By default, all these scripts produce 4 files for each field configuration into 
 - an .mpack file with the prefix `vqs_` that serializes the final trained model, including all parameters and the states of the Markov chains, which can be used to reconstruct the trained model for evaluation purposes
 
 Moreover, an `*_observables.txt` file is created that contains the energy, magnetization and absolute magnetization together with errors and variances for all field_strengths. This allows for a quick evaluation of results.
+
+The important **settings for production scripts**, which can be set at the beginning of the corresponding .py file, are the following:
+
+- `swipe` determines the transfer learning protocol. Viable options are `independent`, `left-right`, and `right-left`.
+- `field_strengths` is a two dimensional array that contains all field configurations $(h_x, h_y, h_z)$. 
+- `direction_index` is either equal to $0=x$, $1=y$ or $2=z$, and determines along which field compenents the transfer learning order is fixed. For instance, `swipe`=`right-left` and `direction_index`=`1` sorts `field_strengths` in decreasing order of the $y$-field components and transfer learning is then applied starting from the first element of the ordered `field_strengths`.
+- `pre_init` determines whether the model is initialized in the exact ground state represenation of the pure system
+- `checkpoint` can point towards a serialized NQS (.mpack file) to load that parametrization and chains in order to continure transfer learning / optimization from with this state.
 
 
 ## Project status
