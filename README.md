@@ -65,6 +65,12 @@ The core implementations are located within the `geneqs` directory. Therein, fou
 
 - `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, a progress bar that shows the relative time requirement of different steps during NQS optimization and more.
 
+The main production scripts are located within the root directoy of the repository. With `<system>` being either `Checkerboard` or `Toric2D_h`, MPI compatible scripts, `<system>_MPI.py`, and scripts that do not require a working MPI installation, `<system>.py`, are provided.
+
+The `<system>_vs_ed.py` scripts are used to compare the performance against exact diagonalization results.
+
+The `<system>_model_comparison.py` scripts implement different neural network architectures to test their performance on the pure systems.
+
 ## Usage
 
 To run an NQS optimization, simply use the command
@@ -80,7 +86,7 @@ For NQS training distributed over multiple hosts, run the command:
 mpiexec -np <number_of_hosts> python <system>_MPI.py
 ```
 
-The `number_of_hosts` must not exceed the number of available GPUs. 
+The `<number_of_hosts>` must not exceed the number of available GPUs. 
 
 ## Project status
 
