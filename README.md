@@ -65,11 +65,13 @@ The core implementations are located within the `geneqs` directory. Therein, fou
 
 - `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, a progress bar that shows the relative time requirement of different steps during NQS optimization and more.
 
-The main production scripts are located within the root directoy of the repository. With `<system>` being either `Checkerboard` or `Toric2D_h`, MPI compatible scripts, `<system>_MPI.py`, and scripts that do not require a working MPI installation, `<system>.py`, are provided.
-
-The `<system>_vs_ed.py` scripts are used to compare the performance against exact diagonalization results.
+The main production scripts are located within the root directoy of the repository. With `<system>` being either `Checkerboard` or `Toric2D_h`, MPI compatible scripts are provided, `<system>_MPI.py`, as well as scripts that do not require a working MPI installation, `<system>.py`. Moreover, the `<system>_vs_ed.py` scripts are used to compare the performance against exact diagonalization results, as they keep track of the exact ground state energies.
 
 The `<system>_model_comparison.py` scripts implement different neural network architectures to test their performance on the pure systems.
+
+Scripts with the `eval_` prefix can be used to load serialized NQS and calculate observables with them (or other things), possibly with more samples etc.
+
+All scripts with the `plot_` prefix only contain plotting functionality to visualize results from the production scripts. For instance, `plot_model_comparison.py` loads the .json containing training statistics to compare, for instance, the energy of different network architectures during training. The `plot_runstats.py` script creates comparison plots containing the acceptance rates, auto-correlation times and split-$\hat{R}$ values over different field configurations. `plot_tc_observables.py` and `plot_cb_observables.py` create plots containing the energy per spin, magnetization, susceptibility (by finite differences), and V-score from an `*_observables.txt` file, see **Usage** for more details.
 
 ## Usage
 
