@@ -42,23 +42,14 @@ save_results = True
 save_stats = True  # whether to save stats logged during training to drive
 save_path = f"{RESULTS_PATH}/toric2d_h/mpi"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
-checkpoint = None  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
+swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
+checkpoint = None # f"{RESULTS_PATH}/toric2d_h/mpi/vqs_ToricCRBM_L[10 10]_h(0.0, 0.0, 0.4).mpack"  # f"{RESULTS_PATH}/toric2d_h/vqs_ToricCRBM_L[8 8]_h(0.0, 0.0, 0.33).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(4214564359)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0 # 0 for x, 1 for y, 2 for z;
-direction = np.array([0., 0., 1]).reshape(-1, 1)
-field_strengths = ((np.linspace(0, 0.6, 7) + 0.1) * direction).T
-field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
-                                                        [0., 0, 0.31],
-                                                        [0., 0, 0.33],
-                                                        [0., 0, 0.34],
-                                                        [0., 0, 0.35],
-                                                        [0., 0, 0.37]])))
-
+direction_index = 2 # 0 for x, 1 for y, 2 for z;
 direction = np.array([0., 0., 0.7]).reshape(-1, 1)
 field_strengths = ((np.linspace(0, 1, 8)) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
@@ -67,12 +58,28 @@ field_strengths = np.vstack((field_strengths, np.array([[0., 0, 0.28],
                                                         [0., 0, 0.34],
                                                         [0., 0, 0.35],
                                                         [0., 0, 0.37]])))
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+
+field_strengths = np.array([[0., 0., 0.70],
+                            [0., 0., 0.60],
+                            [0., 0., 0.50],
+                            [0., 0., 0.40],
+                            [0., 0., 0.37],
+                            [0., 0., 0.35],
+                            [0., 0., 0.34],
+                            [0., 0., 0.33],
+                            [0., 0., 0.31],
+                            [0., 0., 0.30],
+                            [0., 0., 0.28],
+                            [0., 0., 0.20],
+                            [0., 0., 0.10],
+                            [0., 0., 0.00]])
+
+# field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 # field_strengths[:, 0] = 0.3
 
 save_fields = field_strengths  # field values for which vqs is serialized
 # %% operators on hilbert space
-L = 8  # size should be at least 3, else there are problems with pbc and indexing
+L = 10  # size should be at least 3, else there are problems with pbc and indexing
 shape = jnp.array([L, L])
 square_graph = nk.graph.Square(length=L, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
@@ -96,11 +103,11 @@ A_B = 1 / hilbert.size * sum([geneqs.operators.toric_2d.get_netket_star(hilbert,
 # %%  setting hyper-parameters and model
 n_iter = 1000
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
-n_samples = int(32 * n_chains / n_ranks)
+n_chains = 256 * 2 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_samples = int(16 * n_chains / n_ranks)
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples
 chunk_size = n_samples  # doesn't work for gradient operations, need to check why!
-n_expect = chunk_size * 48  # number of samples to estimate observables, must be dividable by chunk_size
+n_expect = chunk_size * 16  # number of samples to estimate observables, must be dividable by chunk_size
 # n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
@@ -115,7 +122,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
                                  holomorphic=True)
 
 # learning rate scheduling
-lr_init = 0.003
+lr_init = 0.01
 lr_end = 0.001
 transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
@@ -123,7 +130,7 @@ lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transitio
 
 # define correlation enhanced RBM
 stddev = 0.01
-trans_dev = stddev / 10  # standard deviation for transfer learning noise
+trans_dev = 0  # standard deviation for transfer learning noise
 default_kernel_init = jax.nn.initializers.normal(stddev)
 
 # get (specific) symmetries of the model, in our case translations

@@ -9,21 +9,21 @@ from global_variables import RESULTS_PATH
 matplotlib.rcParams['svg.fonttype'] = 'none'
 matplotlib.rcParams.update({'font.size': 36})
 cmap = matplotlib.colormaps["Set1"]
-line_styles = ["solid", "solid", "dashed", "dotted"]
+line_styles = ["solid", "dashed", "dotted"]
 
 f_dict = {0: "x", 1: "y", 2: "z"}
 # save_dir = f"{RESULTS_PATH}/checkerboard/vsed_final"
 save_dir = f"{RESULTS_PATH}/toric2d_h/L=3_final"
 
 # %%
-field_directions = 3*[2]  # 0=x, 1=y, 2=z
+field_directions = [0, 1, 2]  # 0=x, 1=y, 2=z
 # shapes = 3*[[4, 2, 2]]
 shapes = 3*[[3, 3]]
 # labels = ["independent", "right_left", "left_right"]
-labels = ["independent", "independent_alpha2", "independent"]
-legend_labels = ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]  # =labels
+labels = ["independent", "independent", "independent"]
+legend_labels = ["x-direction", "y-direction", "z-direction"]  # =labels
 # eval_model = "CheckerCRBM"
-eval_models = ["ToricCRBM", "ToricCRBM", "RBMSymm"]
+eval_models = 3*["ToricCRBM",]
 obs_list = []
 
 # append multiple data to compare them each within one plot
@@ -51,9 +51,9 @@ for i, obs in enumerate(obs_list):
     plot_mag.plot(obs.iloc[:, field_directions[i]], rel_errors, marker="o", markersize=2,
                   color=c, label=legend_labels[i].replace("_","-"), linestyle=line_styles[i])
 
-plot_mag.set_xlabel("Field in \$ z \$-direction \$ h_z \$ ")
+plot_mag.set_xlabel("Field strength \$|h|\$")
 plot_mag.set_ylabel("\$ |E_{\\boldsymbol{\\theta}}-E_\\mathrm{exact}| / |E_\\mathrm{exact}| \$ ")
 plot_mag.set_yscale("log")
 #plot_mag.set_ylim(1e-9, 1e-3)
 plot_mag.legend()
-fig.savefig(f"{save_dir}/error_comparison_L{shape}_cRBMvsRBMSymm2_h{f_dict[field_directions[0]]}.svg")
+fig.savefig(f"{save_dir}/error_comparison_L{shape}_tcdirections_h{f_dict[field_directions[0]]}.svg")

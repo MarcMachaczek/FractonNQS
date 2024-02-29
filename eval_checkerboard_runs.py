@@ -175,36 +175,36 @@ for h in tqdm(field_strengths, "external_field"):
     print(vqs.n_samples, vqs.n_samples_per_rank, vqs.sampler.n_chains, vqs.sampler.n_chains_per_rank, vqs.sampler_state.σ.shape)
     
     # calculate energy and variance of energy
-    # energy_nk = vqs.expect(checkerboard)
-    # observables.add_nk_obs("energy", h, energy_nk)
+    energy_nk = vqs.expect(checkerboard)
+    observables.add_nk_obs("energy", h, energy_nk)
     # calculate magnetization
-    # magnetization_nk = vqs.expect(magnetization)
-    # observables.add_nk_obs("mag", h, magnetization_nk)
+    magnetization_nk = vqs.expect(magnetization)
+    observables.add_nk_obs("mag", h, magnetization_nk)
     # calculate absolute magnetization
-    # abs_magnetization_nk = vqs.expect(abs_magnetization)
-    # observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
+    abs_magnetization_nk = vqs.expect(abs_magnetization)
+    observables.add_nk_obs("abs_mag", h, abs_magnetization_nk)
     # calculate cube parts of the hamiltonian
-    # xcubes_nk = vqs.expect(xcubes)
-    # zcubes_nk = vqs.expect(zcubes)
-    # observables.add_nk_obs("xcubes", h, xcubes_nk)
-    # observables.add_nk_obs("zcubes", h, zcubes_nk)
+    xcubes_nk = vqs.expect(xcubes)
+    zcubes_nk = vqs.expect(zcubes)
+    observables.add_nk_obs("xcubes", h, xcubes_nk)
+    observables.add_nk_obs("zcubes", h, zcubes_nk)
     
     # gather local estimators as each rank calculates them based on their own samples_per_rank
-    if np.any((h == hist_fields).all(axis=1)):
+#     if np.any((h == hist_fields).all(axis=1)):
         
-        energy_locests = []
-        mag_locests = []
-        vqs.n_samples = 2*chunk_size
+#         energy_locests = []
+#         mag_locests = []
+#         vqs.n_samples = 2*chunk_size
         
-        for _ in tqdm(range(1)):
-            vqs.sample()
-            energy_locests.append(np.array(comm.gather(vqs.local_estimators(checkerboard), root=0)).flatten().real)
-            mag_locests.append(np.array(comm.gather(vqs.local_estimators(magnetization), root=0)).flatten().real)
-        energy_locests = np.concatenate(energy_locests)
+#         for _ in tqdm(range(1)):
+#             vqs.sample()
+#             energy_locests.append(np.array(comm.gather(vqs.local_estimators(checkerboard), root=0)).flatten().real)
+#             mag_locests.append(np.array(comm.gather(vqs.local_estimators(magnetization), root=0)).flatten().real)
+#         energy_locests = np.concatenate(energy_locests)
         
 
-        observables.add_hist("epsite", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
-        observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
+#         observables.add_hist("epsite", h, np.histogram(np.asarray(energy_locests) / hilbert.size, n_bins))
+#         observables.add_hist("mag", h, np.histogram(np.asarray(mag_locests), n_bins))
 
     # %% save histograms
     if rank == 0:

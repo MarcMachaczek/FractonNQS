@@ -36,15 +36,15 @@ matplotlib.rcParams.update({'font.size': 12})
 
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
-save_dir = f"{RESULTS_PATH}/toric2d_h/L=8_final/L=8_mc_hx_right_left_chaintrans_nonoise"
+save_dir = f"{RESULTS_PATH}/toric2d_h/L=10_final/L=10_mc_hz_independent"
 
 # %%
-shape = jnp.array([8, 8])
+shape = jnp.array([10, 10])
 square_graph = nk.graph.Square(length=shape[0].item(), pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
 eval_model = "ToricCRBM"
 # get fields
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 obs = pd.read_csv(f"{save_dir}/L{shape}_{eval_model}_observables.txt", sep=" ", header=0)
 field_strengths = obs.iloc[:, :3].values
 
@@ -69,7 +69,7 @@ field_strengths = obs.iloc[:, :3].values
 #                             [0., 0., 0.1],
 #                             [0., 0., 0.]])
 
-n_chains = 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_chains = 256 * 2 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 chunk_size = 1024 * 8
 n_samples = chunk_size * 48
 n_discard_per_chain = 0

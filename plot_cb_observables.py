@@ -13,8 +13,9 @@ line_styles = ["solid", "dashed", "dotted"]
 
 colors = [cmap(0), cmap(0), cmap(1), cmap(1), cmap(2), cmap(2)]
 line_styles = ["dotted", "dotted", "dashed", "dashed", "solid", "solid"]
-markerstyles = 3*["<", ">"]
+markerstyles = ["<", ">"] + [4, 5] + [8, 9]
 alpha = 0.7
+ms = 10
 
 f_dict = {0: "x", 1: "y", 2: "z"}
 save_dir = f"{RESULTS_PATH}/checkerboard/obs_comparison"
@@ -46,13 +47,13 @@ plot_mag = fig.add_subplot(111)
 
 for i, obs in enumerate(obs_list):
     color = colors[i]
-    plot_mag.errorbar(obs.iloc[:, field_directions[i]], obs["mag"], yerr=obs["mag_err"], marker=markerstyles[i], markersize=6,
+    plot_mag.errorbar(obs.iloc[:, field_directions[i]], obs["mag"], yerr=obs["mag_err"], marker=markerstyles[i], markersize=ms,
                       color=color, label=legend_labels[i].replace("_","-"), linestyle=line_styles[i], alpha=alpha)
 
 plot_mag.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
 plot_mag.set_ylabel("Magnetization \$ m \$ ")
 plot_mag.legend()
-fig.savefig(f"{save_dir}/mag_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}.svg")
+fig.savefig(f"{save_dir}/mag_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}2.svg")
 
 # %%%%%%%%%%%%%%%%%%%%%% susceptibility
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -61,13 +62,13 @@ plot_sus = fig.add_subplot(111)
 for i, obs in enumerate(obs_list):
     color = colors[i]
     sus, sus_fields = geneqs.utils.eval_obs.derivative_fd(observable=obs["mag"].values, fields=obs.iloc[:, :3].values)
-    plot_sus.plot(sus_fields[:, field_directions[i]], sus, marker=markerstyles[i], markersize=6,
+    plot_sus.plot(sus_fields[:, field_directions[i]], sus, marker=markerstyles[i], markersize=ms,
                   color=color, label=legend_labels[i].replace("_","-"), linestyle=line_styles[i], alpha=alpha)
 
 plot_sus.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
 plot_sus.set_ylabel("Susceptibility \$ \\chi \$ ")
 plot_sus.legend()
-fig.savefig(f"{save_dir}/susc_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}.svg")
+fig.savefig(f"{save_dir}/susc_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}2.svg")
 
 # %%%%%%%%%%%%%%%%%%%%%% energy per spin
 fig = plt.figure(dpi=300, figsize=(10, 10))
@@ -77,13 +78,13 @@ for i, obs in enumerate(obs_list):
     color = colors[i]
     hilbert_size = np.prod(shapes[i])
     plot_energy.errorbar(obs.iloc[:, field_directions[i]], obs["energy"].values / hilbert_size,
-                         yerr=obs["energy_err"].values / hilbert_size, marker=markerstyles[i], markersize=6,
+                         yerr=obs["energy_err"].values / hilbert_size, marker=markerstyles[i], markersize=ms,
                          color=color, label=legend_labels[i].replace("_","-"), linestyle=line_styles[i], alpha=alpha)
 
 plot_energy.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
 plot_energy.set_ylabel("Energy per spin \$ E/N \$")
 plot_energy.legend()
-fig.savefig(f"{save_dir}/epsite_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}.svg")
+fig.savefig(f"{save_dir}/epsite_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}2.svg")
 
 # %%%%%%%%%%%%%%%%%%%%%% v-score of energy, see Wu et al:
 # "Variational Benchmarks for Quantum Many-Body Problems"
@@ -94,7 +95,7 @@ for i, obs in enumerate(obs_list):
     color = colors[i]
     hilbert_size = np.prod(shapes[i])
     vscore = hilbert_size * np.abs(obs["energy_var"].values / obs["energy"].values**2)
-    plot_vscore.plot(obs.iloc[:, field_directions[i]], vscore, marker=markerstyles[i], markersize=6,
+    plot_vscore.plot(obs.iloc[:, field_directions[i]], vscore, marker=markerstyles[i], markersize=ms,
                    color=color, label=legend_labels[i].replace("_","-"), linestyle=line_styles[i], alpha=alpha)
 
 plot_vscore.set_xlabel(f"Field strength in \$ {f_dict[field_directions[0]]} \$-direction \$ h_{f_dict[field_directions[0]]} \$ ")
@@ -102,7 +103,7 @@ plot_vscore.set_ylabel("V-score = \$ N \\text{Var}( E ) / \\langle E \\rangle^2 
 plot_vscore.set_yscale("log")
 plot_vscore.set_ylim(top=0.5, bottom=1e-7)
 plot_vscore.legend()
-fig.savefig(f"{save_dir}/vscore_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}.svg")
+fig.savefig(f"{save_dir}/vscore_comparison_L{shape}_cRBM_{f_dict[field_directions[0]]}2.svg")
 
 
 # fig = plt.figure(dpi=300, figsize=(10, 10))

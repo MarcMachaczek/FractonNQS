@@ -12,11 +12,11 @@ cmap = matplotlib.colormaps["Set1"]
 line_styles = ["solid", "dashed", "dotted"]
 
 f_dict = {0: "x", 1: "y", 2: "z"}
-save_dir = f"{RESULTS_PATH}/toric2d_h/L=8_final"
+save_dir = f"{RESULTS_PATH}/toric2d_h/L=10_final"
 
 # %%
-field_directions = 2*[2,]
-shapes = 2*[[8, 8]]
+field_directions = 3*[2]
+shapes = 3*[[10, 10]]
 labels = ["independent", "right_left", "left_right"]
 legend_labels = ["independent", "right_left", "left_right"]  # ["CRBM, alpha=1", "CRBM, alpha=2", "RBMSymm"]
 eval_model = "ToricCRBM"
