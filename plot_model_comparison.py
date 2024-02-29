@@ -15,7 +15,7 @@ save_dir = f"{RESULTS_PATH}/toric2d_h/model_comparison"
 shape = np.array([5, 5])
 eval_models = ["FFNNf(2, 4)", "RBM", "RBMSymm", "SymmNNf(2, 4)", "ToricCRBM"]
 h = (0., 0., 0.)
-E0 = -2*np.prod(shape)
+E0 = -2 * np.prod(shape)
 
 # %% energy
 fig = plt.figure(dpi=300, figsize=(20, 10))
@@ -29,7 +29,7 @@ for i, eval_model in enumerate(eval_models):
                      label=eval_model)
 
 plot_en.axhline(E0, color="dimgrey", linestyle="dashed")
-plot_en.set_ylim(top=0., bottom=E0-1)
+plot_en.set_ylim(top=0., bottom=E0 - 1)
 plot_en.set_xlim(left=0., right=stats["Energy"]["iters"][-1] + 1)
 plot_en.set_xlabel("Training Iterations")
 plot_en.set_ylabel("Energy")
@@ -44,11 +44,11 @@ plot_aux = fig.add_subplot(111)
 for i, eval_model in enumerate(eval_models):
     stats = json.load(open(f"{save_dir}/stats_L{shape}_{eval_model}_h{h}.json"))
     plot_aux.errorbar(stats["stars"]["iters"],
-                     -np.asarray(stats["stars"]["Mean"]["real"]) + np.asarray(stats["plaqs"]["Mean"]["real"]),
-                     yerr=np.asarray(stats["stars"]["Sigma"]),# + np.asarray(stats["plaqs"]["Sigma"]),
-                     label=eval_model)
+                      -np.asarray(stats["stars"]["Mean"]["real"]) + np.asarray(stats["plaqs"]["Mean"]["real"]),
+                      yerr=np.asarray(stats["stars"]["Sigma"]) + np.asarray(stats["plaqs"]["Sigma"]),
+                      label=eval_model)
 
-plot_aux.set_ylim(top=-E0/2+1, bottom=0)
+plot_aux.set_ylim(top=-E0 / 2 + 1, bottom=0)
 plot_aux.set_xlim(left=0., right=stats["Energy"]["iters"][-1] + 1)
 plot_aux.set_xlabel("Training Iterations")
 plot_aux.set_ylabel("\$\sum_\mathcal{V} A_{\mathcal{V}} - \sum_\mathcal{F} B_{\mathcal{F}}\$")

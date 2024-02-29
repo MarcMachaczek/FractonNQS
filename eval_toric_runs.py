@@ -170,4 +170,4 @@ for h in tqdm(field_strengths, "external_field"):
 if rank == 0:
     save_array = observables.obs_to_array(separate_keys=False)
     np.savetxt(f"{save_dir}/L{shape}_{eval_model}_eval_obs.txt", save_array,
-                   header=" ".join(observables.key_names + observables.obs_names), comments="")
+               header=" ".join(observables.key_names + observables.obs_names), comments="")

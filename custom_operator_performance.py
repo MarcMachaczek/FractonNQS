@@ -5,9 +5,9 @@ import matplotlib
 import netket as nk
 import geneqs
 from global_variables import BENCHMARK_PATH
+
 matplotlib.rcParams['svg.fonttype'] = 'none'
 matplotlib.rcParams.update({'font.size': 24})
-
 
 toric_shapes = jnp.array([[4, 4], [6, 6], [8, 8]])
 checkerboard_shapes = jnp.array([[2, 2, 2], [4, 4, 4], [6, 6, 6]])
@@ -18,7 +18,7 @@ netket_toric_times = []
 for toric_shape in toric_shapes:
     # define toric code operator
     square_graph = nk.graph.Square(length=toric_shape[0].item(), pbc=True)
-    toric_hilbert = nk.hilbert.Spin(s=1/2, N=square_graph.n_edges)
+    toric_hilbert = nk.hilbert.Spin(s=1 / 2, N=square_graph.n_edges)
     custom_toric = geneqs.operators.toric_2d.ToricCode2d(toric_hilbert, toric_shape, h=(1, 0, 0))
     netket_toric = geneqs.operators.toric_2d.get_netket_toric2dh(toric_hilbert, toric_shape, h=(1, 0, 0))
 
@@ -32,19 +32,20 @@ for toric_shape in toric_shapes:
     # get times
     _, custom_time = geneqs.utils.benchmarking.time_function(custom_toric.get_conn_padded, 40, toric_samples)
     _, netket_time = geneqs.utils.benchmarking.time_function(netket_toric.get_conn_padded, 40, toric_samples)
-    
+
     custom_toric_times.append(custom_time)
     netket_toric_times.append(netket_time)
 
-    
 custom_checkerboard_times = []
 netket_checkerboard_times = []
 for checkerboard_shape in checkerboard_shapes:
     # define checkerboard operator
     cube_graph = nk.graph.Hypercube(length=checkerboard_shape[0].item(), n_dim=3, pbc=True)
     checkerboard_hilbert = nk.hilbert.Spin(s=1 / 2, N=cube_graph.n_nodes)
-    custom_checkerboard = geneqs.operators.checkerboard.Checkerboard(checkerboard_hilbert, checkerboard_shape, h=(1, 0, 0))
-    netket_checkerboard = geneqs.operators.checkerboard.get_netket_checkerboard(checkerboard_hilbert, checkerboard_shape, h=(1, 0, 0))
+    custom_checkerboard = geneqs.operators.checkerboard.Checkerboard(checkerboard_hilbert, checkerboard_shape,
+                                                                     h=(1, 0, 0))
+    netket_checkerboard = geneqs.operators.checkerboard.get_netket_checkerboard(checkerboard_hilbert,
+                                                                                checkerboard_shape, h=(1, 0, 0))
 
     # construct some dummy samples
     checkerboard_samples = jnp.ones(shape=(n_samples, checkerboard_hilbert.size))
@@ -54,12 +55,13 @@ for checkerboard_shape in checkerboard_shapes:
     ncconns, ncmels = netket_checkerboard.get_conn_padded(checkerboard_samples)
 
     # %% get times
-    _, custom_time = geneqs.utils.benchmarking.time_function(custom_checkerboard.get_conn_padded, 40, checkerboard_samples)
-    _, netket_time = geneqs.utils.benchmarking.time_function(netket_checkerboard.get_conn_padded, 40, checkerboard_samples)
-    
+    _, custom_time = geneqs.utils.benchmarking.time_function(custom_checkerboard.get_conn_padded, 40,
+                                                             checkerboard_samples)
+    _, netket_time = geneqs.utils.benchmarking.time_function(netket_checkerboard.get_conn_padded, 40,
+                                                             checkerboard_samples)
+
     custom_checkerboard_times.append(custom_time)
     netket_checkerboard_times.append(netket_time)
-
 
 fig = plt.figure(dpi=300, figsize=(20, 10))
 toric_plot = fig.add_subplot(121)

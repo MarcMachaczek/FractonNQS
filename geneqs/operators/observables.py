@@ -11,7 +11,7 @@ from geneqs.utils.indexing import edge_to_index
 # %%
 class AbsZMagnetization(nk.operator.DiscreteOperator):
     """
-    Operator corresponing to the absolute magnetization of a state. For regular magnetization simply use NetKet local
+    Operator corresponding to the absolute z-magnetization of a state. For regular magnetization simply use NetKet local
     operators.
     """
 
@@ -57,7 +57,7 @@ class AbsZMagnetization(nk.operator.DiscreteOperator):
 
 class AbsXMagnetization(nk.operator.DiscreteOperator):
     """
-    Operator corresponing to the absolute magnetization of a state. For regular magnetization simply use NetKet local
+    Operator corresponding to the absolute x-magnetization of a state. For regular magnetization simply use NetKet local
     operators.
     """
 
@@ -103,7 +103,7 @@ class AbsXMagnetization(nk.operator.DiscreteOperator):
 
 class AbsYMagnetization(nk.operator.DiscreteOperator):
     """
-    Operator corresponing to the absolute magnetization of a state. For regular magnetization simply use NetKet local
+    Operator corresponding to the absolute y-magnetization of a state. For regular magnetization simply use NetKet local
     operators.
     """
 
@@ -172,7 +172,7 @@ def abs_zmagnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.
         sigma: Input state or "bra", acting from the left.
 
     Returns:
-        connected states or "kets" eta, corresponding matrix elements mels
+        connected states or "kets" eta, corresponding to matrix elements mels
 
     """
 
@@ -196,7 +196,7 @@ def abs_xmagnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.
         sigma: Input state or "bra", acting from the left.
 
     Returns:
-        connected states or "kets" eta, corresponding matrix elements mels
+        connected states or "kets" eta, corresponding to matrix elements mels
 
     """
     n_sites = sigma.shape[-1]
@@ -205,7 +205,7 @@ def abs_xmagnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.
     def flip(x, idx):
         return x.at[idx].set(-x.at[idx].get())
 
-    # connected states is sigma itself
+    # connected states where any qubit is flipped
     eta = jnp.tile(sigma, (n_sites, 1))
     eta = eta.at[:].set(flip(eta.at[:].get(), jnp.arange(n_sites)))
 
@@ -225,7 +225,7 @@ def abs_ymagnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.
         sigma: Input state or "bra", acting from the left.
 
     Returns:
-        connected states or "kets" eta, corresponding matrix elements mels
+        connected states or "kets" eta, corresponding to matrix elements mels
 
     """
     n_sites = sigma.shape[-1]
@@ -234,7 +234,7 @@ def abs_ymagnetization_conns_and_mels(sigma: jax.Array) -> Tuple[jax.Array, jax.
     def flip(x, idx):
         return x.at[idx].set(-x.at[idx].get())
 
-    # connected states is sigma itself
+    # connected states where any qubit is flipped
     eta = jnp.tile(sigma, (n_sites, 1))
     eta = eta.at[:].set(flip(eta.at[:].get(), jnp.arange(n_sites)))
 

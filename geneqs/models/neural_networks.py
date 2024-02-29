@@ -11,6 +11,9 @@ zeros = jax.nn.initializers.zeros
 
 
 class SimpleNN(nn.Module):
+    """
+    A simple FFNN architecture.
+    """
     features: Sequence[int]
     # The nonlinear activation function
     activation: Any = nknn.gelu
@@ -47,6 +50,9 @@ class SimpleNN(nn.Module):
 
 
 class SymmetricNN(nn.Module):
+    """
+    A symmetric FFNN. The first layer constructs invariant features similar to a GCNN.
+    """
     # permutations of lattice sites corresponding to symmetries
     symmetries: HashableArray
     # features for each layer in the NN

@@ -2,7 +2,6 @@ import matplotlib
 from matplotlib import pyplot as plt
 import numpy as np
 
-import geneqs.utils.eval_obs
 from global_variables import RESULTS_PATH
 
 matplotlib.rcParams['svg.fonttype'] = 'none'
@@ -30,9 +29,9 @@ for i, shape in enumerate(shapes):
     shape_string = " ".join(map(str, shape))
     # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
     epsite_histograms = np.load(f"{save_dir}/hist_epsite_L[{shape_string}]_{eval_model}_{label}.npy", allow_pickle=True)
-    
+
     hist = epsite_histograms[h_idx]
-    
+
     field, hist_values, bin_edges = np.round(hist[0], 3), hist[1], hist[2]
     print(hist_values, bin_edges)
     mids = (bin_edges[1:] + bin_edges[:-1]) / 2
@@ -45,9 +44,9 @@ for i, shape in enumerate(shapes):
     shape_string = " ".join(map(str, shape))
     # shape is (n_hist_fields, 3), where 3 = field_value + hist_values + bin_edges
     mag_histograms = np.load(f"{save_dir}/hist_mag_L[{shape_string}]_{eval_model}_{label}.npy", allow_pickle=True)
-    
+
     hist = mag_histograms[h_idx]
-    
+
     field, hist_values, bin_edges = np.round(hist[0], 3), hist[1], hist[2]
     print(hist_values, bin_edges)
     mids = (bin_edges[1:] + bin_edges[:-1]) / 2

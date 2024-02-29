@@ -7,8 +7,7 @@ from flax.linen.dtypes import promote_dtype
 import functools
 from typing import Any
 
-# %%
-# adapted from flax library
+
 def dotproduct_attention(query: jax.Array,
                          key: jax.Array,
                          value: jax.Array,

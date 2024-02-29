@@ -1,92 +1,119 @@
-# Gauge-equivariant Neural Quantum States
+# Neural Network Quantum States (NQS) for Fracton Models
 
+This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
+Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model in the presence of external magnetic fields. In particular, this package handles translational symmetries for qubits and correlators constructed from them to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Custom operator and neural network implementations with GPU support allow for simulations up to 512 qubits ($L=8$) on the Checkerboard model on a single NVIDIA A100 GPU. Calculating the magnetization from the trained NQS for different magnetic fields, for instance, indicates a strong-first order phase transition.
 
-## Getting started
+## Setup
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+A Python$\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to JAX constraints).
+After cloning the repository, a new virtual environment `venv` can be created with the command:
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/MarcMa/geneqs.git
-git branch -M main
-git push -uf origin main
+python -m venv <directory>
 ```
 
-## Integrate with your tools
+Anaconda is **not** recommened for this, as described in the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html). 
+Typically, it is easiest to choose `<directory>`=`venv`, which creates the `venv` virtual environment into a newly created `venv` folder of the current working directory (which we assume is the root of the cloned repository).
+Then, activate the virtual environment with
 
-- [ ] [Set up project integrations](https://gitlab.com/MarcMa/geneqs/-/settings/integrations)
+```
+source venv/bin/activate
+```
 
-## Collaborate with your team
+This codebase currently uses the CUDA 11.8 compatible JAX version. It can be installed into the currently activate environment using the commands
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+```
+pip install --upgrade pip
+pip install --upgrade "jax[cuda11_pip]" -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+```
 
-## Test and Deploy
+Of course, this requires an NVIDIA GPU with up-to-date drivers. For CPU-only support, install JAX with
 
-Use the built-in continuous integration in GitLab.
+```
+pip install --upgrade pip
+pip install --upgrade "jax[cpu]"
+```
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+For more details refer to the [JAX installation guide](https://github.com/google/jax#installation).
 
-***
+The `requirements.txt` contains all other required packages together with their versions. They can be installed simply by using the command
 
-# Editing this README
+```
+pip install -r requirements.txt
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+This essentially completes the setup process.
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+However, it is possible to use MPI in order to run NQS optimizations on multiple hosts / GPUs. Assuming a working MPI installation, simply execute 
 
-## Name
-Choose a self-explaining name for your project.
+```
+pip install --upgrade "netket[mpi]"
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+to install all required MPI dependencies. For more details on this, refer to the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html).
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## Code structure
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+The core implementations are located within the `geneqs` directory. Therein, four sub-folders can be found: `models`, `operators`, `sampling`, and `utils`.
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+- `models` contains all variational wave function implementations. In particular, `rbm.py` contains all RBM-type architectures and `neural_networks.py` contains FFNN-like architectures.
+
+- `operators` contains all operator implementations for calculating connected (matrix) elements and some more functionality in a NetKet compatible syntax. This includes `checkerboard.py` and `toric_2d.py`.
+
+- `sampling` so far implements only the implementation of the weighted update rule for MCMC sampling in `update_rules.py`.
+
+- `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubical lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, a progress bar that shows the relative time requirement of different steps during NQS optimization and more.
+
+The main production scripts are located within the root directoy of the repository. With `<system>` being either `Checkerboard` or `Toric2D_h`, MPI compatible scripts are provided, `<system>_MPI.py`, as well as scripts that do not require a working MPI installation, `<system>.py`. Moreover, the `<system>_vs_ed.py` scripts are used to compare the performance against exact diagonalization results, as they keep track of the exact ground state energies.
+
+The `<system>_model_comparison.py` scripts implement different neural network architectures to test their performance on the pure systems.
+
+Scripts with the `eval_` prefix can be used to load serialized NQS and calculate observables with them (or other things), possibly with more samples etc.
+
+All scripts with the `plot_` prefix only contain plotting functionality to visualize results from the production scripts. For instance, `plot_model_comparison.py` loads the .json containing training statistics to compare, for instance, the energy of different network architectures during training. The `plot_runstats.py` script creates comparison plots containing the acceptance rates, auto-correlation times and split-$\hat{R}$ values over different field configurations. `plot_tc_observables.py` and `plot_cb_observables.py` create plots containing the energy per spin, magnetization, susceptibility (by finite differences), and V-score from an `*_observables.txt` file, see the **Usage** section for more details.
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+To run an NQS optimization, simply use the command
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+```
+python <script_name>.py
+```
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+from within the activated `venv` environment. 
+For NQS training distributed over multiple hosts, run the command:
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```
+mpiexec -np <number_of_hosts> python <system>_MPI.py
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+The `<number_of_hosts>` must not exceed the number of available GPUs.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+By default, all these scripts produce 4 files for each field configuration into the `save_path` (by default, the `checkerboard` or `toric2d_h` folder in the results directory):
 
-## License
-For open source projects, say how it is licensed.
+- a .pdf file that contains most hyperparameter settings and shows the energy vs training iterations
+- a .txt file with prefix `params_` that contains all optimized parameters in a “human-readable” form
+- a .json file with the prefix `stats_` that contains all training stats like energy variances, split-$\hat{R}$ values, auto-correlation times etc.
+- an .mpack file with the prefix `vqs_` that serializes the final trained model, including all parameters and the states of the Markov chains, which can be used to reconstruct the trained model for evaluation purposes
+
+Moreover, an `*_observables.txt` file is created that contains the energy, magnetization and absolute magnetization together with errors and variances for all field_strengths. This allows for a quick evaluation of results.
+
+The important **settings for production scripts**, which can be set at the beginning of the corresponding .py file, are the following:
+
+- `swipe` determines the transfer learning protocol. Viable options are `independent`, `left-right`, and `right-left`.
+- `field_strengths` is a two-dimensional array that contains all field configurations $(h_x, h_y, h_z)$. 
+- `direction_index` is either equal to $0=x$, $1=y$ or $2=z$, and determines along which field compenents the transfer learning order is fixed. For instance, `swipe`=`right-left` and `direction_index`=`1` sorts `field_strengths` in decreasing order of the $y$-field components and transfer learning is then applied starting from the first element of the ordered `field_strengths`.
+- `pre_init` determines whether the model is initialized in the exact ground state represenation of the pure system
+- `checkpoint` can point towards a serialized NQS (.mpack file) to load that parametrization and chains in order to continure transfer learning / optimization from with this state.
+
 
 ## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+
+So far, this project lacks many quality-of-life features that should be mandatory for an accessible and easy-to-use library, like simple toy-examples with proper argument parsing, a detailed documentation, tests and many more. We aim to bring this project to the Python Package Index (PyPI) soon. This will come with a number of improvements like (in rough order):
+
+1. toy-examples on Google Colab for an easy introduction of available functionality
+2. clean production scripts with proper argument parsing for easy repoduction of core results
+3. documentation
+4. benchmarks and tests
+5. ...

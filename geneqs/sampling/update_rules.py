@@ -11,7 +11,6 @@ from netket.utils.types import PyTree, PRNGKeyT
 from netket.sampler import MetropolisRule
 
 
-# %%
 @struct.dataclass
 class WeightedRule(MetropolisRule):
     """A Metropolis sampling rule that can be used to combine different rules acting
