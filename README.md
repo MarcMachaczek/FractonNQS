@@ -2,7 +2,7 @@
 
 This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
 
-Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model subject to uniform magnetic fields. In particular, this package handles translational symmetries for qubits and correlators to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Custom operator and neural network implementations with GPU support allow for simulations up to 512 qubits ($L=8$) on the Checkerboard model on a single NVIDIA A100 or V100 GPU. Calculating the magnetization from the trained NQS for different magnetic fields, for instance, indicates a strong-first order phase transition.
+Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model subject to uniform magnetic fields. In particular, this package handles translational symmetries for qubits and correlators to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Custom operator and neural network implementations with GPU support allow for simulations of up to 512 qubits on the Checkerboard model using a single NVIDIA A100 or V100 GPU. Calculating the magnetization from the trained NQS for different magnetic fields, for instance, indicates a strong-first order phase transition.
 
 This code repository is still subject to change and represents only a preliminary version.
 
