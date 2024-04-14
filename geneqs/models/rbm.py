@@ -9,6 +9,252 @@ from typing import Union, Any, Callable, Sequence
 
 default_kernel_init = jax.nn.initializers.normal(stddev=0.01)
 
+class CheckerLoopCRBM_2(nn.Module):
+    """
+    Difference to regular CorrelationRBM: extra hidden units exclusively connected to the loop correlators.
+    """
+    # permutations of lattice sites corresponding to symmetries
+    symmetries: HashableArray
+    # correlators that serve as additional input for the cRBM
+    correlators: Sequence[HashableArray]
+    # permutations of correlators corresponding to symmetries
+    correlator_symmetries: Sequence[HashableArray]
+    # loops that serve as additional input for the cRBM, extra hidden units are connected to just them
+    loops: Sequence[HashableArray]
+    # permutations of loop correlators corresponding to symmetries
+    loop_symmetries: Sequence[HashableArray]
+    # The dtype of the weights
+    param_dtype: Any = jnp.float64
+    # The nonlinear activation function
+    activation: Any = nknn.log_cosh
+    # feature density. Number of features equal to alpha * n_sites / n_symm
+    alpha: Union[float, int] = 1
+    # Numerical precision of the computation see :class:`jax.lax.Precision` for details
+    precision: Any = "highest"
+
+    # Initializer for the Dense layer matrix
+    kernel_init: Callable = default_kernel_init
+    # Initializer for the biases
+    bias_init: Callable = default_kernel_init
+
+    def setup(self):
+        self.n_symm, self.n_sites = self.symmetries.__array__().shape
+        self.features = int(self.alpha * self.n_sites / self.n_symm)
+        if self.alpha > 0 and self.features == 0:
+            raise ValueError(
+                f"alpha={self.alpha} is too small "
+                f"for {self.n_symm} permutations, alpha ≥ {self.n_symm / self.n_sites} is needed.")
+
+    @nn.compact
+    def __call__(self, x):
+        n_batch = x.shape[0]
+        # initialize bias and kernel for the "single spin correlators" analogous to GCNN
+        hidden_bias = self.param("hidden_bias", self.bias_init, (self.features,), self.param_dtype)
+        symm_kernel = self.param("symm_kernel", self.kernel_init, (self.features, self.n_sites), self.param_dtype)
+
+        # take care of possibly different dtypes (e.g. x is float while parameters are complex)
+        x, hidden_bias, symm_kernel = promote_dtype(x, hidden_bias, symm_kernel, dtype=None)
+
+        # convert kernel to dense kernel of shape (features, n_symmetries, n_sites)
+        symm_kernel = jnp.take(symm_kernel, self.symmetries.wrapped, axis=1)
+
+        # x has shape (batch, n_sites), kernel has shape (features, n_symmetries, n_sites)
+        # theta has shape (batch, features, n_symmetries)
+        theta = jax.lax.dot_general(x, symm_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+        theta += jnp.expand_dims(hidden_bias, 1)
+
+        visible_bias = self.param("visible_bias", self.bias_init, (1,), self.param_dtype)
+        bias = visible_bias * jnp.sum(x, axis=(1,))
+
+        for i, (correlator, corr_symmetry) in enumerate(zip(self.correlators, self.correlator_symmetries)):
+            # initialize "visible" bias and kernel matrix for correlator
+            correlator = correlator.wrapped  # convert hashable array to (usable) jax.Array
+            corr_bias = self.param(f"corr{i}_bias", self.bias_init, (1,), self.param_dtype)
+            corr_kernel = self.param(f"corr{i}_kernel", self.kernel_init, (self.features, len(correlator)),
+                                     self.param_dtype)
+
+            # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
+            corr_kernel = jnp.take(corr_kernel, corr_symmetry.wrapped, axis=1)
+
+            # correlator has shape (n_corrs, degree), e.g. n_corrs=L⁴/2 and degree=8 for cubes
+            corr_values = jnp.take(x, correlator, axis=1).prod(axis=2)  # shape (batch, n_corrs)
+            # jax.debug.print("corr{0}_values: {1}", i, corr_values)
+
+            # corr_values has shape (batch, n_corrs)
+            # kernel has shape (features, n_correlator_symmetries, n_corrs)
+            # theta has shape (batch, features, n_symmetries)
+            theta += jax.lax.dot_general(corr_values, corr_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+            # jax.debug.print("theta{0}_values: {1}", i, theta)
+            bias += corr_bias * jnp.sum(corr_values, axis=(1,))
+
+        # add loop features corresponding to hidden units only connected to loops
+        loop_out = 0
+        for i, (loop_corr, loop_symmetry) in enumerate(zip(self.loops, self.loop_symmetries)):
+            # initialize "visible" bias and kernel matrix for loop correlator
+            loop_corr = loop_corr.wrapped  # convert hashable array to (usable) jax.Array
+            loop_hidden_bias = self.param(f"loop{i}_hidden_bias", self.bias_init, (1,), self.param_dtype)
+            loop_visible_bias = self.param(f"loop{i}_visible_bias", self.bias_init, (1,), self.param_dtype)
+            loop_kernel = self.param(f"loop{i}_kernel", self.kernel_init, (self.features, len(loop_corr)),
+                                     self.param_dtype)
+            loop_kernel_extra = self.param(f"loop{i}_kernel_extra", self.kernel_init, (1, len(loop_corr)),
+                                           self.param_dtype)
+
+            # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
+            loop_kernel = jnp.take(loop_kernel, loop_symmetry.wrapped, axis=1)
+            # convert kernel_extra to dense kernel_extra of shape (1, n_correlator_symmetries, n_corrs)
+            loop_kernel_extra = jnp.take(loop_kernel_extra, loop_symmetry.wrapped, axis=1)
+
+            # loop_corr has shape (n_corrs, degree)
+            loop_values = jnp.take(x, loop_corr, axis=1).prod(axis=2)  # shape (batch, n_corrs)
+
+            # loop_values has shape (batch, n_corrs)
+            # kernel has shape (features, n_loop_symmetries, n_corrs)
+            # loop_theta has shape (batch, features, n_symmetries)
+            loop_theta = jax.lax.dot_general(loop_values, loop_kernel, (((1,), (2,)), ((), ())),
+                                             precision=self.precision)
+            
+            # loop_values has shape (batch, n_corrs)
+            # kernel_extra has shape (1, n_loop_symmetries, n_corrs)
+            # loop_theta_extra has shape (batch, 1, n_symmetries)
+            loop_theta_extra = jax.lax.dot_general(loop_values, loop_kernel_extra, (((1,), (2,)), ((), ())),
+                                                   precision=self.precision)
+
+            # add loop features to original rbm input
+            theta += loop_theta
+            bias += loop_visible_bias * jnp.sum(loop_values, axis=(1,))
+
+            # now for the extra factors
+            loop_theta_extra += jnp.expand_dims(loop_hidden_bias, 1)
+            loop_out += jnp.sum(self.activation(loop_theta_extra), axis=(1, 2))
+
+        out = self.activation(theta)
+        out = jnp.sum(out, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
+        out += loop_out + bias
+        return out
+
+# %%
+class ToricLoopCRBM_2(nn.Module):
+    """
+    Difference to regular CorrelationRBM: Two separate bias terms for single spins according to the two sublattices
+    of the Toric Code model; extra hidden units exclusively connected to the loop correlators.
+    """
+    # permutations of lattice sites corresponding to symmetries
+    symmetries: HashableArray
+    # correlators that serve as additional input for the cRBM
+    correlators: Sequence[HashableArray]
+    # permutations of correlators corresponding to symmetries
+    correlator_symmetries: Sequence[HashableArray]
+    # loops that serve as additional input for the cRBM, extra hidden units are connected to just them
+    loops: Sequence[HashableArray]
+    # permutations of loop correlators corresponding to symmetries
+    loop_symmetries: Sequence[HashableArray]
+    # The dtype of the weights
+    param_dtype: Any = jnp.float64
+    # The nonlinear activation function
+    activation: Any = nknn.log_cosh
+    # feature density. Number of features equal to alpha * n_sites / n_symm
+    alpha: Union[float, int] = 1
+    # Numerical precision of the computation see :class:`jax.lax.Precision` for details
+    precision: Any = "highest"
+
+    # Initializer for the Dense layer matrix
+    kernel_init: Callable = default_kernel_init
+    # Initializer for the biases
+    bias_init: Callable = default_kernel_init
+
+    def setup(self):
+        self.n_symm, self.n_sites = self.symmetries.__array__().shape
+        self.features = int(self.alpha * self.n_sites / self.n_symm)
+        if self.alpha > 0 and self.features == 0:
+            raise ValueError(
+                f"alpha={self.alpha} is too small "
+                f"for {self.n_symm} permutations, alpha ≥ {self.n_symm / self.n_sites} is needed.")
+
+    @nn.compact
+    def __call__(self, x):
+        n_batch = x.shape[0]
+        # initialize bias and kernel for the "single spin correlators" analogous to GCNN
+        hidden_bias = self.param("hidden_bias", self.bias_init, (self.features,), self.param_dtype)
+        symm_kernel = self.param("symm_kernel", self.kernel_init, (self.features, self.n_sites), self.param_dtype)
+
+        # take care of possibly different dtypes (e.g. x is float while parameters are complex)
+        x, hidden_bias, symm_kernel = promote_dtype(x, hidden_bias, symm_kernel, dtype=None)
+
+        # convert kernel to dense kernel of shape (features, n_symmetries, n_sites)
+        symm_kernel = jnp.take(symm_kernel, self.symmetries.wrapped, axis=1)
+
+        # x has shape (batch, n_sites), kernel has shape (features, n_symmetries, n_sites)
+        # theta has shape (batch, features, n_symmetries)
+        theta = jax.lax.dot_general(x, symm_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+        theta += jnp.expand_dims(hidden_bias, 1)
+
+        # here, use two visible biases according to the two spins in one unit cell
+        visible_bias = self.param("visible_bias", self.bias_init, (2,), self.param_dtype)
+        bias = jnp.sum(x.reshape(n_batch, -1, 2), axis=(1,)) @ visible_bias
+
+        for i, (correlator, corr_symmetry) in enumerate(zip(self.correlators, self.correlator_symmetries)):
+            # initialize "visible" bias and kernel matrix for correlator
+            correlator = correlator.wrapped  # convert hashable array to (usable) jax.Array
+            corr_bias = self.param(f"corr{i}_bias", self.bias_init, (1,), self.param_dtype)
+            corr_kernel = self.param(f"corr{i}_kernel", self.kernel_init, (self.features, len(correlator)),
+                                     self.param_dtype)
+
+            # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
+            corr_kernel = jnp.take(corr_kernel, corr_symmetry.wrapped, axis=1)
+
+            # correlator has shape (n_corrs, degree), e.g. n_corrs=L²=n_site/2 and degree=4 for plaquettes
+            corr_values = jnp.take(x, correlator, axis=1).prod(axis=2)  # shape (batch, n_corrs)
+
+            # corr_values has shape (batch, n_corrs)
+            # kernel has shape (features, n_correlator_symmetries, n_corrs)
+            # theta has shape (batch, features, n_symmetries)
+            theta += jax.lax.dot_general(corr_values, corr_kernel, (((1,), (2,)), ((), ())), precision=self.precision)
+            bias += corr_bias * jnp.sum(corr_values, axis=(1,))
+
+        # add loop features corresponding to hidden units only connected to loops
+        loop_out = 0
+        for i, (loop_corr, loop_symmetry) in enumerate(zip(self.loops, self.loop_symmetries)):
+            # initialize "visible" bias and kernel matrix for loop correlator
+            loop_corr = loop_corr.wrapped  # convert hashable array to (usable) jax.Array
+            loop_hidden_bias = self.param(f"loop{i}_hidden_bias", self.bias_init, (1,), self.param_dtype)
+            loop_visible_bias = self.param(f"loop{i}_visible_bias", self.bias_init, (1,), self.param_dtype)
+            loop_kernel = self.param(f"loop{i}_kernel", self.kernel_init, (self.features, len(loop_corr)),
+                                     self.param_dtype)
+            loop_kernel_extra = self.param(f"loop{i}_kernel_extra", self.kernel_init, (1, len(loop_corr)),
+                                           self.param_dtype)
+
+            # convert kernel to dense kernel of shape (features, n_correlator_symmetries, n_corrs)
+            loop_kernel = jnp.take(loop_kernel, loop_symmetry.wrapped, axis=1)
+            # convert kernel_extra to dense kernel_extra of shape (1, n_correlator_symmetries, n_corrs)
+            loop_kernel_extra = jnp.take(loop_kernel_extra, loop_symmetry.wrapped, axis=1)
+
+            # loop_corr has shape (n_corrs, degree)
+            loop_values = jnp.take(x, loop_corr, axis=1).prod(axis=2)  # shape (batch, n_corrs)
+
+            # loop_values has shape (batch, n_corrs)
+            # kernel has shape (features, n_loop_symmetries, n_corrs)
+            # loop_theta has shape (batch, features, n_symmetries)
+            loop_theta = jax.lax.dot_general(loop_values, loop_kernel, (((1,), (2,)), ((), ())),
+                                             precision=self.precision)
+            
+            # loop_values has shape (batch, n_corrs)
+            # kernel_extra has shape (1, n_loop_symmetries, n_corrs)
+            # loop_theta_extra has shape (batch, 1, n_symmetries)
+            loop_theta_extra = jax.lax.dot_general(loop_values, loop_kernel_extra, (((1,), (2,)), ((), ())),
+                                                   precision=self.precision)
+
+            # add loop features to original rbm input
+            theta += loop_theta
+            bias += loop_visible_bias * jnp.sum(loop_values, axis=(1,))
+
+            # now for the extra factors
+            loop_theta_extra += jnp.expand_dims(loop_hidden_bias, 1)
+            loop_out += jnp.sum(self.activation(loop_theta_extra), axis=(1, 2))
+
+        out = self.activation(theta)
+        out = jnp.sum(out, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
+        out += loop_out + bias
+        return out
 
 # %%
 class CheckerLoopCRBM(nn.Module):
@@ -123,8 +369,7 @@ class CheckerLoopCRBM(nn.Module):
         out = jnp.sum(out, axis=(1, 2))  # sum over all symmetries and features = alpha * n_sites / n_symmetries
         out += loop_out + bias
         return out
-
-
+    
 # %%
 class ToricLoopCRBM(nn.Module):
     """

@@ -3,7 +3,7 @@ from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 n_ranks = comm.Get_size()
-rank = MPI.COMM_WORLD.Get_rank()
+rank = comm.Get_rank()  # MPI.COMM_WORLD.Get_rank()
 # supress warning about no cuda mpi version
 # we don't need that because jax handles that, we only want to run copies of a process with some communication
 os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"
@@ -41,33 +41,26 @@ matplotlib.rcParams.update({'font.size': 12})
 # %% training configuration
 save_results = True
 save_stats = True  # whether to save stats logged during training to drive
-save_path = f"{RESULTS_PATH}/checkerboard"
+save_path = f"{RESULTS_PATH}/checkerboard/L=4_final/L=4_hx_right_left_repeat"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "left_right"  # viable options: "independent", "left_right", "right_left"
-checkpoint = None # f"{RESULTS_PATH}/checkerboard/vqs_CheckerCRBM_L[6 6 6]_h(0.33, 0.0, 0.0).mpack"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
+checkpoint = None  # f"{RESULTS_PATH}/checkerboard/L=4_final/L=4_hx_right_left_repeat/vqs_CheckerCRBM_2_L[4 4 4]_h(0.36, 0.0, 0.0).mpack"
 # options are either None or the path to an .mpack file containing a VQSs
 
 random_key = jax.random.PRNGKey(421456433459)  # so far only used for weightinit
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
-# direction = np.array([0., 1.0, 0]).reshape(-1, 1)
-# field_strengths = (np.linspace(0, 1, 11) * direction).T
-# field_strengths = np.vstack((field_strengths, np.array([[0., 0.55, 0.],
-#                                                         [0., 0.65, 0.],
-#                                                         [0., 0.67, 0.],
-#                                                         [0., 0.72, 0.],
-#                                                         [0., 0.74, 0.],
-#                                                         [0., 0.76, 0.],
-#                                                         [0., 0.78, 0.],
-#                                                         [0., 0.82, 0.],
-#                                                         [0., 0.84, 0.],
-#                                                         [0., 0.86, 0.]])))
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.80],
                             [0., 0., 0.70],
                             [0., 0., 0.60],
+                            [0., 0., 0.55],
+                            [0., 0., 0.52],
                             [0., 0., 0.50],
+                            [0., 0., 0.48],
+                            [0., 0., 0.47],
+                            [0., 0., 0.46],
                             [0., 0., 0.45],
                             [0., 0., 0.44],
                             [0., 0., 0.43],
@@ -83,14 +76,23 @@ field_strengths = np.array([[0., 0., 0.90],
                             [0., 0., 0.33],
                             [0., 0., 0.30],
                             [0., 0., 0.20],
-                            [0., 0., 0.10]])
+                            [0., 0., 0.10],
+                            [0., 0., 0.00]])
 
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+field_strengths = np.array([[0., 0., 0.35],
+                            [0., 0., 0.34],
+                            [0., 0., 0.33],
+                            [0., 0., 0.30],
+                            [0., 0., 0.20],
+                            [0., 0., 0.10],
+                            [0., 0., 0.00]])
+
+field_strengths[:, [direction_index, 2]] = field_strengths[:, [2, direction_index]]
 
 save_fields = field_strengths  # field values for which vqs is serialized
 
 # %% operators on hilbert space
-L = 6  # this translates to L+1 without PBC
+L = 4  # this translates to L+1 without PBC
 shape = jnp.array([L, L, L])
 cube_graph = nk.graph.Hypercube(length=L, n_dim=3, pbc=True)
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
@@ -107,20 +109,20 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters and model
-n_iter = 1500 # 1500  # 1500 for L=8
-min_iter = 1500  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
-n_chains = 4 * 256 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_iter = 1200 # 1500  # 1500 for L=8
+min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
+n_chains = 4 * 256  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 
-n_samples = int(16 * n_chains / n_ranks)  # usually 16k samples
+n_samples = int(16 * n_chains)  # usually 16k samples
 n_discard_per_chain = 24  # should be small for using many chains, default is 10% of n_samples, we usually use 24
-chunk_size = int(n_samples / n_ranks / 2)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
-n_expect = n_ranks * chunk_size * 10   # number of samples to estimate observables, must be dividable by chunk_size
+chunk_size = n_samples  # int(n_samples / n_ranks / 2)  # chunksize for each rank; for L=6: int(n_samples / n_ranks / 2)
+n_expect = 4 * chunk_size  # number of samples to estimate observables, must be dividable by chunk_size
 
 # n_bins = 20  # number of bins for calculating histograms
 
 diag_shift_init = 1e-4
 diag_shift_end = 1e-5
-diag_shift_begin = int(n_iter * 3 / 5)
+diag_shift_begin = int(n_iter * 2 / 5)
 diag_shift_steps = int(n_iter * 1 / 5)
 diag_shift_schedule = optax.linear_schedule(diag_shift_init, diag_shift_end, diag_shift_steps, diag_shift_begin)
 
@@ -132,7 +134,7 @@ preconditioner = nk.optimizer.SR(nk.optimizer.qgt.QGTJacobianDense,
 # learning rate scheduling
 lr_init = 0.003
 lr_end = 0.001
-transition_begin = int(n_iter * 2 / 5)
+transition_begin = int(n_iter * 3 / 5)
 transition_steps = int(n_iter * 1 / 5)
 lr_schedule = optax.linear_schedule(lr_init, lr_end, transition_steps, transition_begin)
 
@@ -160,18 +162,18 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
                    HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
 
 alpha = 1 / 4
-cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=correlators,
-                                     correlator_symmetries=correlator_symmetries,
-                                     loops=loops,
-                                     loop_symmetries=loop_symmetries,
-                                     alpha=alpha,
-                                     kernel_init=default_kernel_init,
-                                     bias_init=default_kernel_init,
-                                     param_dtype=complex)
+cRBM = geneqs.models.CheckerLoopCRBM_2(symmetries=perms,
+                                       correlators=correlators,
+                                       correlator_symmetries=correlator_symmetries,
+                                       loops=loops,
+                                       loop_symmetries=loop_symmetries,
+                                       alpha=alpha,
+                                       kernel_init=default_kernel_init,
+                                       bias_init=default_kernel_init,
+                                       param_dtype=complex)
 
 model = cRBM
-eval_model = "CheckerCRBM"
+eval_model = "CheckerCRBM_2"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()
@@ -224,7 +226,19 @@ if checkpoint is not None:
                                     n_discard_per_chain=n_discard_per_chain)
     with open(checkpoint, 'rb') as file:
         checkpoint_vqs = flax.serialization.from_bytes(checkpoint_vqs, file.read())
+        rank_sigmas = checkpoint_vqs.sampler_state.σ.reshape(n_ranks, -1, checkpoint_vqs.sampler_state.σ.shape[-1])
+        rank_sampler_state = checkpoint_vqs.sampler_state.replace(σ=rank_sigmas[rank])
+        checkpoint_vqs.sampler_state = rank_sampler_state
+        checkpoint_vqs.n_chains_per_rank = checkpoint_vqs.sampler_state.σ.shape[0]
+    checkpoint_vqs.chunk_size = chunk_size
+    checkpoint_vqs.n_samples = n_samples
+    # print(checkpoint_vqs.n_samples,
+    #       checkpoint_vqs.n_samples_per_rank,
+    #       checkpoint_vqs.sampler.n_chains,
+    #       checkpoint_vqs.sampler.n_chains_per_rank,
+    #       checkpoint_vqs.sampler_state.σ.shape)
     print(f"checkpoint {checkpoint} loaded.")
+    
 last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
 last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
 

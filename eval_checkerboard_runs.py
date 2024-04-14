@@ -3,7 +3,7 @@ from mpi4py import MPI
 
 comm = MPI.COMM_WORLD
 n_ranks = comm.Get_size()
-rank = MPI.COMM_WORLD.Get_rank()
+rank = comm.Get_rank()
 # supress warning about no cuda mpi version
 # we don't need that because jax handles that, we only want to run copies of a process with some communication
 os.environ["MPI4JAX_USE_CUDA_MPI"] = "0"
@@ -34,42 +34,42 @@ from global_variables import RESULTS_PATH
 
 cmap = matplotlib.colormaps["Set1"]
 f_dict = {0: "x", 1: "y", 2: "z"}
-L = 8
-label = "hx_independent"
+L = 4
+label = "hz_left_right_chaintransfer_nonoise_dense_lowlr"
 save_dir = f"{RESULTS_PATH}/checkerboard/L={L}_final/L={L}_mc_crbm_{label}"
 
 # %%
-shape = jnp.array([8, 8, 8])
+shape = jnp.array([L, L, L])
 hilbert = nk.hilbert.Spin(s=1 / 2, N=jnp.prod(shape).item())
-eval_model = "CheckerCRBM"
+eval_model = "CheckerCRBM_2"
 # get fields
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 2  # 0 for x, 1 for y, 2 for z;
 obs = pd.read_csv(f"{save_dir}/L{shape}_{eval_model}_observables.txt", sep=" ", header=0)
 field_strengths = obs.iloc[:, :3].values
 
-field_strengths = np.array([[0., 0., 0.90],
-                            [0., 0., 0.80],
-                            [0., 0., 0.70],
-                            [0., 0., 0.60],
-                            [0., 0., 0.50],
-                            [0., 0., 0.45],
-                            [0., 0., 0.44],
-                            [0., 0., 0.43],
-                            [0., 0., 0.42],
-                            [0., 0., 0.41],
-                            [0., 0., 0.40],
-                            [0., 0., 0.39],
-                            [0., 0., 0.38],
-                            [0., 0., 0.37],
-                            [0., 0., 0.36],
-                            [0., 0., 0.35],
-                            [0., 0., 0.34],
-                            [0., 0., 0.33],
-                            [0., 0., 0.30],
-                            [0., 0., 0.20],
-                            [0., 0., 0.10],
-                            [0., 0., 0.00]])
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+# field_strengths = np.array([[0., 0., 0.90],
+#                             [0., 0., 0.80],
+#                             [0., 0., 0.70],
+#                             [0., 0., 0.60],
+#                             [0., 0., 0.50],
+#                             [0., 0., 0.45],
+#                             [0., 0., 0.44],
+#                             [0., 0., 0.43],
+#                             [0., 0., 0.42],
+#                             [0., 0., 0.41],
+#                             [0., 0., 0.40],
+#                             [0., 0., 0.39],
+#                             [0., 0., 0.38],
+#                             [0., 0., 0.37],
+#                             [0., 0., 0.36],
+#                             [0., 0., 0.35],
+#                             [0., 0., 0.34],
+#                             [0., 0., 0.33],
+#                             [0., 0., 0.30],
+#                             [0., 0., 0.20],
+#                             [0., 0., 0.10],
+#                             [0., 0., 0.00]])
+# field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 
 # hist_fields = np.array([[0.20, 0, 0],
 #                         [0.40, 0, 0],
@@ -78,9 +78,9 @@ field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
 #                         [0.50, 0, 0],
 #                         [0.70, 0, 0]])
 
-n_chains = 256 * 1 * n_ranks  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
+n_chains = 256 * 4  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 chunk_size = 1024
-n_samples = chunk_size * 24 * 3
+n_samples = chunk_size * 16 * 24
 n_discard_per_chain = 0
 n_bins = 20
 
@@ -128,15 +128,15 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
 
 alpha = 1 / 4
 default_kernel_init = jax.nn.initializers.normal(0.01)
-cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=correlators,
-                                     correlator_symmetries=correlator_symmetries,
-                                     loops=loops,
-                                     loop_symmetries=loop_symmetries,
-                                     alpha=alpha,
-                                     kernel_init=default_kernel_init,
-                                     bias_init=default_kernel_init,
-                                     param_dtype=complex)
+cRBM = geneqs.models.CheckerLoopCRBM_2(symmetries=perms,
+                                       correlators=correlators,
+                                       correlator_symmetries=correlator_symmetries,
+                                       loops=loops,
+                                       loop_symmetries=loop_symmetries,
+                                       alpha=alpha,
+                                       kernel_init=default_kernel_init,
+                                       bias_init=default_kernel_init,
+                                       param_dtype=complex)
 model = cRBM
 
 # create custom update rule

@@ -36,5 +36,6 @@ def time_function(func: Callable, n_runs: int = 10, *args, **kwargs):
     t0 = time.perf_counter_ns()
     for _ in tqdm(range(n_runs)):
         result = func(*args, **kwargs)
+        del result
 
-    return result, round((time.perf_counter_ns() - t0) / n_runs, 4)
+    return round((time.perf_counter_ns() - t0) / n_runs, 4)

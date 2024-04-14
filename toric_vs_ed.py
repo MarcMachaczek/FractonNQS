@@ -22,15 +22,15 @@ matplotlib.rcParams.update({'font.size': 12})
 # %% training configuration
 save_results = True
 save_stats = True  # whether to save stats logged during training to drive
-save_path = f"{RESULTS_PATH}/toric2d_h"
+save_path = f"{RESULTS_PATH}/toric2d_h/L=3_final_2/L=3_vsed_full_hy_right_left_nonoise"
 pre_init = False  # True only has effect when swipe=="independent"
-swipe = "independent"  # viable options: "independent", "left_right", "right_left"
+swipe = "right_left"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(14954567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 0  # 0 for x, 1 for y, 2 for z;
+direction_index = 1  # 0 for x, 1 for y, 2 for z;
 # define fields for which to trian the NQS and get observables
 direction = np.array([0.9, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
@@ -38,7 +38,7 @@ field_strengths = (np.linspace(0, 1, 10) * direction).T
 field_strengths = np.vstack((field_strengths, np.array([[0.32, 0., 0.],
                                                         [0.35, 0., 0.]])))
 
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+field_strengths[:, [0, 1]] = field_strengths[:, [1, 0]]
 
 save_fields = field_strengths  # field values for which vqs is serialized
 
@@ -119,15 +119,15 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms(shape))
                    HashableArray(geneqs.utils.indexing.get_ystring_perms(shape)))
 
 alpha = 1
-cRBM = geneqs.models.ToricLoopCRBM(symmetries=link_perms,
-                                   correlators=correlators,
-                                   correlator_symmetries=correlator_symmetries,
-                                   loops=loops,
-                                   loop_symmetries=loop_symmetries,
-                                   alpha=alpha,
-                                   kernel_init=default_kernel_init,
-                                   bias_init=default_kernel_init,
-                                   param_dtype=complex)
+cRBM = geneqs.models.ToricLoopCRBM_2(symmetries=link_perms,
+                                     correlators=correlators,
+                                     correlator_symmetries=correlator_symmetries,
+                                     loops=loops,
+                                     loop_symmetries=loop_symmetries,
+                                     alpha=alpha,
+                                     kernel_init=default_kernel_init,
+                                     bias_init=default_kernel_init,
+                                     param_dtype=complex)
 
 RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             alpha=alpha,
@@ -137,7 +137,7 @@ RBMSymm = nk.models.RBMSymm(symmetries=link_perms,
                             param_dtype=complex)
 
 model = cRBM
-eval_model = "ToricCRBM"
+eval_model = "ToricCRBM_2"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()

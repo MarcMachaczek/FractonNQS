@@ -22,15 +22,15 @@ matplotlib.rcParams.update({'font.size': 12})
 # %% training configuration
 save_results = True
 save_stats = True  # whether to save stats logged during training to drive
-save_path = f"{RESULTS_PATH}/checkerboard"
-pre_init = False  # True only has effect when swip=="independent"
+save_path = f"{RESULTS_PATH}/checkerboard/vsed_final/vsed_full_hx_independent"
+pre_init = False  # True only has effect when swipe=="independent"
 swipe = "independent"  # viable options: "independent", "left_right", "right_left"
 # if pre_init==True and swipe!="independent", pre_init only applies to the first training run
 
 random_key = jax.random.PRNGKey(1234567)  # this can be used to make results deterministic, but so far is not used
 
 # define fields for which to trian the NQS and get observables
-direction_index = 2  # 0 for x, 1 for y, 2 for z;
+direction_index = 0  # 0 for x, 1 for y, 2 for z;
 direction = np.array([0.9, 0., 0.]).reshape(-1, 1)
 field_strengths = (np.linspace(0, 1, 10) * direction).T
 
@@ -39,7 +39,8 @@ field_strengths = np.vstack((field_strengths, np.array([[0.15, 0., 0.],
                                                         [0.35, 0., 0.],
                                                         [0.45, 0., 0.]])))
 
-field_strengths[:, [0, 2]] = field_strengths[:, [2, 0]]
+# field_strengths[:, [0, 1]] = field_strengths[:, [1, 0]]
+print(f"training for field strengths: {field_strengths}")
 
 save_fields = field_strengths  # field values for which vqs is serialized
 
@@ -59,7 +60,7 @@ elif direction_index == 2:
     magnetization = 1 / hilbert.size * sum([nk.operator.spin.sigmaz(hilbert, i) for i in range(hilbert.size)])
 
 # %%  setting hyper-parameters
-n_iter = 1300
+n_iter = 1200
 min_iter = n_iter  # after min_iter training can be stopped by callback (e.g. due to no improvement of gs energy)
 n_chains = 512  # total number of MCMC chains, when runnning on GPU choose ~O(1000)
 n_samples = n_chains * 40
@@ -109,15 +110,15 @@ loop_symmetries = (HashableArray(geneqs.utils.indexing.get_xstring_perms3d(shape
                    HashableArray(geneqs.utils.indexing.get_zstring_perms3d(shape, 2)))
 
 alpha = 1 / 4
-cRBM = geneqs.models.CheckerLoopCRBM(symmetries=perms,
-                                     correlators=correlators,
-                                     correlator_symmetries=correlator_symmetries,
-                                     loops=loops,
-                                     loop_symmetries=loop_symmetries,
-                                     alpha=alpha,
-                                     kernel_init=default_kernel_init,
-                                     bias_init=default_kernel_init,
-                                     param_dtype=complex)
+cRBM = geneqs.models.CheckerLoopCRBM_2(symmetries=perms,
+                                       correlators=correlators,
+                                       correlator_symmetries=correlator_symmetries,
+                                       loops=loops,
+                                       loop_symmetries=loop_symmetries,
+                                       alpha=alpha,
+                                       kernel_init=default_kernel_init,
+                                       bias_init=default_kernel_init,
+                                       param_dtype=complex)
 
 RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             alpha=alpha,
@@ -127,7 +128,7 @@ RBMSymm = nk.models.RBMSymm(symmetries=perms,
                             param_dtype=complex)
 
 model = cRBM
-eval_model = "CheckerCRBM"
+eval_model = "CheckerCRBM_2"
 
 # create custom update rule
 single_rule = nk.sampler.rules.LocalRule()

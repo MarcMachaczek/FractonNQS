@@ -1,5 +1,0 @@
-# define the benchmarking settings
-OPERATOR_BENCHMARK:
-  n_samples: 1024  # samples to calculate expected value
-  n_runs: 100  # number of runs to average performance
-  lattice_size: 6 # extend of the lattice (same in every direction), details depend on how the operator is defined

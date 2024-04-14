@@ -218,6 +218,17 @@ if checkpoint is not None:
                                     n_discard_per_chain=n_discard_per_chain)
     with open(checkpoint, 'rb') as file:
         checkpoint_vqs = flax.serialization.from_bytes(checkpoint_vqs, file.read())
+        rank_sigmas = checkpoint_vqs.sampler_state.σ.reshape(n_ranks, -1, checkpoint_vqs.sampler_state.σ.shape[-1])
+        rank_sampler_state = checkpoint_vqs.sampler_state.replace(σ=rank_sigmas[rank])
+        checkpoint_vqs.sampler_state = rank_sampler_state
+        checkpoint_vqs.n_chains_per_rank = checkpoint_vqs.sampler_state.σ.shape[0]
+    checkpoint_vqs.chunk_size = chunk_size
+    checkpoint_vqs.n_samples = n_samples
+    # print(checkpoint_vqs.n_samples,
+    #       checkpoint_vqs.n_samples_per_rank,
+    #       checkpoint_vqs.sampler.n_chains,
+    #       checkpoint_vqs.sampler.n_chains_per_rank,
+    #       checkpoint_vqs.sampler_state.σ.shape)
     print(f"checkpoint {checkpoint} loaded.")
 last_trained_params = None if checkpoint is None else checkpoint_vqs.parameters
 last_sampler_state = None if checkpoint is None else checkpoint_vqs.sampler_state
