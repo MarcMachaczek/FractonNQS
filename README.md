@@ -6,7 +6,7 @@ Based on JAX and NetKet3, it provides functionality for training NQS on the 3d C
 
 ## Setup
 
-A Python$\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to JAX constraints).
+A Python $\geq3.10$ installation is required. Further, a Linux based OS is strongly recommended (due to JAX constraints).
 After cloning the repository, a new virtual environment `venv` can be created with the command:
 
 ```
