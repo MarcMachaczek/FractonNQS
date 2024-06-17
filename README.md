@@ -1,10 +1,8 @@
 # Neural Network Quantum States (NQS) for Fracton Models
 
-This is the code repository for the Master project titled "Neural Network Quantum States for Fracton Models".
+This is the code repository for the  paper "Neural Quantum State Study of Fracton Models".
 
-Based on JAX and NetKet3, it provides functionality for training NQS on the 2d Toric Code and 3d Checkerboard fracton model subject to uniform magnetic fields. In particular, this package handles translational symmetries for qubits and correlators to implement a translation-invariant correlation-enhanced RBM for the Toric Code, as described in [Valenti et al.](https://arxiv.org/abs/2103.05017), and the Checkerboard model. Custom operator and neural network implementations with GPU support allow for simulations of up to 512 qubits on the Checkerboard model using a single NVIDIA A100 or V100 GPU. Calculating the energy and magnetization from the trained NQS for different magnetic fields, for instance, indicates a strong-first order phase transition.
-
-This code repository is still subject to change and represents only a preliminary version.
+Based on JAX and NetKet3, it provides functionality for training NQS on the 3d Checkerboard fracton model (and the 2d toric code) subject to uniform magnetic fields. In particular, this package handles translational symmetries for qubits and correlators to implement a translation-invariant correlation-enhanced RBM, as introduced in [Valenti et al.](https://arxiv.org/abs/2103.05017) for the toric code. Custom operator and neural network implementations with GPU support allow for simulations of up to 512 qubits on the Checkerboard model using a single NVIDIA A100 or V100 GPU. Calculating the energy and magnetization from the trained NQS for different magnetic fields, for instance, indicates a strong-first order phase transition.
 
 ## Setup
 
@@ -12,7 +10,7 @@ A Python$\geq3.10$ installation is required. Further, a Linux based OS is strong
 After cloning the repository, a new virtual environment `venv` can be created with the command:
 
 ```
-python -m venv <directory>
+python3 -m venv <directory>
 ```
 
 Anaconda is **not** recommened for this, as described in the [NetKet3 installation guide](https://netket.readthedocs.io/en/latest/docs/install.html). 
@@ -63,7 +61,7 @@ The core implementations are located within the `geneqs` directory. Therein, fou
 
 - `operators` contains all operator implementations for calculating connected (matrix) elements and some more functionality in a NetKet compatible syntax. This includes `checkerboard.py` and `toric_2d.py`.
 
-- `sampling` so far implements only the implementation of the weighted update rule for MCMC sampling in `update_rules.py`.
+- `sampling` so far only implements a weighted update rule for MCMC sampling in `update_rules.py`.
 
 - `utils` contains many different functionalities that are required for NQS training and implementing symmetries. Most notably, `indexing.py` contains all functionality for indexing qubit positions on the square / cubic lattices, constructing permutations corresponding to translations on the respective lattices for different correlator types etc. Moreover, `training.py` contains a custom training loop, enabling tracking of observables during optimization, a progress bar that shows the relative time requirement of different steps during NQS optimization and more.
 
@@ -83,7 +81,7 @@ To run an NQS optimization, simply use the command
 python <script_name>.py
 ```
 
-from within the activated `venv` environment. 
+after activating the `venv` environment. 
 For NQS training distributed over multiple hosts, run the command:
 
 ```
@@ -106,16 +104,5 @@ The important **settings for production scripts**, which can be set at the begin
 - `sweep` determines the transfer learning protocol. Viable options are `independent`, `left-right`, and `right-left`.
 - `field_strengths` is a two-dimensional array that contains all field configurations $(h_x, h_y, h_z)$. 
 - `direction_index` is either equal to $0=x$, $1=y$ or $2=z$, and determines along which field compenents the transfer learning order is fixed. For instance, `swipe`=`right-left` and `direction_index`=`1` sorts `field_strengths` in decreasing order of the $y$-field components and transfer learning is then applied starting from the first element of the ordered `field_strengths`.
-- `pre_init` determines whether the model is initialized in the exact ground state represenation of the pure system
 - `checkpoint` can point towards a serialized NQS (.mpack file) to load that parametrization and chains in order to continure transfer learning / optimization from with this state.
-
-
-## Project status
-
-So far, this project lacks many quality-of-life features that should be mandatory for an accessible and easy-to-use library, like simple toy-examples with proper argument parsing, a detailed documentation, tests and many more. In the future, we might bring the code to the PyPI, which will come with a number of improvements like (in rough order):
-
-1. toy-examples on Google Colab for an easy introduction of available functionality
-2. clean production scripts with proper argument parsing
-3. documentation
-4. benchmarks and tests
-5. ...
+- `pre_init` determines whether the model is initialized in the exact ground state represenation of the pure system.
